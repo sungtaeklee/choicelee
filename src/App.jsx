@@ -324,21 +324,96 @@ const GroupBadge = ({ v }) => <span className={GROUP_CLS[v]}>{v}</span>
 const Tag = ({ children }) => <span className="ctag">{children}</span>
 const ChannelChip = ({ channel }) => <span className="chchip"><ChannelIcon channel={channel} /> {channel}</span>
 
-function Sidebar({ screen, setScreen, account, onLogout }) {
-  const items = [['dashboard', 'Dashboard'], ['architecture', 'Architecture & Impact'], ['inbox', 'VOC Inbox'], ['board', 'Classification Board'], ['detail', 'Case Detail & Action'], ['insight', 'Insight Report'], ['prompts', 'Copilot Prompt Templates']]
+/* ---------- 셸: 아이콘 레일 · 서브 LNB · 탑바 · Agent 패널 ---------- */
+const RAIL_ICONS = {
+  home: 'M3 11l9-8 9 8M5 10v10h14V10', grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  mail: 'M3 6h18v12H3zM3.5 7l8.5 6 8.5-6', cal: 'M4 5h16v15H4zM4 9h16M8 3v4M16 3v4',
+  org: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 20c0-4 4-6 8-6s8 2 8 6', pay: 'M3 7h6l2 2h10v10H3z',
+  chat: 'M4 5h16v11H9l-4 4v-4H4z', bell: 'M6 16V11a6 6 0 1112 0v5l2 2H4zM10 21h4',
+}
+const RailIcon = ({ d }) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+function IconRail({ account, onLogout, notify }) {
+  const items = [['home', '홈'], ['grid', '전체메뉴'], ['mail', '메일'], ['cal', '일정'], ['org', '조직도'], ['pay', '결재']]
   return (
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">U+</span><span className="brand-name">VOC Action<br /><b>Copilot</b></span></div>
-      <nav className="nav">{items.map(([k, l]) => <button key={k} className={'nav-item' + (screen === k ? ' active' : '')} onClick={() => setScreen(k)}>{l}</button>)}</nav>
-      <div className="side-foot">
-        {account && <div className="side-acct"><span className="side-acct-email" title={account}>{account}</span><button className="side-logout" onClick={onLogout}>로그아웃</button></div>}
-        공모전 MVP · 사내 전용<br />Copilot 분류 · 사람 검수 후 처리
+    <nav className="rail">
+      <div className="rail-top">
+        {items.map(([k, l]) => <button key={k} className="rail-ic" title={`${l} · 데모 미구현`} onClick={() => notify.toast('이 데모에서는 Agent 화면만 동작합니다')}><RailIcon d={RAIL_ICONS[k]} /><span>{l}</span></button>)}
+        <button className="rail-ic on" title="Agent"><RailIcon d={RAIL_ICONS.chat} /><span>Agent</span></button>
       </div>
+      <div className="rail-bot">
+        <div className="rail-ai">AI</div>
+        <button className="rail-ic" title="알림 · 데모" onClick={() => notify.toast('알림 (데모)')}><RailIcon d={RAIL_ICONS.bell} /></button>
+        <button className="rail-avatar" title={`${account} · 클릭하면 로그아웃`} onClick={onLogout}>{(account || 'U')[0].toUpperCase()}</button>
+      </div>
+    </nav>
+  )
+}
+function SubLNB({ screen, setScreen }) {
+  const items = [['dashboard', 'Dashboard'], ['inbox', 'VOC Inbox'], ['board', 'Classification Board'], ['detail', 'Case Detail & Action'], ['insight', 'Insight Report'], ['architecture', 'Architecture & Impact'], ['prompts', 'Copilot Prompt Templates']]
+  return (
+    <aside className="sublnb">
+      <div className="slnb-brand"><span className="brand-mark">U+</span><span className="slnb-title">VOC Action <b>Copilot</b></span></div>
+      <div className="slnb-sec-l">메뉴</div>
+      <nav className="slnb-nav">{items.map(([k, l]) => <button key={k} className={'slnb-item' + (screen === k ? ' on' : '')} onClick={() => setScreen(k)}>{l}</button>)}</nav>
+      <div className="slnb-sec-l">고정</div>
+      <div className="slnb-pin">VOC 표준분류 22종<br />4그룹 게이트 분류 체계</div>
+      <div className="slnb-foot">공모전 MVP · 사내 전용<br />Copilot 분류 · 사람 검수 후 처리</div>
     </aside>
   )
 }
-function Header({ title, sub }) {
-  return <header className="topbar"><div><div className="topbar-title">{title}</div>{sub && <div className="topbar-sub">{sub}</div>}</div><div className="topbar-right"><span className="ai-pill">● Copilot AI 연결됨 (데모)</span></div></header>
+function Topbar({ title, onTogglePanel, panelOpen }) {
+  return (
+    <header className="topbar">
+      <div className="crumb">U+ Agent<span className="crumb-sep">›</span>VOC Action Copilot<span className="crumb-sep">›</span><b>{title}</b></div>
+      <div className="topbar-right">
+        <span className="ai-pill">● Copilot 연결됨 (데모)</span>
+        <button className="panel-tgl" onClick={onTogglePanel} title={panelOpen ? 'Agent 패널 접기' : 'Agent 패널 펼치기'}>{panelOpen ? '›' : '‹'}</button>
+      </div>
+    </header>
+  )
+}
+function AgentPanel({ screen, caseId, added, notify, onClose }) {
+  const data = added || []
+  const c = data.find((v) => v.id === caseId) || (screen === 'detail' ? data[0] : null)
+  const today = new Date().toISOString().slice(0, 10)
+  const send = (el) => { const v = (el.value || '').trim(); if (!v) return; notify.toast('Copilot에 전달했습니다 — 사내 연동 시 뷰어에 반영됩니다 (데모)'); el.value = '' }
+  return (
+    <aside className="agent-panel">
+      <div className="ap-head"><span className="ap-date">{today} · VOC Copilot</span><button className="ap-x" onClick={onClose} title="패널 접기">›</button></div>
+      <div className="ap-body">
+        {c ? (
+          <>
+            <div className="ap-card">
+              <div className="ap-card-h"><b>{c.id}</b> · {c.channel}{c.week ? ` · ${c.week}` : ''}</div>
+              <div className="ap-line"><GroupBadge v={c.group} /> <Tag>{c.cat}</Tag></div>
+              <div className="ap-mut">{c.summary}</div>
+              <div className="ap-mut">대응영역 {[c.area1, c.area2].filter(Boolean).join(' › ') || '-'} · 심각도 {c.severity} · 개발 {c.devNeeded}</div>
+            </div>
+            <div className="ap-sec">제안 액션 · 담당자 검수 후 실행</div>
+            {c.sms && <button className="ap-act" onClick={() => notify.modal('고객 안내 문자 (초안)', c.sms)}>✉ 고객 안내 문자 보내기</button>}
+            {c.mail && <button className="ap-act" onClick={() => notify.modal(`담당(${c.org}) 메일 (초안)`, `${c.mail.subject}\n\n${c.mail.body}`)}>✉ 담당({c.org}) 메일 전달</button>}
+            <button className="ap-act" onClick={() => notify.toast('사내 시스템 연동 시 상태가 변경됩니다 (데모)')}>✓ 진행상황 ‘처리 완료’로 변경</button>
+            <div className="ap-sec">Copilot 분석</div>
+            <ul className="ap-anal">{(c.analysis || []).map((a, i) => <li key={i}>{a}</li>)}</ul>
+          </>
+        ) : (
+          <>
+            <div className="ap-greet">무엇을 도와드릴까요?</div>
+            <div className="ap-mut">VOC Inbox에서 입력·붙여넣은 케이스를 열면, 여기서 분류 결과와 제안 액션을 바로 확인하고 지시할 수 있어요.</div>
+            <div className="ap-chips">
+              <button onClick={() => notify.toast('VOC Inbox에서 데이터를 입력/붙여넣으세요')}>처리 필요 보기</button>
+              <button onClick={() => notify.toast('Insight Report에서 High 리스크를 확인하세요')}>High 리스크</button>
+              <button onClick={() => notify.toast('Dashboard에서 전체 집계를 확인하세요')}>오늘 요약</button>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="ap-input">
+        <input placeholder="고칠 내용을 말하면 반영해요" onKeyDown={(e) => { if (e.key === 'Enter') send(e.currentTarget) }} />
+        <button className="ap-send" title="전달" onClick={(e) => send(e.currentTarget.previousSibling)}>↑</button>
+      </div>
+    </aside>
+  )
 }
 const Toast = ({ msg, onClose }) => msg ? <div className="toast" onClick={onClose}>{msg}</div> : null
 const Modal = ({ open, title, body, onClose }) => !open ? null : (
@@ -775,6 +850,7 @@ export default function App() {
   const [caseId, setCaseId] = useState('VOC-1001')
   const [toast, setToast] = useState('')
   const [modal, setModal] = useState({ open: false, title: '', body: '' })
+  const [panelOpen, setPanelOpen] = useState(true)
   const [added, setAdded] = useState(loadAdded) // 입력/붙여넣은 VOC — localStorage에 저장되어 재접속 시 복원됨
   useEffect(() => {
     const ok = saveAdded(added)
@@ -784,14 +860,15 @@ export default function App() {
     toast: (m) => { setToast(m); window.clearTimeout(window.__t); window.__t = window.setTimeout(() => setToast(''), 2200) },
     modal: (title, body) => setModal({ open: true, title, body }),
   }), [])
-  const openCase = (id) => { setCaseId(id); setScreen('detail') }
-  const [t, sub] = TITLES[screen]
+  const openCase = (id) => { setCaseId(id); setScreen('detail'); setPanelOpen(true) }
+  const [t] = TITLES[screen]
   if (!authEmail) return <Login onAuthed={setAuthEmail} />
   return (
     <div className="app">
-      <Sidebar screen={screen} setScreen={setScreen} account={authEmail} onLogout={() => { setSession(''); setAuthEmail('') }} />
+      <IconRail account={authEmail} onLogout={() => { setSession(''); setAuthEmail('') }} notify={notify} />
+      <SubLNB screen={screen} setScreen={setScreen} />
       <div className="main">
-        <Header title={t} sub={sub} />
+        <Topbar title={t} onTogglePanel={() => setPanelOpen((o) => !o)} panelOpen={panelOpen} />
         <div className="content">
           {screen === 'dashboard' && <Dashboard go={setScreen} added={added} />}
           {screen === 'architecture' && <Architecture />}
@@ -802,6 +879,7 @@ export default function App() {
           {screen === 'prompts' && <PromptTemplates notify={notify} />}
         </div>
       </div>
+      {panelOpen && <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} onClose={() => setPanelOpen(false)} />}
       <Toast msg={toast} onClose={() => setToast('')} />
       <Modal open={modal.open} title={modal.title} body={modal.body} onClose={() => setModal({ open: false, title: '', body: '' })} />
     </div>
