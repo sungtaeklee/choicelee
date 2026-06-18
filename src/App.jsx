@@ -292,9 +292,9 @@ function setSession(email) { try { email ? localStorage.setItem(SESS_KEY, email)
 /* ---------- 메타/배지 ---------- */
 const SEVERITY = { High: 'sev sev-high', Medium: 'sev sev-med', Low: 'sev sev-low' }
 const SENTIMENT = { Negative: 'sent sent-neg', Neutral: 'sent sent-neu', Positive: 'sent sent-pos' }
-const STATUS = { '신규': 'stt stt-new', '분류 완료': 'stt stt-cls', '처리 필요': 'stt stt-todo', '처리 중': 'stt stt-doing', '완료': 'stt stt-done' }
+const STATUS = { '신규': 'stt stt-new', '분류 완료': 'stt stt-cls', '처리 필요': 'stt stt-todo', '처리 중': 'stt stt-doing', '처리 완료': 'stt stt-done' }
 const CONF = { '높음': 'conf conf-h', '보통': 'conf conf-m', '낮음': 'conf conf-l' }
-const KANBAN_COLS = ['신규', '분류 완료', '처리 필요', '처리 중', '완료']
+const KANBAN_COLS = ['신규', '분류 완료', '처리 필요', '처리 중', '처리 완료']
 
 function ChannelIcon({ channel, size = 16 }) {
   const c = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' }
@@ -372,44 +372,80 @@ function Topbar({ title, onTogglePanel, panelOpen }) {
     </header>
   )
 }
-function AgentPanel({ screen, caseId, added, notify, onClose }) {
+function AgentPanel({ screen, caseId, added, notify, onClose, updateCases }) {
   const data = added || []
-  const c = data.find((v) => v.id === caseId) || (screen === 'detail' ? data[0] : null)
   const today = new Date().toISOString().slice(0, 10)
-  const send = (el) => { const v = (el.value || '').trim(); if (!v) return; notify.toast('Copilot에 전달했습니다 — 사내 연동 시 뷰어에 반영됩니다 (데모)'); el.value = '' }
+  const [done, setDone] = useState(null)
+  const single = (screen === 'detail') ? data.find((v) => v.id === caseId) : null
+  const todo = data.filter((v) => v.status === '처리 필요')
+  const proposed = (v) => {
+    if (v.group === '장애/오류' || v.group === '성능') return v.devNeeded === 'Y' ? '개발 대응 요청 · 진행상황 안내' : 'AS 우선 배정 · 안내 SMS'
+    if (v.group === '개선 요청/희망') return 'UX 개선 검토 등록 · 회신 안내'
+    return '담당 확인 · 안내 SMS'
+  }
+  const actIds = (ids) => {
+    if (!ids.length) return
+    const items = data.filter((v) => ids.includes(v.id)).map((v) => ({ id: v.id, who: v.customer, cat: v.cat, from: v.status, to: '처리 완료' }))
+    updateCases(ids, { status: '처리 완료' })
+    setDone({ items })
+    notify.toast(`${ids.length}건 처리 완료 — 가운데 뷰어에 반영됨`)
+  }
+  const send = (el) => { const v = (el.value || '').trim(); if (!v) return; notify.toast('Copilot에 전달했습니다 (데모)'); el.value = '' }
+  const ViewerResult = () => !done ? null : (
+    <div className="ap-viewer">
+      <div className="ap-viewer-h">뷰어 수정 <span className="ap-applied">✓ 반영완료</span></div>
+      {done.items.slice(0, 8).map((it) => (
+        <div key={it.id} className="ap-change"><b>{it.who}</b> <span className="ap-mut">{it.cat}</span><span className="ap-arrow"><span className="dot dot-todo">{it.from}</span> → <span className="dot dot-done">{it.to}</span></span></div>
+      ))}
+    </div>
+  )
   return (
     <aside className="agent-panel">
-      <div className="ap-head"><span className="ap-date">{today} · VOC Copilot</span><button className="ap-x" onClick={onClose} title="패널 접기">›</button></div>
+      <div className="ap-head"><span className="ap-date">{today} · 선제조치 Copilot</span><button className="ap-x" onClick={onClose} title="패널 접기">›</button></div>
       <div className="ap-body">
-        {c ? (
+        {single ? (
           <>
             <div className="ap-card">
-              <div className="ap-card-h"><b>{c.id}</b> · {c.channel}{c.week ? ` · ${c.week}` : ''}</div>
-              <div className="ap-line"><GroupBadge v={c.group} /> <Tag>{c.cat}</Tag></div>
-              <div className="ap-mut">{c.summary}</div>
-              <div className="ap-mut">대응영역 {[c.area1, c.area2].filter(Boolean).join(' › ') || '-'} · 심각도 {c.severity} · 개발 {c.devNeeded}</div>
+              <div className="ap-card-h"><b>{single.id}</b> · {single.channel}{single.week ? ` · ${single.week}` : ''}</div>
+              <div className="ap-line"><GroupBadge v={single.group} /> <Tag>{single.cat}</Tag> <StatBadge v={single.status} /></div>
+              <div className="ap-mut">{single.summary}</div>
+              <div className="ap-mut">제안: {proposed(single)}</div>
             </div>
-            <div className="ap-sec">제안 액션 · 담당자 검수 후 실행</div>
-            {c.sms && <button className="ap-act" onClick={() => notify.modal('고객 안내 문자 (초안)', c.sms)}>✉ 고객 안내 문자 보내기</button>}
-            {c.mail && <button className="ap-act" onClick={() => notify.modal(`담당(${c.org}) 메일 (초안)`, `${c.mail.subject}\n\n${c.mail.body}`)}>✉ 담당({c.org}) 메일 전달</button>}
-            <button className="ap-act" onClick={() => notify.toast('사내 시스템 연동 시 상태가 변경됩니다 (데모)')}>✓ 진행상황 ‘처리 완료’로 변경</button>
+            <div className="ap-sec">액션 · 담당자 검수 후 실행</div>
+            {single.sms && <button className="ap-act" onClick={() => notify.modal('고객 안내 문자 (초안)', single.sms)}>✉ 고객 안내 문자 보기/보내기</button>}
+            {single.mail && <button className="ap-act" onClick={() => notify.modal(`담당(${single.org}) 메일 (초안)`, `${single.mail.subject}\n\n${single.mail.body}`)}>✉ 담당({single.org}) 메일 전달</button>}
+            {single.status !== '처리 완료'
+              ? <button className="ap-act primary" onClick={() => actIds([single.id])}>✓ 이 건 ‘처리 완료’로 변경</button>
+              : <div className="ap-doneline">✓ 처리 완료됨 · 뷰어 반영됨</div>}
             <div className="ap-sec">Copilot 분석</div>
-            <ul className="ap-anal">{(c.analysis || []).map((a, i) => <li key={i}>{a}</li>)}</ul>
+            <ul className="ap-anal">{(single.analysis || []).map((a, i) => <li key={i}>{a}</li>)}</ul>
+            <ViewerResult />
+          </>
+        ) : todo.length ? (
+          <>
+            <div className="ap-greet">조치 필요 {todo.length}건</div>
+            <div className="ap-mut">아래 건들을 한 번에 처리하고, 진행상황을 가운데 뷰어에 바로 반영해요.</div>
+            {todo.slice(0, 6).map((v) => (
+              <div key={v.id} className="ap-item">
+                <div className="ap-item-h"><b>{v.customer}</b> <span className="ap-mut">{v.channel}{v.week ? ` · ${v.week}` : ''}</span><span className="dot dot-todo">조치필요</span></div>
+                <div className="ap-mut">{v.cat} · {v.summary}</div>
+                <div className="ap-item-act">{proposed(v)}</div>
+              </div>
+            ))}
+            {todo.length > 6 && <div className="ap-mut">외 {todo.length - 6}건</div>}
+            <button className="ap-act primary" onClick={() => actIds(todo.map((v) => v.id))}>조치 필요 {todo.length}건 일괄 조치</button>
+            <ViewerResult />
           </>
         ) : (
           <>
             <div className="ap-greet">무엇을 도와드릴까요?</div>
-            <div className="ap-mut">VOC Inbox에서 입력·붙여넣은 케이스를 열면, 여기서 분류 결과와 제안 액션을 바로 확인하고 지시할 수 있어요.</div>
-            <div className="ap-chips">
-              <button onClick={() => notify.toast('VOC Inbox에서 데이터를 입력/붙여넣으세요')}>처리 필요 보기</button>
-              <button onClick={() => notify.toast('Insight Report에서 High 리스크를 확인하세요')}>High 리스크</button>
-              <button onClick={() => notify.toast('Dashboard에서 전체 집계를 확인하세요')}>오늘 요약</button>
-            </div>
+            <div className="ap-mut">현재 ‘처리 필요(High)’ 건이 없습니다. VOC Inbox에서 데이터를 입력·붙여넣으면, 여기서 분류 결과와 제안 액션을 바로 처리하고 가운데 뷰어에 반영할 수 있어요.</div>
+            <ViewerResult />
           </>
         )}
       </div>
       <div className="ap-input">
-        <input placeholder="고칠 내용을 말하면 반영해요" onKeyDown={(e) => { if (e.key === 'Enter') send(e.currentTarget) }} />
+        <input placeholder="고칠 내용을 말하면 뷰어에 반영해요" onKeyDown={(e) => { if (e.key === 'Enter') send(e.currentTarget) }} />
         <button className="ap-send" title="전달" onClick={(e) => send(e.currentTarget.previousSibling)}>↑</button>
       </div>
     </aside>
@@ -421,7 +457,7 @@ const Modal = ({ open, title, body, onClose }) => !open ? null : (
 )
 
 /* ---------- [1] Dashboard (실데이터 집계) ---------- */
-function Dashboard({ go, added }) {
+function Dashboard({ go, added, openCase }) {
   const data = added || []
   const total = data.length
   const reviewCnt = data.filter((v) => v.review).length
@@ -444,6 +480,8 @@ function Dashboard({ go, added }) {
   // 진행상황 분포
   const statusDist = KANBAN_COLS.map((k) => ({ k, n: data.filter((v) => v.status === k).length }))
   const maxStatus = Math.max(1, ...statusDist.map((s) => s.n))
+  // 조치 필요(High) 리스트 — 우측 Agent의 일괄 조치가 여기 상태로 반영됨 (선택은 High 기준이라 조치 후에도 행 유지)
+  const actionList = data.filter((v) => v.severity === 'High').slice(0, 10)
   return (
     <div className="screen">
       <section className="hero">
@@ -463,6 +501,27 @@ function Dashboard({ go, added }) {
             <div className="panel"><h2 className="sec-title">주요 이슈 TOP 5 <span className="sec-note">표준분류 기준</span></h2><ol className="top-list">{top.map((it, i) => <li key={it.t}><span className="rank">{i + 1}</span><span className="top-t">{it.t}</span><span className="top-n">{it.n.toLocaleString()}건</span></li>)}</ol></div>
             <div className="panel"><h2 className="sec-title">진행상황 분포</h2><div className="funnel">{statusDist.map((f) => <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>)}</div></div>
           </div>
+          {actionList.length > 0 && (
+            <>
+              <h2 className="sec-title">조치 필요 VOC <span className="sec-note">High 리스크 {actionList.length}건 · 우측 Agent에서 ‘일괄 조치’하면 상태가 여기 바로 반영됩니다</span></h2>
+              <div className="table-wrap">
+                <table className="vtable">
+                  <thead><tr><th>ID</th><th>고객번호</th><th>채널</th><th>표준분류</th><th>원인(요약)</th><th>주차</th><th>상태</th></tr></thead>
+                  <tbody>{actionList.map((v) => (
+                    <tr key={v.id} className={v.status === '처리 완료' ? 'row-done' : ''} onClick={() => openCase && openCase(v.id)}>
+                      <td className="mono">{v.id}</td>
+                      <td className="muted nowrap">{v.customer}</td>
+                      <td><ChannelChip channel={v.channel} /></td>
+                      <td><Tag>{v.cat}</Tag></td>
+                      <td className="cell-content" title={v.content}>{v.summary || v.content}</td>
+                      <td className="muted nowrap">{v.week || '-'}</td>
+                      <td><StatBadge v={v.status} /></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
       <h2 className="sec-title">예상 효과</h2>
@@ -861,6 +920,7 @@ export default function App() {
     modal: (title, body) => setModal({ open: true, title, body }),
   }), [])
   const openCase = (id) => { setCaseId(id); setScreen('detail'); setPanelOpen(true) }
+  const updateCases = (ids, patch) => setAdded((prev) => prev.map((v) => ids.includes(v.id) ? { ...v, ...patch } : v))
   const [t] = TITLES[screen]
   if (!authEmail) return <Login onAuthed={setAuthEmail} />
   return (
@@ -870,7 +930,7 @@ export default function App() {
       <div className="main">
         <Topbar title={t} onTogglePanel={() => setPanelOpen((o) => !o)} panelOpen={panelOpen} />
         <div className="content">
-          {screen === 'dashboard' && <Dashboard go={setScreen} added={added} />}
+          {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} />}
           {screen === 'architecture' && <Architecture />}
           {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
           {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} />}
@@ -879,7 +939,7 @@ export default function App() {
           {screen === 'prompts' && <PromptTemplates notify={notify} />}
         </div>
       </div>
-      {panelOpen && <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} onClose={() => setPanelOpen(false)} />}
+      {panelOpen && <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} onClose={() => setPanelOpen(false)} updateCases={updateCases} />}
       <Toast msg={toast} onClose={() => setToast('')} />
       <Modal open={modal.open} title={modal.title} body={modal.body} onClose={() => setModal({ open: false, title: '', body: '' })} />
     </div>
