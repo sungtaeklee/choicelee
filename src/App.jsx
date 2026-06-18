@@ -494,12 +494,13 @@ function Dashboard({ go, added, openCase, selected, setSelected }) {
   const highCnt = data.filter((v) => v.severity === 'High').length
   const todoCnt = data.filter((v) => v.status === '처리 필요').length
   const autoRate = total ? Math.round(((total - reviewCnt) / total) * 100) : 0
+  const pct = (n) => total ? Math.round((n / total) * 100) : 0
   const stats = [
-    { v: total.toLocaleString(), l: '전체 VOC' },
-    { v: autoRate + '%', l: '자동 분류율(검토불요)', accent: true },
-    { v: todoCnt.toLocaleString(), l: '처리 필요' },
-    { v: highCnt.toLocaleString(), l: 'High 리스크', warn: true },
-    { v: reviewCnt.toLocaleString(), l: '검토필요' },
+    { v: total.toLocaleString(), l: '전체 VOC', chip: '수집 누적' },
+    { v: autoRate + '%', l: '자동 분류율', chip: '검토불요 기준', accent: true, cls: 'brand' },
+    { v: todoCnt.toLocaleString(), l: '처리 필요', chip: `전체의 ${pct(todoCnt)}%` },
+    { v: highCnt.toLocaleString(), l: 'High 리스크', chip: `전체의 ${pct(highCnt)}%`, warn: true, cls: 'up' },
+    { v: reviewCnt.toLocaleString(), l: '검토 필요', chip: '사람 확인' },
   ]
   // 채널별 집계
   const chMap = {}; data.forEach((v) => { chMap[v.channel] = (chMap[v.channel] || 0) + 1 })
@@ -521,34 +522,51 @@ function Dashboard({ go, added, openCase, selected, setSelected }) {
   const toggleAll = () => setSelected(allChecked ? [] : allIds)
   return (
     <div className="screen">
-      <section className="hero">
-        <div className="hero-eyebrow">U+ AI Copilot 활용 · CX 운영</div>
-        <h1 className="hero-title">U+ VOC Action Copilot</h1>
-        <p className="hero-desc">입력·붙여넣은 고객 VOC를 Copilot AI가 4개 그룹·22개 표준분류로 분류하고, 처리 액션과 개선 인사이트까지 연결합니다.</p>
-        <div className="hero-cta"><button className="btn btn-primary" onClick={() => go('inbox')}>VOC 입력 시작</button><button className="btn btn-ghost" onClick={() => go('insight')}>인사이트 보기</button></div>
-      </section>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">VOC Action Copilot</h1>
+          <p className="page-sub">입력·붙여넣은 고객 VOC를 Copilot AI가 4그룹·22개 표준분류로 분류하고, 처리 액션과 개선 인사이트까지 연결합니다.</p>
+        </div>
+        <div className="page-actions">
+          <button className="btn btn-ghost" onClick={() => go('insight')}>인사이트 보기</button>
+          <button className="btn btn-primary" onClick={() => go('inbox')}>VOC 입력 시작</button>
+        </div>
+      </div>
       {total === 0 ? (
         <div className="panel empty-panel">아직 데이터가 없습니다. <b>VOC Inbox</b>에서 VOC를 입력하거나 엑셀을 붙여넣으면 여기에 실시간 집계됩니다.<div style={{ marginTop: '12px' }}><button className="btn btn-primary" onClick={() => go('inbox')}>VOC 입력하러 가기</button></div></div>
       ) : (
         <>
-          <div className="stat-row">{stats.map((s) => <div key={s.l} className={'stat-card' + (s.accent ? ' accent' : '') + (s.warn ? ' warn' : '')}><div className="stat-v">{s.v}</div><div className="stat-l">{s.l}</div></div>)}</div>
-          <h2 className="sec-title">채널별 VOC <span className="sec-note">합계 {total.toLocaleString()}건 = 전체 VOC</span></h2>
-          <div className="card-row">{channels.map((c) => <div key={c.key} className="ch-card"><div className="ch-head"><ChannelIcon channel={c.key} size={18} /><span>{c.key}</span></div><div className="ch-cnt">{c.n.toLocaleString()}건</div></div>)}</div>
+          <div className="kpi-row">{stats.map((s) => (
+            <div key={s.l} className={'kpi-card' + (s.accent ? ' accent' : '') + (s.warn ? ' warn' : '')}>
+              <div className="kpi-l">{s.l}</div>
+              <div className="kpi-main"><span className="kpi-v">{s.v}</span>{s.chip && <span className={'kpi-chip' + (s.cls ? ' ' + s.cls : '')}>{s.chip}</span>}</div>
+            </div>
+          ))}</div>
           <h2 className="sec-title">분석 요약 <span className="sec-note">증상 유형 · 주요 이슈 · 진행상황</span></h2>
           <div className="chart3">
             <div className="panel chart-card">
-              <div className="block-label">증상 유형 분류 <span className="muted">전체 누적</span></div>
+              <div className="card-title">증상 유형 분류 <span className="muted">전체 누적</span></div>
               <div className="donut-wrap">
                 <Donut segments={groupSeg} total={total} centerLabel="전체 VOC" />
-                <ul className="donut-legend">{groupSeg.map((s) => <li key={s.label}><span className="lg-dot" style={{ background: s.color }} />{s.label}<b>{Math.round(s.value / total * 100)}%</b></li>)}</ul>
+                <ul className="donut-legend">{groupSeg.map((s) => <li key={s.label}><span className="lg-dot" style={{ background: s.color }} />{s.label}<b>{pct(s.value)}%</b></li>)}</ul>
               </div>
             </div>
-            <div className="panel chart-card"><div className="block-label">주요 이슈 TOP 5 <span className="muted">표준분류 기준</span></div><ol className="top-list">{top.map((it, i) => <li key={it.t}><span className="rank">{i + 1}</span><span className="top-t">{it.t}</span><span className="top-n">{it.n.toLocaleString()}건</span></li>)}</ol></div>
-            <div className="panel chart-card"><div className="block-label">진행상황 분포</div><div className="funnel">{statusDist.map((f) => <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>)}</div></div>
+            <div className="panel chart-card"><div className="card-title">주요 이슈 TOP 5 <span className="muted">표준분류 기준</span></div><ol className="top-list">{top.map((it, i) => <li key={it.t}><span className="rank">{i + 1}</span><span className="top-t">{it.t}</span><span className="top-n">{it.n.toLocaleString()}건</span></li>)}</ol></div>
+            <div className="panel chart-card"><div className="card-title">진행상황 분포</div><div className="funnel">{statusDist.map((f) => <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>)}</div></div>
+          </div>
+          <div className="panel">
+            <div className="card-title">채널별 분포 <span className="muted">합계 {total.toLocaleString()}건</span></div>
+            <div className="hbars">{channels.slice(0, 7).map((c) => (
+              <div key={c.key} className="hbar-row">
+                <span className="hbar-k"><ChannelIcon channel={c.key} size={15} />{c.key}</span>
+                <div className="hbar-track"><div className="hbar-fill" style={{ width: Math.max(3, c.n / channels[0].n * 100) + '%' }} /></div>
+                <span className="hbar-n">{c.n.toLocaleString()}건</span>
+              </div>
+            ))}</div>
           </div>
           {actionList.length > 0 && (
             <>
-              <h2 className="sec-title">조치 필요 VOC <span className="sec-note">High 리스크 {actionList.length}건 · 체크 후 우측 Agent에서 ‘선택 조치’, 미선택 시 ‘전체 조치’ → 상태가 여기 바로 반영됩니다{selected.length ? ` · ${selected.length}건 선택됨` : ''}</span></h2>
+              <h2 className="sec-title">조치 필요 VOC <span className="sec-note">High 리스크 {actionList.length}건 · 체크 후 우측 Agent에서 ‘선택 조치’, 미선택 시 ‘전체 조치’{selected.length ? ` · ${selected.length}건 선택됨` : ''}</span></h2>
               <div className="table-wrap">
                 <table className="vtable">
                   <thead><tr><th className="cbx-col"><input type="checkbox" checked={allChecked} onChange={toggleAll} /></th><th>ID</th><th>고객번호</th><th>채널</th><th>표준분류</th><th>원인(요약)</th><th>주차</th><th>상태</th></tr></thead>
@@ -568,10 +586,12 @@ function Dashboard({ go, added, openCase, selected, setSelected }) {
               </div>
             </>
           )}
+          <div className="panel effect-panel">
+            <div className="card-title">기대 효과</div>
+            <div className="effect-row">{EFFECTS.map((e) => <div key={e.t} className="effect-card"><div className="effect-t">{e.t}</div><div className="effect-d">{e.d}</div></div>)}</div>
+          </div>
         </>
       )}
-      <h2 className="sec-title">예상 효과</h2>
-      <div className="effect-row">{EFFECTS.map((e) => <div key={e.t} className="effect-card"><div className="effect-t">{e.t}</div><div className="effect-d">{e.d}</div></div>)}</div>
     </div>
   )
 }
