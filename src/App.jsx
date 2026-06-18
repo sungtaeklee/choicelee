@@ -372,20 +372,32 @@ function SubLNB({ screen, setScreen }) {
     </aside>
   )
 }
-function Topbar({ title, onTogglePanel, panelOpen }) {
+function Topbar({ title, mode, setMode, agentTitle }) {
   return (
     <header className="topbar">
-      <div className="crumb">U+ Agent<span className="crumb-sep">›</span>VOC Action Copilot<span className="crumb-sep">›</span><b>{title}</b></div>
-      <div className="topbar-right">
-        <span className="ai-pill">● Copilot 연결됨 (데모)</span>
-        <button className="panel-tgl" onClick={onTogglePanel} title={panelOpen ? 'Agent 패널 접기' : 'Agent 패널 펼치기'}>{panelOpen ? '›' : '‹'}</button>
-      </div>
+      {mode !== 'expanded' && (
+        <div className="tb-main">
+          <div className="crumb">U+ Agent<span className="crumb-sep">›</span>VOC Action Copilot<span className="crumb-sep">›</span><b>{title}</b></div>
+          <div className="tb-main-right">
+            <span className="ai-pill">● Copilot 연결됨 (데모)</span>
+            {mode === 'collapsed' && <button className="tb-open" onClick={() => setMode('split')} title="Agent 패널 열기"><span className="tb-open-i">‹</span>Agent</button>}
+          </div>
+        </div>
+      )}
+      {mode !== 'collapsed' && (
+        <div className="tb-agent">
+          <span className="tb-agent-title">{agentTitle}</span>
+          <div className="tb-agent-ctrl">
+            <button onClick={() => setMode(mode === 'expanded' ? 'split' : 'expanded')} title={mode === 'expanded' ? '분할 보기' : 'Agent 전체화면'}>{mode === 'expanded' ? '⤡' : '⤢'}</button>
+            {mode !== 'expanded' && <button onClick={() => setMode('collapsed')} title="Agent 패널 접기">»</button>}
+          </div>
+        </div>
+      )}
     </header>
   )
 }
-function AgentPanel({ screen, caseId, added, notify, onClose, updateCases, selected, setSelected }) {
+function AgentPanel({ screen, caseId, added, notify, updateCases, selected, setSelected }) {
   const data = added || []
-  const today = new Date().toISOString().slice(0, 10)
   const [done, setDone] = useState(null)
   const single = (screen === 'detail') ? data.find((v) => v.id === caseId) : null
   const todo = data.filter((v) => v.status === '처리 필요')
@@ -414,7 +426,6 @@ function AgentPanel({ screen, caseId, added, notify, onClose, updateCases, selec
   )
   return (
     <aside className="agent-panel">
-      <div className="ap-head"><span className="ap-date">{today} · 선제조치 Copilot</span><button className="ap-x" onClick={onClose} title="패널 접기">›</button></div>
       <div className="ap-body">
         {single ? (
           <>
@@ -984,7 +995,7 @@ export default function App() {
   const [caseId, setCaseId] = useState('VOC-1001')
   const [toast, setToast] = useState('')
   const [modal, setModal] = useState({ open: false, title: '', body: '' })
-  const [panelOpen, setPanelOpen] = useState(true)
+  const [panelMode, setPanelMode] = useState('split') // 'split'(분할·기본) | 'collapsed'(Nav 전체) | 'expanded'(Agent 전체)
   const [selected, setSelected] = useState([]) // 체크박스로 선택한 케이스 id (대시보드 ↔ Agent 패널 공유)
   const [added, setAdded] = useState(loadAdded) // 입력/붙여넣은 VOC — localStorage에 저장되어 재접속 시 복원됨
   useEffect(() => {
@@ -995,27 +1006,36 @@ export default function App() {
     toast: (m) => { setToast(m); window.clearTimeout(window.__t); window.__t = window.setTimeout(() => setToast(''), 2200) },
     modal: (title, body) => setModal({ open: true, title, body }),
   }), [])
-  const openCase = (id) => { setCaseId(id); setScreen('detail'); setPanelOpen(true) }
+  const openCase = (id) => { setCaseId(id); setScreen('detail'); setPanelMode((m) => m === 'collapsed' ? 'split' : m) }
   const updateCases = (ids, patch) => setAdded((prev) => prev.map((v) => ids.includes(v.id) ? { ...v, ...patch } : v))
   const [t] = TITLES[screen]
+  const agentTitle = new Date().toISOString().slice(0, 10) + ' · 선제조치 Copilot'
   if (!authEmail) return <Login onAuthed={setAuthEmail} />
   return (
     <div className="app">
       <IconRail account={authEmail} onLogout={() => { setSession(''); setAuthEmail('') }} notify={notify} />
       <SubLNB screen={screen} setScreen={setScreen} />
-      <div className="main">
-        <Topbar title={t} onTogglePanel={() => setPanelOpen((o) => !o)} panelOpen={panelOpen} />
-        <div className="content">
-          {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} selected={selected} setSelected={setSelected} />}
-          {screen === 'architecture' && <Architecture />}
-          {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
-          {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
-          {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} />}
-          {screen === 'insight' && <InsightReport added={added} />}
-          {screen === 'prompts' && <PromptTemplates notify={notify} />}
+      <div className={'workspace mode-' + panelMode}>
+        <Topbar title={t} mode={panelMode} setMode={setPanelMode} agentTitle={agentTitle} />
+        <div className="workbody">
+          {panelMode !== 'expanded' && (
+            <main className="main-nav">
+              <div className="content">
+                {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} selected={selected} setSelected={setSelected} />}
+                {screen === 'architecture' && <Architecture />}
+                {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
+                {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
+                {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} />}
+                {screen === 'insight' && <InsightReport added={added} />}
+                {screen === 'prompts' && <PromptTemplates notify={notify} />}
+              </div>
+            </main>
+          )}
+          {panelMode !== 'collapsed' && (
+            <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} updateCases={updateCases} selected={selected} setSelected={setSelected} />
+          )}
         </div>
       </div>
-      {panelOpen && <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} onClose={() => setPanelOpen(false)} updateCases={updateCases} selected={selected} setSelected={setSelected} />}
       <Toast msg={toast} onClose={() => setToast('')} />
       <Modal open={modal.open} title={modal.title} body={modal.body} onClose={() => setModal({ open: false, title: '', body: '' })} />
     </div>
