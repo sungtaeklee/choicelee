@@ -44,18 +44,22 @@ const CAT_KW = [
   ['데이터(사용량/선물/충전)', ['데이터사용량', '데이터선물', '데이터충전', '데이터쿠폰', '데이터']],
   ['로밍', ['로밍요금', '해외문자', '로밍']],
   ['유심/이심/IMSI', ['유심교체', '이심', '심전환', 'imsi', '유심']],
-  ['단말/기기/액세서리', ['기기변경', '단말기', '액세서리', '모바일신분증', '기기']],
+  ['단말/기기/액세서리', ['기기변경', '단말기', '액세서리', '모바일신분증', '핸드폰', '휴대폰', '기기']],
   ['멤버십/쿠폰/혜택/VIP콕', ['멤버십', 'vip콕', 'vip', '쿠폰', '혜택', '이벤트', '제휴', '영화']],
   ['설치/AS(홈상품)', ['이전설치', '인터넷설치', '공유기', '리모컨', '홈상품', '설치']],
   ['IPTV/셋톱박스', ['iptv', '셋톱박스', '셋톱', '셋탑']],
   ['상담/고객지원', ['상담연결', '상담지연', '미답변', '고객센터', 'ars', '답변지연', '상담']],
   ['매장/대리점', ['대리점', '매장', '영업', '오프라인']],
   ['회원/로그인/인증', ['로그인', '본인인증', '인증번호', '회원가입', '회원탈퇴', '아이디', '비밀번호', '명의', '인증']],
-  ['요금/청구/납부/환불', ['청구서', '청구', '요금조회', '납부', '미납', '자동이체', '환불', '요금']],
+  ['요금/청구/납부/환불', ['청구서', '청구', '요금조회', '납부', '미납', '자동이체', '환불', '과금', '이중청구', '중복결제', '요금']],
   ['휴대폰결제/소액결제', ['휴대폰결제', '소액결제', '결제한도']],
   ['유독/모바일TV/익시오/스마트홈', ['유독', '모바일tv', '익시오', 'ixio', '스마트홈', '넷플릭스', '디즈니', '티비', 'tv']],
   ['배송', ['배송', '택배', '수령', '배달', '도착']],
   ['검색/챗봇/AI', ['검색', '챗봇', '인공지능', 'ai']],
+]
+// 강한 우선순위 규칙: 모호한 일반 키워드보다 먼저 적용(예: '데이터' 단어가 있어도 연결 실패면 네트워크)
+const PRIORITY_RULES = [
+  [/안터|안터짐|안터져|안터지|터지지않|음영|신호.{0,2}약|신호.{0,2}없|신호불량|전파/, '네트워크/통신품질/와이파이'],
 ]
 function demoClassify(text) {
   const v = norm(text)
@@ -64,11 +68,9 @@ function demoClassify(text) {
   if (FAULT_KW.some((k) => v.includes(norm(k)))) return { group: '장애/오류', cat: '앱/웹 기능오류', conf: '보통', review: false, mode: '정형' }
   if (PERF_KW.some((k) => v.includes(norm(k)))) return { group: '성능', cat: v.includes('백화') ? '앱/웹 백화 현상' : '앱/웹 속도 느림', conf: '보통', review: false, mode: '정형' }
   if (IMPROVE_KW.some((k) => v.includes(norm(k)))) return { group: '개선 요청/희망', cat: '앱/웹 기능 개선', conf: '보통', review: false, mode: '정형' }
-  // 열림 그룹: 22개 중 longest-match
-  let best = null
-  for (const [cat, kws] of CAT_KW) for (const kw of kws) { const nk = norm(kw); if (nk && v.includes(nk) && (!best || nk.length > best.len)) best = { cat, len: nk.length } }
-  if (!best) return { group: '단순 문의/불만/기타', cat: '기타', conf: '낮음', review: true, mode: '열림' }
-  return { group: '단순 문의/불만/기타', cat: best.cat, conf: best.len >= 3 ? '높음' : '보통', review: best.len < 2, mode: '열림' }
+  // 열림 그룹: 22개 분류는 점수제로
+  const p = pick22(text)
+  return { group: '단순 문의/불만/기타', cat: p.cat, conf: p.conf, review: p.review, mode: '열림' }
 }
 
 /* ---------- 업로드 VOC 분류·보강 (raw 행 → 우리 스키마) ----------
@@ -80,17 +82,21 @@ function pickFixedCat(group, text) {
     if (/접속불가|접속안|먹통/.test(v)) return '앱/웹 접속불가'
     if (/정합성|데이터불일치|데이터안맞/.test(v)) return '앱/웹화면 데이터 정합성 이슈'
     if (/로그인/.test(v)) return '로그인불가/로그인풀림'
-    if (/오류|에러|안됨|안돼|튕|실패|깨짐/.test(v)) return '앱/웹 기능오류'
+    if (/오류|에러|안됨|안돼|안되|튕|실패|깨짐|작동|동작|반응없|적용.{0,2}안/.test(v)) return '앱/웹 기능오류'
     return '기타'
   }
   if (group === '성능') return /백화/.test(v) ? '앱/웹 백화 현상' : '앱/웹 속도 느림'
   return '앱/웹 기능 개선' // 개선 요청/희망
 }
-function pick22(text) { // 열림 그룹 22개 중 longest-match (게이트 없이 카테고리만)
-  const v = norm(text); let best = null
-  for (const [cat, kws] of CAT_KW) for (const kw of kws) { const nk = norm(kw); if (nk && v.includes(nk) && (!best || nk.length > best.len)) best = { cat, len: nk.length } }
-  if (!best) return { cat: '기타', conf: '낮음', review: true }
-  return { cat: best.cat, conf: best.len >= 3 ? '높음' : '보통', review: best.len < 2 }
+function pick22(text) { // 열림 그룹 22개 분류: 우선순위 규칙 → 점수제(매칭 키워드 길이 합)
+  const v = norm(text)
+  for (const [re, cat] of PRIORITY_RULES) if (re.test(v)) return { cat, conf: '높음', review: false }
+  const scores = {}
+  for (const [cat, kws] of CAT_KW) { let s = 0; for (const kw of kws) { const nk = norm(kw); if (nk && v.includes(nk)) s += nk.length } if (s) scores[cat] = s }
+  const e = Object.entries(scores).sort((a, b) => b[1] - a[1])
+  if (!e.length) return { cat: '기타', conf: '낮음', review: true }
+  const tie = e[1] && e[1][1] === e[0][1]
+  return { cat: e[0][0], conf: e[0][1] >= 4 ? '높음' : e[0][1] >= 2 ? '보통' : '낮음', review: e[0][1] < 2 || tie }
 }
 function deriveSeverity(group, text) {
   if (group === '장애/오류') return 'High'
