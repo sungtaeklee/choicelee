@@ -508,3 +508,39 @@ h1,h2{margin:0}
 .fm-dia-t{font:700 12px var(--sans);fill:#b8005f}
 .fm-lbl{font:700 11px var(--sans);fill:#b8005f}
 .fm-loop-t{font:600 11px var(--sans);fill:#b8005f}
+
+/* ---------- 추이·영역 피벗 / 검색 / 발송이력 / 담당자 폼 ---------- */
+.pivot th,.pivot td{padding:8px 12px}
+.pivot .pv-rowh{position:sticky;left:0;background:#fbfcfd;z-index:1}
+.pv-num{text-align:right;font-variant-numeric:tabular-nums}
+.pv-l1 td{background:#f4f0fb;font-weight:700;color:var(--ink)}
+.pv-l1 td:first-child{color:var(--magenta-d)}
+.pv-l2 td:first-child{padding-left:26px;color:var(--slate)}
+.pv-l2 td{color:var(--muted)}
+.pv-sum{font-weight:800;color:var(--ink)}
+.pv-total td{background:#eef0f4;font-weight:800;border-top:2px solid var(--line)}
+.pivot tbody tr{cursor:default}
+
+.trend-bars{display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding:8px 2px 2px;min-height:150px}
+.tb-col{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:46px}
+.tb-v{font:700 12px var(--sans);color:var(--ink)}
+.tb-bar{width:60%;max-width:34px;background:linear-gradient(180deg,#ff6bb3,var(--magenta));border-radius:6px 6px 0 0}
+.tb-k{font-size:10px;color:var(--muted);white-space:nowrap}
+
+.search-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.search-row select,.search-row input{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font:13px var(--sans);background:#fff}
+.search-row input{flex:1;min-width:160px}
+.search-row select:focus,.search-row input:focus{outline:none;border-color:var(--magenta)}
+
+.owner-panel .of-row{display:flex;align-items:center;gap:10px;font-size:12.5px}
+.of-row>span{width:64px;flex-shrink:0;color:var(--muted);font-weight:600}
+.of-row select,.of-row input{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:13px var(--sans);background:#fff}
+.of-row select:focus,.of-row input:focus{outline:none;border-color:var(--magenta)}
+.of-area{width:100%;box-sizing:border-box;min-height:84px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font:13px var(--sans);line-height:1.5}
+.of-area:focus{outline:none;border-color:var(--magenta)}
+.jira-link{font-size:12px;color:var(--magenta-d);text-decoration:none;font-weight:600}
+.jira-link:hover{text-decoration:underline}
+
+.kind{font:700 11px var(--sans);padding:3px 9px;border-radius:11px;white-space:nowrap}
+.kind-mail{background:#e7eefe;color:#2563eb}
+.kind-sms{background:var(--magenta-soft);color:var(--magenta-d)}

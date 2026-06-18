@@ -12,9 +12,24 @@ const GROUP_MODE = {
   '장애/오류': '정형', '성능': '정형', '개선 요청/희망': '정형', '단순 문의/불만/기타': '열림',
 }
 const FIXED_DEPTH2 = {
-  '장애/오류': ['앱/웹 기능오류', '앱/웹 접속불가', '앱/웹화면 데이터 정합성 이슈', '로그인불가/로그인풀림', '기타'],
+  '장애/오류': ['로그인불가/로그인풀림', '앱/웹 기능오류', '앱/웹 접속불가', '앱/웹화면 데이터 정합성 이슈', '기타'],
   '성능': ['앱/웹 속도 느림', '앱/웹 백화 현상'],
-  '개선 요청/희망': ['앱/웹 기능 개선'],
+  '개선 요청/희망': ['앱/웹 기능 개선', '회원/로그인 개선', '기타'],
+}
+/* 대응영역 트리 (엑셀 '오류VOC인입영역' 기준) — 1depth → 2depth */
+const AREA_TREE = {
+  'MY': ['가입정보관리', '요금/납부/청구', '회원/로그인/ID', '휴대폰 결제', '데이터', '고객지원', '자녀 통신요금 관리', '메뉴/GNB/위젯', '결합할인'],
+  '검색/챗봇': ['검색/챗봇'],
+  '혜택/멤버십': ['VIP콕(영화/구독/제휴)', '바코드/메뉴', '유플미션/출석체크', '멤버십(등급/정책)', '유플투쁠'],
+  '상품/스토어': ['기타(유독)', '로밍', '모바일 가입', '유심/이심(eSIM)/너겟', '모바일 요금제', '모바일 부가서비스', '홈 요금제/홈 부가서비스', '액세서리/라이브'],
+}
+const AREA1_LIST = Object.keys(AREA_TREE)
+/* 영역별 담당자 매핑 (임시 예시 — 김형걸 담당자 표 입수 시 교체) */
+const OWNER_BY_AREA = {
+  'MY': '김민수 · MY서비스팀',
+  '검색/챗봇': '이서연 · AI검색팀',
+  '혜택/멤버십': '박지훈 · 멤버십팀',
+  '상품/스토어': '최유진 · 커머스팀',
 }
 const CAT22 = [
   '네트워크/통신품질/와이파이', '인터넷·통신속도 불만', '앱·웹 이용문의', '요금제', '해지/약정/위약금',
@@ -86,7 +101,12 @@ function pickFixedCat(group, text) {
     return '기타'
   }
   if (group === '성능') return /백화/.test(v) ? '앱/웹 백화 현상' : '앱/웹 속도 느림'
-  return '앱/웹 기능 개선' // 개선 요청/희망
+  if (group === '개선 요청/희망') {
+    if (/로그인|회원|아이디|비밀번호|인증|가입/.test(v)) return '회원/로그인 개선'
+    if (/개선|추가|바꿔|바뀌|좋겠|불편|제안|했으면/.test(v)) return '앱/웹 기능 개선'
+    return '기타'
+  }
+  return '앱/웹 기능 개선'
 }
 function pick22(text) { // 열림 그룹 22개 분류: 우선순위 규칙 → 점수제(매칭 키워드 길이 합)
   const v = norm(text)
@@ -127,21 +147,26 @@ function aiSummarize(content) {
   const s = clause.length >= 8 ? clause : t
   return s.length > 45 ? s.slice(0, 45) + '…' : s
 }
-/* 표준분류 → 대응 영역(1 넓은 / 2 세부) 제안. 사내 라우팅 taxonomy라 가장 보정이 잦은 표. */
+/* 표준분류/정형분류 → 대응 영역(1 넓은 / 2 세부). 사내 라우팅 taxonomy (영역 트리 기준). */
 const AREA_BY_CAT = {
-  '요금제': ['MY', '요금제'], '요금/청구/납부/환불': ['MY', '요금/청구'], '휴대폰결제/소액결제': ['MY', '휴대폰결제'],
-  '데이터(사용량/선물/충전)': ['MY', '데이터'], '부가서비스': ['MY', '부가서비스'], '앱·웹 이용문의': ['MY', '앱/웹 이용'],
-  '검색/챗봇/AI': ['MY', '검색/챗봇'], '해지/약정/위약금': ['상품/스토어', '해지/약정'], '가입/개통/결합': ['상품/스토어', '가입/개통'],
-  '단말/기기/액세서리': ['상품/스토어', '단말/기기'], '배송': ['상품/스토어', '배송'], '유심/이심/IMSI': ['상품/스토어', '유심/이심'],
-  '설치/AS(홈상품)': ['상품/스토어', '설치/AS'], 'IPTV/셋톱박스': ['상품/스토어', 'IPTV/셋톱'], '유독/모바일TV/익시오/스마트홈': ['상품/스토어', '유독/스마트홈'],
-  '멤버십/쿠폰/혜택/VIP콕': ['혜택/멤버십', '멤버십/혜택'], '회원/로그인/인증': ['회원/로그인', '인증'],
-  '네트워크/통신품질/와이파이': ['기타', '네트워크/품질'], '인터넷·통신속도 불만': ['기타', '인터넷/속도'], '로밍': ['기타', '로밍'],
-  '상담/고객지원': ['기타', '고객센터'], '매장/대리점': ['기타', '매장/대리점'], '기타': ['기타', '기타'],
+  // 열림 그룹 22개
+  '요금제': ['상품/스토어', '모바일 요금제'], '요금/청구/납부/환불': ['MY', '요금/납부/청구'], '휴대폰결제/소액결제': ['MY', '휴대폰 결제'],
+  '데이터(사용량/선물/충전)': ['MY', '데이터'], '부가서비스': ['상품/스토어', '모바일 부가서비스'], '앱·웹 이용문의': ['MY', '메뉴/GNB/위젯'],
+  '검색/챗봇/AI': ['검색/챗봇', '검색/챗봇'], '해지/약정/위약금': ['상품/스토어', '모바일 가입'], '가입/개통/결합': ['상품/스토어', '모바일 가입'],
+  '단말/기기/액세서리': ['상품/스토어', '액세서리/라이브'], '배송': ['상품/스토어', '액세서리/라이브'], '유심/이심/IMSI': ['상품/스토어', '유심/이심(eSIM)/너겟'],
+  '설치/AS(홈상품)': ['상품/스토어', '홈 요금제/홈 부가서비스'], 'IPTV/셋톱박스': ['상품/스토어', '홈 요금제/홈 부가서비스'], '유독/모바일TV/익시오/스마트홈': ['상품/스토어', '기타(유독)'],
+  '멤버십/쿠폰/혜택/VIP콕': ['혜택/멤버십', 'VIP콕(영화/구독/제휴)'], '회원/로그인/인증': ['MY', '회원/로그인/ID'],
+  '네트워크/통신품질/와이파이': ['MY', '데이터'], '인터넷·통신속도 불만': ['MY', '데이터'], '로밍': ['상품/스토어', '로밍'],
+  '상담/고객지원': ['MY', '고객지원'], '매장/대리점': ['MY', '고객지원'], '기타': ['MY', '메뉴/GNB/위젯'],
+  // 정형 그룹 VOC구분2
+  '로그인불가/로그인풀림': ['MY', '회원/로그인/ID'], '회원/로그인 개선': ['MY', '회원/로그인/ID'],
+  '앱/웹 기능오류': ['MY', '메뉴/GNB/위젯'], '앱/웹 기능 개선': ['MY', '메뉴/GNB/위젯'], '앱/웹 접속불가': ['MY', '메뉴/GNB/위젯'],
+  '앱/웹 속도 느림': ['MY', '메뉴/GNB/위젯'], '앱/웹 백화 현상': ['MY', '메뉴/GNB/위젯'], '앱/웹화면 데이터 정합성 이슈': ['MY', '메뉴/GNB/위젯'],
 }
 function catToArea(group, cat) {
-  if (group === '장애/오류' || group === '성능' || group === '개선 요청/희망') return ['APP/WEB', cat]
-  return AREA_BY_CAT[cat] || ['기타', cat]
+  return AREA_BY_CAT[cat] || ['MY', '메뉴/GNB/위젯']
 }
+function ownerForArea(area1) { return OWNER_BY_AREA[area1] || '미지정' }
 function devNeeded(group) { return (group === '장애/오류' || group === '성능' || group === '개선 요청/희망') ? 'Y' : 'N' }
 function draftAnswer(group, cat) {
   if (group === '장애/오류' || group === '성능') return `불편을 드려 죄송합니다. 말씀하신 '${cat}' 증상은 담당 부서에서 원인을 확인하고 있으며, 확인되는 대로 신속히 안내드리겠습니다.`
@@ -244,7 +269,7 @@ function enrichRow(r, id) {
     channel: cleanChannel(r.channel), customer: maskPII(r.customer) || '****', customerRaw: (r.customer || '').trim(),
     date: r.date || '', week: r.week || '', occur: r.occur || '',
     content, summary, group, cat, severity, sentiment, status, conf, review, action, org, mode,
-    area1, area2, devNeeded: dev,
+    area1, area2, devNeeded: dev, owner: ownerForArea(area1), jiraUrl: '', ownerNote: '',
     analysis: [
       `채널·내용 기반 분류 → '${group}' (${mode})`,
       mode === '정형' ? `정형 — 닫힌 분류값 '${cat}'로 매핑` : `열림 — 표준분류 22개 중 '${cat}'로 추론`,
@@ -266,18 +291,24 @@ function loadAdded() {
     if (!raw) return []
     const recs = JSON.parse(raw)
     if (!Array.isArray(recs)) return []
-    return recs.map((r) => enrichRow({ channel: r.c, content: r.t, customer: r.n, date: r.d, week: r.w, occur: r.o }, r.id))
+    return recs.map((r) => {
+      const e = enrichRow({ channel: r.c, content: r.t, customer: r.n, date: r.d, week: r.w, occur: r.o }, r.id)
+      return { ...e, status: r.s || e.status, owner: r.ow || e.owner, jiraUrl: r.j || '', ownerNote: r.on || '' }
+    })
   } catch { return [] }
 }
 function saveAdded(arr) {
   try {
     if (typeof localStorage === 'undefined') return true
     if (!arr.length) { localStorage.removeItem(LS_KEY); return true }
-    const recs = arr.map((v) => ({ id: v.id, c: v.channel, t: v.content, n: v.customerRaw || '', d: v.date || '', w: v.week || '', o: v.occur || '' }))
+    const recs = arr.map((v) => ({ id: v.id, c: v.channel, t: v.content, n: v.customerRaw || '', d: v.date || '', w: v.week || '', o: v.occur || '', s: v.status, ow: v.owner, j: v.jiraUrl || '', on: v.ownerNote || '' }))
     localStorage.setItem(LS_KEY, JSON.stringify(recs))
     return true
   } catch { return false } // 저장 한도 초과 등
 }
+const LS_SENT = 'voc-action-copilot:sent:v1'
+function loadSent() { try { return JSON.parse(localStorage.getItem(LS_SENT) || '[]') } catch { return [] } }
+function saveSent(l) { try { localStorage.setItem(LS_SENT, JSON.stringify((l || []).slice(0, 500))) } catch { } }
 
 /* ---------- 사내 전용 접근 (데모 게이트) ----------
    ⚠ 백엔드가 없으므로 이건 시연용 게이트다. 진짜 접근 제어가 아니다(소스/스토리지로 우회 가능).
@@ -361,9 +392,9 @@ function IconRail({ account, onLogout, notify }) {
 }
 function SubLNB({ screen, setScreen }) {
   const SECTIONS = [
-    { label: '현황', items: [['dashboard', '대시보드']] },
+    { label: '현황', items: [['dashboard', '대시보드'], ['trends', '기간별·영역별 추이']] },
     { label: '수집 · 자동분류', items: [['inbox', 'VOC 수집·입력'], ['board', '분류 보드']] },
-    { label: '처리 · 반영', items: [['detail', '케이스 처리'], ['insight', '인사이트 리포트']] },
+    { label: '처리 · 반영', items: [['detail', '케이스 처리'], ['insight', '인사이트 리포트'], ['sentlog', '발송 이력']] },
     { label: '설계 · 도구', items: [['architecture', '프로세스 플로우'], ['prompts', 'Copilot 프롬프트']] },
   ]
   return (
@@ -498,6 +529,83 @@ const PageHead = ({ title, sub, children }) => (
     {children && <div className="page-actions">{children}</div>}
   </div>
 )
+
+/* ---------- [추이·영역] 피벗 + 원문검색 (엑셀 1·2번 시트 대응) ---------- */
+function weekKey(w) { const m = String(w).match(/(\d+)\D+(\d+)/); return m ? (+m[1]) * 10 + (+m[2]) : 9999 }
+function buildPivot(data, getL1, getL2) {
+  const tree = {}
+  for (const d of data) {
+    const l1 = getL1(d) || '기타', l2 = getL2(d) || '기타', w = d.week || '미상'
+    const t1 = tree[l1] || (tree[l1] = { sum: 0, byWeek: {}, cats: {} })
+    t1.sum++; t1.byWeek[w] = (t1.byWeek[w] || 0) + 1
+    const t2 = t1.cats[l2] || (t1.cats[l2] = { sum: 0, byWeek: {} })
+    t2.sum++; t2.byWeek[w] = (t2.byWeek[w] || 0) + 1
+  }
+  return tree
+}
+function PivotView({ tree, weeks, l1order }) {
+  const known = (l1order || []).filter((k) => tree[k])
+  const extra = Object.keys(tree).filter((k) => !known.includes(k))
+  const l1s = [...known, ...extra]
+  const grand = weeks.map((w) => l1s.reduce((s, l1) => s + (tree[l1].byWeek[w] || 0), 0))
+  const grandSum = l1s.reduce((s, l1) => s + tree[l1].sum, 0)
+  return (
+    <div className="table-wrap"><table className="vtable pivot">
+      <thead><tr><th className="pv-rowh">구분</th>{weeks.map((w) => <th key={w} className="pv-num">{w}</th>)}<th className="pv-num">합계</th></tr></thead>
+      <tbody>
+        {l1s.map((l1) => {
+          const node = tree[l1]
+          const cats = Object.entries(node.cats).sort((a, b) => b[1].sum - a[1].sum)
+          return (
+            <React.Fragment key={l1}>
+              <tr className="pv-l1"><td>{l1}</td>{weeks.map((w) => <td key={w} className="pv-num">{node.byWeek[w] || ''}</td>)}<td className="pv-num pv-sum">{node.sum}</td></tr>
+              {cats.map(([l2, c]) => <tr key={l2} className="pv-l2"><td>{l2}</td>{weeks.map((w) => <td key={w} className="pv-num">{c.byWeek[w] || ''}</td>)}<td className="pv-num">{c.sum}</td></tr>)}
+            </React.Fragment>
+          )
+        })}
+        <tr className="pv-total"><td>총합계</td>{grand.map((n, i) => <td key={i} className="pv-num">{n}</td>)}<td className="pv-num pv-sum">{grandSum}</td></tr>
+      </tbody>
+    </table></div>
+  )
+}
+function VOCTrends({ added }) {
+  const data = added || []
+  const [q, setQ] = useState(''); const [fw, setFw] = useState('전체'); const [fa, setFa] = useState('전체')
+  const weeks = useMemo(() => [...new Set(data.map((d) => d.week).filter(Boolean))].sort((a, b) => weekKey(a) - weekKey(b)), [data])
+  const pv1 = useMemo(() => buildPivot(data, (d) => d.group, (d) => d.cat), [data])
+  const pv2 = useMemo(() => buildPivot(data, (d) => d.area1, (d) => d.area2), [data])
+  const totalsByWeek = weeks.map((w) => ({ w, n: data.filter((d) => d.week === w).length }))
+  const maxW = Math.max(1, ...totalsByWeek.map((t) => t.n))
+  const results = data.filter((d) => (fw === '전체' || d.week === fw) && (fa === '전체' || d.area1 === fa) && (!q || (d.content || '').includes(q) || (d.summary || '').includes(q)))
+  if (!data.length) return <div className="screen"><PageHead title="기간별·영역별 추이" sub="VOC구분·대응영역 추이와 원문 검색" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 입력하거나 붙여넣으면 추이·영역 피벗이 생성됩니다.</div></div>
+  return (
+    <div className="screen">
+      <PageHead title="기간별·영역별 추이" sub="① 기간별 VOC 추이(구분1·2) · ② 영역별(대응영역1·2) · ③ 원문 검색" />
+      <div className="panel">
+        <div className="card-title">주차별 VOC 추이 <span className="muted">전체 {data.length.toLocaleString()}건 · {weeks.length}개 주차</span></div>
+        <div className="trend-bars">{totalsByWeek.map((t) => <div key={t.w} className="tb-col"><div className="tb-v">{t.n}</div><div className="tb-bar" style={{ height: Math.max(4, t.n / maxW * 120) + 'px' }} /><div className="tb-k">{t.w}</div></div>)}</div>
+      </div>
+      <div className="panel"><div className="card-title">① 기간별 VOC 추이 <span className="muted">VOC구분1 · 구분2 × 주차</span></div><PivotView tree={pv1} weeks={weeks} l1order={GROUPS} /></div>
+      <div className="panel"><div className="card-title">② 영역별 VOC <span className="muted">대응영역1 · 2 × 주차</span></div><PivotView tree={pv2} weeks={weeks} l1order={AREA1_LIST} /></div>
+      <div className="panel">
+        <div className="card-title">③ 기간·영역별 VOC 원문 검색</div>
+        <div className="search-row">
+          <select value={fw} onChange={(e) => setFw(e.target.value)}><option>전체</option>{weeks.map((w) => <option key={w}>{w}</option>)}</select>
+          <select value={fa} onChange={(e) => setFa(e.target.value)}><option>전체</option>{AREA1_LIST.map((a) => <option key={a}>{a}</option>)}</select>
+          <input placeholder="원문 키워드 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+          <span className="muted nowrap">{results.length.toLocaleString()}건</span>
+        </div>
+        <div className="table-wrap"><table className="vtable">
+          <thead><tr><th>ID</th><th>주차</th><th>채널</th><th>구분</th><th>대응영역</th><th>원문</th></tr></thead>
+          <tbody>{results.slice(0, 200).map((d) => (
+            <tr key={d.id}><td className="mono">{d.id}</td><td className="nowrap muted">{d.week || '-'}</td><td><ChannelChip channel={d.channel} /></td><td className="nowrap"><GroupBadge v={d.group} /> <Tag>{d.cat}</Tag></td><td className="nowrap muted">{d.area1} › {d.area2}</td><td className="cell-content" title={d.content}>{d.content}</td></tr>
+          ))}</tbody>
+        </table></div>
+        {results.length > 200 && <p className="micro">상위 200건만 표시 — 검색어/필터로 좁혀주세요.</p>}
+      </div>
+    </div>
+  )
+}
 
 /* ---------- [1] Dashboard (실데이터 집계) ---------- */
 const DONUT_COLORS = ['#e6007e', '#6938ef', '#1570ef', '#12b76a', '#f79009', '#98a2b3']
@@ -775,11 +883,23 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
 }
 
 /* ---------- [4] Case Detail ---------- */
-function CaseDetail({ caseId, notify, added, updateCases }) {
+function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
   const [showNum, setShowNum] = useState(false)
+  const [own, setOwn] = useState(''); const [jira, setJira] = useState('')
+  const [snd, setSnd] = useState({ kind: '문자', to: '', body: '' })
   const all = [...(added || []), ...VOCS]
   const c = all.find((v) => v.id === caseId) || all[0]
+  useEffect(() => {
+    if (!c) return
+    setOwn(c.owner || ''); setJira(c.jiraUrl || '')
+    setSnd({ kind: '문자', to: c.customerRaw || c.customer || '', body: c.sms || '' })
+  }, [c && c.id])
   const copy = (t, l) => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => notify.toast(l + ' 복사됨')).catch(() => notify.toast('복사 실패')); else notify.toast('복사 불가') }
+  const doSend = () => {
+    if (!snd.to.trim() || !snd.body.trim()) { notify.toast('수신·내용을 입력하세요'); return }
+    if (addSent) addSent({ caseId: c.id, kind: snd.kind, owner: own || c.owner || '미지정', to: snd.to.trim(), content: snd.body.trim() })
+    notify.toast(`${snd.kind} 발송 기록됨 (데모) — 발송 이력에 추가`)
+  }
   if (!c) return <div className="screen"><div className="panel empty-panel">표시할 케이스가 없습니다. VOC Inbox에서 VOC를 입력하거나 엑셀을 붙여넣어 추가하세요.</div></div>
   const canReveal = c.customerRaw && c.customerRaw !== c.customer
   return (
@@ -819,8 +939,23 @@ function CaseDetail({ caseId, notify, added, updateCases }) {
           <div className="panel"><div className="block-label">UX/개발 개선 요청</div><div className="impv"><div><span className="impv-k">문제</span>{c.improvement.problem}</div><div><span className="impv-k">제안</span>{c.improvement.suggestion}</div><div><span className="impv-k">기대효과</span>{c.improvement.effect}</div></div></div>
         </div>
         <div className="case-side">
-          <div className="panel"><div className="block-label">추천 액션</div><div className="action-list"><div className="action-item">1. 고객 문자/푸시 안내</div><div className="action-item">2. 담당자 메일 전달</div><div className="action-item">3. UX/개발 개선 검토</div></div></div>
-          <div className="panel"><div className="block-label">실행</div><div className="btn-col"><button className="btn btn-primary" onClick={() => notify.modal('개선 요청 등록', '실제 적용 시 사내 업무시스템(Jira 등)에 개선 요청이 등록됩니다. 본 MVP에서는 데모로 표시됩니다.')}>개선 요청 등록</button><button className="btn btn-ghost" onClick={() => { if (updateCases && c.source === 'input') { updateCases([c.id], { status: '처리 완료' }); notify.toast('진행상황을 ‘처리 완료’로 변경했습니다') } else notify.toast('처리 완료로 표시됨 (데모)') }}>처리 완료로 변경</button><button className="btn btn-ghost" onClick={() => notify.modal('발송 안내', '실제 적용 시 사내 문자/메일/업무시스템과 연동됩니다. 본 MVP에서는 실제 발송하지 않습니다.')}>고객 발송</button></div><p className="micro">최종 확정·발송·개발 반영은 담당자 검수 후 진행됩니다.</p></div>
+          <div className="panel"><div className="block-label">예상 처리 방안</div><div className="action-list"><div className="action-item">{c.action}{c.devNeeded === 'Y' ? ' · 개발 대응 필요' : ''}</div><div className="action-item muted">담당 영역: {c.area1} › {c.area2}</div></div></div>
+          <div className="panel owner-panel">
+            <div className="block-label">담당자 작업</div>
+            <label className="of-row"><span>진행상황</span><select value={c.status} onChange={(e) => updateCases && updateCases([c.id], { status: e.target.value })}>{KANBAN_COLS.map((s) => <option key={s}>{s}</option>)}</select></label>
+            <label className="of-row"><span>담당자</span><input value={own} onChange={(e) => setOwn(e.target.value)} onBlur={() => updateCases && updateCases([c.id], { owner: own })} placeholder="영역 담당자" /></label>
+            <label className="of-row"><span>Jira URL</span><input value={jira} onChange={(e) => setJira(e.target.value)} onBlur={() => updateCases && updateCases([c.id], { jiraUrl: jira })} placeholder="https://jira… (표시용)" /></label>
+            {c.jiraUrl && <a className="jira-link" href={c.jiraUrl} target="_blank" rel="noreferrer">티켓 열기 ↗</a>}
+            <button className="btn btn-ghost sm" onClick={() => notify.modal('개선 요청 등록', '실제 적용 시 사내 업무시스템(Jira 등)에 개선 요청이 등록됩니다. 본 MVP는 데모 표시입니다.')}>개선 요청 등록</button>
+          </div>
+          <div className="panel">
+            <div className="block-label">메일 · 문자 발송 <span className="muted" style={{ fontWeight: 400 }}>데모 · 실제 발송 안 함</span></div>
+            <label className="of-row"><span>유형</span><select value={snd.kind} onChange={(e) => setSnd({ ...snd, kind: e.target.value })}><option>문자</option><option>메일</option></select></label>
+            <label className="of-row"><span>수신</span><input value={snd.to} onChange={(e) => setSnd({ ...snd, to: e.target.value })} placeholder="수신 번호/이메일" /></label>
+            <textarea className="of-area" value={snd.body} onChange={(e) => setSnd({ ...snd, body: e.target.value })} placeholder="발송 내용" />
+            <button className="btn btn-primary" onClick={doSend}>발송 (데모)</button>
+            <p className="micro">발송 시 ‘발송 이력’ 메뉴에 담당자·수신·내용·발송일이 기록됩니다. 최종 발송·개발 반영은 담당자 검수 후 진행됩니다.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -1027,6 +1162,23 @@ function Architecture() {
   )
 }
 
+/* ---------- [발송 이력] 메일·문자 발송 이력 ---------- */
+function SentLog({ sentLog }) {
+  const log = sentLog || []
+  if (!log.length) return <div className="screen"><PageHead title="발송 이력" sub="발송된 메일·문자 전체 이력" /><div className="panel empty-panel">아직 발송 이력이 없습니다. <b>케이스 처리</b> 화면에서 메일/문자를 발송(데모)하면 담당자·수신·내용·발송일이 여기에 기록됩니다.</div></div>
+  return (
+    <div className="screen">
+      <PageHead title="발송 이력" sub={`발송된 메일·문자 ${log.length}건 · 담당자/수신/내용/발송일`} />
+      <div className="table-wrap"><table className="vtable">
+        <thead><tr><th>발송일시</th><th>유형</th><th>담당자</th><th>수신</th><th>케이스</th><th>내용</th></tr></thead>
+        <tbody>{log.map((s) => (
+          <tr key={s.id}><td className="nowrap muted">{s.date}</td><td><span className={'kind ' + (s.kind === '메일' ? 'kind-mail' : 'kind-sms')}>{s.kind}</span></td><td className="nowrap">{s.owner}</td><td className="nowrap">{s.to}</td><td className="mono nowrap">{s.caseId}</td><td className="cell-content" title={s.content}>{s.content}</td></tr>
+        ))}</tbody>
+      </table></div>
+    </div>
+  )
+}
+
 /* ---------- 로그인 / 가입 게이트 ---------- */
 function Login({ onAuthed }) {
   const [mode, setMode] = useState('login')
@@ -1080,6 +1232,8 @@ function Login({ onAuthed }) {
 /* ---------- App ---------- */
 const TITLES = {
   dashboard: ['대시보드', 'VOC 운영 현황과 AI 분류 효과'],
+  trends: ['기간별·영역별 추이', 'VOC구분·대응영역 추이와 원문 검색'],
+  sentlog: ['발송 이력', '발송된 메일·문자 이력'],
   architecture: ['프로세스 플로우', '개선안 처리 흐름 · Before/After · 기대효과'],
   inbox: ['VOC 수집·입력', '수집 VOC 목록 · 직접 입력 분류'],
   board: ['분류 보드', '4그룹 게이트 + 22개 표준분류'],
@@ -1097,6 +1251,9 @@ export default function App() {
   const [panelMode, setPanelMode] = useState('split') // 'split'(분할·기본) | 'collapsed'(Nav 전체) | 'expanded'(Agent 전체)
   const [selected, setSelected] = useState([]) // 체크박스로 선택한 케이스 id (대시보드 ↔ Agent 패널 공유)
   const [added, setAdded] = useState(loadAdded) // 입력/붙여넣은 VOC — localStorage에 저장되어 재접속 시 복원됨
+  const [sentLog, setSentLog] = useState(loadSent)
+  useEffect(() => { saveSent(sentLog) }, [sentLog])
+  const addSent = (e) => setSentLog((l) => [{ id: 'S' + Date.now(), date: new Date().toLocaleString('ko-KR'), ...e }, ...l])
   useEffect(() => {
     const ok = saveAdded(added)
     if (!ok && added.length) setToast('브라우저 저장 한도를 초과해 일부가 저장되지 않았을 수 있습니다')
@@ -1121,11 +1278,13 @@ export default function App() {
             <main className="main-nav">
               <div className="content">
                 {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} selected={selected} setSelected={setSelected} />}
+                {screen === 'trends' && <VOCTrends added={added} />}
                 {screen === 'architecture' && <Architecture />}
                 {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
                 {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
-                {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} />}
+                {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} />}
                 {screen === 'insight' && <InsightReport added={added} />}
+                {screen === 'sentlog' && <SentLog sentLog={sentLog} />}
                 {screen === 'prompts' && <PromptTemplates notify={notify} />}
               </div>
             </main>
