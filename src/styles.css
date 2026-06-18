@@ -394,3 +394,30 @@ h1,h2{margin:0}
 .ap-arrow{margin-left:auto;display:flex;align-items:center;gap:5px;color:var(--muted)}
 .row-done{background:var(--low-soft)!important}
 .row-done:hover td{background:#d6f3e3!important}
+
+/* ---------- 도넛 · 3카드 차트 ---------- */
+.chart3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.chart-card{display:flex;flex-direction:column;gap:12px}
+.donut-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.donut{width:140px;height:140px;flex:0 0 auto}
+.donut-num{font:800 24px var(--mono);fill:var(--ink)}
+.donut-lbl{font-size:11px;fill:var(--muted)}
+.donut-legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;flex:1;min-width:120px}
+.donut-legend li{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--slate)}
+.donut-legend b{margin-left:auto;font-weight:700;color:var(--ink)}
+.lg-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
+
+/* ---------- 체크박스 컬럼 · 선택행 ---------- */
+.cbx-col{width:38px;text-align:center}
+.cbx-col input{width:15px;height:15px;accent-color:var(--magenta);cursor:pointer}
+.vtable tbody tr{cursor:pointer}
+.row-sel{background:var(--magenta-soft)!important}
+.row-sel:hover td{background:#fcd9ec!important}
+
+/* ---------- 칸반 드래그 ---------- */
+.board-hint{font-size:12px;color:var(--muted);background:var(--magenta-soft);border:1px solid #f6c6e0;border-radius:9px;padding:9px 13px}
+.kcard{cursor:grab}
+.kcard:active{cursor:grabbing}
+.kcard-drag{opacity:.45;outline:2px dashed var(--magenta)}
+.kcol-over{outline:2px dashed var(--magenta);outline-offset:-2px;background:var(--magenta-soft)}
+.kcol-over .kcol-body{min-height:60px}

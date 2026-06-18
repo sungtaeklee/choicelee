@@ -160,6 +160,17 @@ function maskPII(s) {
   return t
 }
 
+/* 채널값 정제 — 붙여넣기 열 밀림으로 채널칸에 문장/이메일/시간 등이 들어오면 '기타'로 버킷팅 */
+const KNOWN_CHANNELS = ['고객의소리', 'Call', '콜', '콜랩', 'Medallia', '메달리아', 'App Store', '앱스토어', '구글플레이', '고객센터', '공용메일', '채팅', '챗봇', '홈페이지', '웹', '앱']
+function cleanChannel(ch) {
+  const s = String(ch || '').trim()
+  if (!s) return '미상'
+  if (KNOWN_CHANNELS.includes(s)) return s
+  // 채널 같지 않은 값(문장·이메일·시간·날짜·과도하게 김) → 기타
+  if (s.length > 10 || /@|https?:|[.,?!]|요청|예정|확인|드립니다|건입니다|^\d/.test(s)) return '기타'
+  return s
+}
+
 /* ---------- 엑셀에서 복사한 셀(TSV) 붙여넣기 파싱 ----------
    탭=열 구분, 줄바꿈=행 구분.
    ① 첫 줄이 헤더면 이름으로 열을 찾음(열 순서 무관, 가장 견고)
@@ -230,7 +241,7 @@ function enrichRow(r, id) {
     : null
   return {
     id, source: 'input',
-    channel: r.channel || '고객의소리', customer: maskPII(r.customer) || '****', customerRaw: (r.customer || '').trim(), customerRaw: (r.customer || '').trim(),
+    channel: cleanChannel(r.channel), customer: maskPII(r.customer) || '****', customerRaw: (r.customer || '').trim(),
     date: r.date || '', week: r.week || '', occur: r.occur || '',
     content, summary, group, cat, severity, sentiment, status, conf, review, action, org, mode,
     area1, area2, devNeeded: dev,
@@ -372,12 +383,13 @@ function Topbar({ title, onTogglePanel, panelOpen }) {
     </header>
   )
 }
-function AgentPanel({ screen, caseId, added, notify, onClose, updateCases }) {
+function AgentPanel({ screen, caseId, added, notify, onClose, updateCases, selected, setSelected }) {
   const data = added || []
   const today = new Date().toISOString().slice(0, 10)
   const [done, setDone] = useState(null)
   const single = (screen === 'detail') ? data.find((v) => v.id === caseId) : null
   const todo = data.filter((v) => v.status === '처리 필요')
+  const sel = selected || []
   const proposed = (v) => {
     if (v.group === '장애/오류' || v.group === '성능') return v.devNeeded === 'Y' ? '개발 대응 요청 · 진행상황 안내' : 'AS 우선 배정 · 안내 SMS'
     if (v.group === '개선 요청/희망') return 'UX 개선 검토 등록 · 회신 안내'
@@ -388,6 +400,7 @@ function AgentPanel({ screen, caseId, added, notify, onClose, updateCases }) {
     const items = data.filter((v) => ids.includes(v.id)).map((v) => ({ id: v.id, who: v.customer, cat: v.cat, from: v.status, to: '처리 완료' }))
     updateCases(ids, { status: '처리 완료' })
     setDone({ items })
+    if (setSelected) setSelected([])
     notify.toast(`${ids.length}건 처리 완료 — 가운데 뷰어에 반영됨`)
   }
   const send = (el) => { const v = (el.value || '').trim(); if (!v) return; notify.toast('Copilot에 전달했습니다 (데모)'); el.value = '' }
@@ -433,7 +446,9 @@ function AgentPanel({ screen, caseId, added, notify, onClose, updateCases }) {
               </div>
             ))}
             {todo.length > 6 && <div className="ap-mut">외 {todo.length - 6}건</div>}
-            <button className="ap-act primary" onClick={() => actIds(todo.map((v) => v.id))}>조치 필요 {todo.length}건 일괄 조치</button>
+            {sel.length > 0
+              ? <button className="ap-act primary" onClick={() => actIds(sel)}>선택 {sel.length}건 조치</button>
+              : <button className="ap-act primary" onClick={() => actIds(todo.map((v) => v.id))}>조치 필요 {todo.length}건 일괄 조치</button>}
             <ViewerResult />
           </>
         ) : (
@@ -457,7 +472,22 @@ const Modal = ({ open, title, body, onClose }) => !open ? null : (
 )
 
 /* ---------- [1] Dashboard (실데이터 집계) ---------- */
-function Dashboard({ go, added, openCase }) {
+const DONUT_COLORS = ['#e6007e', '#6938ef', '#1570ef', '#12b76a', '#f79009', '#98a2b3']
+function Donut({ segments, total, centerLabel }) {
+  const sum = segments.reduce((a, s) => a + s.value, 0) || 1
+  const R = 52, C = 2 * Math.PI * R; let off = 0
+  return (
+    <svg viewBox="0 0 140 140" className="donut" role="img">
+      <g transform="translate(70,70) rotate(-90)">
+        <circle r={R} fill="none" stroke="var(--line-2)" strokeWidth="17" />
+        {segments.map((s, i) => { const len = s.value / sum * C; const seg = <circle key={i} r={R} fill="none" stroke={s.color} strokeWidth="17" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-off} />; off += len; return seg })}
+      </g>
+      <text x="70" y="66" textAnchor="middle" className="donut-num">{total.toLocaleString()}</text>
+      <text x="70" y="84" textAnchor="middle" className="donut-lbl">{centerLabel}</text>
+    </svg>
+  )
+}
+function Dashboard({ go, added, openCase, selected, setSelected }) {
   const data = added || []
   const total = data.length
   const reviewCnt = data.filter((v) => v.review).length
@@ -482,6 +512,13 @@ function Dashboard({ go, added, openCase }) {
   const maxStatus = Math.max(1, ...statusDist.map((s) => s.n))
   // 조치 필요(High) 리스트 — 우측 Agent의 일괄 조치가 여기 상태로 반영됨 (선택은 High 기준이라 조치 후에도 행 유지)
   const actionList = data.filter((v) => v.severity === 'High').slice(0, 10)
+  // 그룹(증상 유형) 분포 — 도넛
+  const grpMap = {}; data.forEach((v) => { grpMap[v.group] = (grpMap[v.group] || 0) + 1 })
+  const groupSeg = GROUPS.filter((g) => grpMap[g]).map((g, i) => ({ label: g, value: grpMap[g], color: DONUT_COLORS[i % DONUT_COLORS.length] }))
+  const allIds = actionList.map((v) => v.id)
+  const allChecked = allIds.length > 0 && allIds.every((id) => selected.includes(id))
+  const toggle = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id])
+  const toggleAll = () => setSelected(allChecked ? [] : allIds)
   return (
     <div className="screen">
       <section className="hero">
@@ -497,25 +534,34 @@ function Dashboard({ go, added, openCase }) {
           <div className="stat-row">{stats.map((s) => <div key={s.l} className={'stat-card' + (s.accent ? ' accent' : '') + (s.warn ? ' warn' : '')}><div className="stat-v">{s.v}</div><div className="stat-l">{s.l}</div></div>)}</div>
           <h2 className="sec-title">채널별 VOC <span className="sec-note">합계 {total.toLocaleString()}건 = 전체 VOC</span></h2>
           <div className="card-row">{channels.map((c) => <div key={c.key} className="ch-card"><div className="ch-head"><ChannelIcon channel={c.key} size={18} /><span>{c.key}</span></div><div className="ch-cnt">{c.n.toLocaleString()}건</div></div>)}</div>
-          <div className="two-col">
-            <div className="panel"><h2 className="sec-title">주요 이슈 TOP 5 <span className="sec-note">표준분류 기준</span></h2><ol className="top-list">{top.map((it, i) => <li key={it.t}><span className="rank">{i + 1}</span><span className="top-t">{it.t}</span><span className="top-n">{it.n.toLocaleString()}건</span></li>)}</ol></div>
-            <div className="panel"><h2 className="sec-title">진행상황 분포</h2><div className="funnel">{statusDist.map((f) => <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>)}</div></div>
+          <h2 className="sec-title">분석 요약 <span className="sec-note">증상 유형 · 주요 이슈 · 진행상황</span></h2>
+          <div className="chart3">
+            <div className="panel chart-card">
+              <div className="block-label">증상 유형 분류 <span className="muted">전체 누적</span></div>
+              <div className="donut-wrap">
+                <Donut segments={groupSeg} total={total} centerLabel="전체 VOC" />
+                <ul className="donut-legend">{groupSeg.map((s) => <li key={s.label}><span className="lg-dot" style={{ background: s.color }} />{s.label}<b>{Math.round(s.value / total * 100)}%</b></li>)}</ul>
+              </div>
+            </div>
+            <div className="panel chart-card"><div className="block-label">주요 이슈 TOP 5 <span className="muted">표준분류 기준</span></div><ol className="top-list">{top.map((it, i) => <li key={it.t}><span className="rank">{i + 1}</span><span className="top-t">{it.t}</span><span className="top-n">{it.n.toLocaleString()}건</span></li>)}</ol></div>
+            <div className="panel chart-card"><div className="block-label">진행상황 분포</div><div className="funnel">{statusDist.map((f) => <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>)}</div></div>
           </div>
           {actionList.length > 0 && (
             <>
-              <h2 className="sec-title">조치 필요 VOC <span className="sec-note">High 리스크 {actionList.length}건 · 우측 Agent에서 ‘일괄 조치’하면 상태가 여기 바로 반영됩니다</span></h2>
+              <h2 className="sec-title">조치 필요 VOC <span className="sec-note">High 리스크 {actionList.length}건 · 체크 후 우측 Agent에서 ‘선택 조치’, 미선택 시 ‘전체 조치’ → 상태가 여기 바로 반영됩니다{selected.length ? ` · ${selected.length}건 선택됨` : ''}</span></h2>
               <div className="table-wrap">
                 <table className="vtable">
-                  <thead><tr><th>ID</th><th>고객번호</th><th>채널</th><th>표준분류</th><th>원인(요약)</th><th>주차</th><th>상태</th></tr></thead>
+                  <thead><tr><th className="cbx-col"><input type="checkbox" checked={allChecked} onChange={toggleAll} /></th><th>ID</th><th>고객번호</th><th>채널</th><th>표준분류</th><th>원인(요약)</th><th>주차</th><th>상태</th></tr></thead>
                   <tbody>{actionList.map((v) => (
-                    <tr key={v.id} className={v.status === '처리 완료' ? 'row-done' : ''} onClick={() => openCase && openCase(v.id)}>
-                      <td className="mono">{v.id}</td>
-                      <td className="muted nowrap">{v.customer}</td>
-                      <td><ChannelChip channel={v.channel} /></td>
-                      <td><Tag>{v.cat}</Tag></td>
-                      <td className="cell-content" title={v.content}>{v.summary || v.content}</td>
-                      <td className="muted nowrap">{v.week || '-'}</td>
-                      <td><StatBadge v={v.status} /></td>
+                    <tr key={v.id} className={(v.status === '처리 완료' ? 'row-done' : '') + (selected.includes(v.id) ? ' row-sel' : '')}>
+                      <td className="cbx-col" onClick={(e) => { e.stopPropagation(); toggle(v.id) }}><input type="checkbox" checked={selected.includes(v.id)} onChange={() => toggle(v.id)} /></td>
+                      <td className="mono" onClick={() => openCase && openCase(v.id)}>{v.id}</td>
+                      <td className="muted nowrap" onClick={() => openCase && openCase(v.id)}>{v.customer}</td>
+                      <td onClick={() => openCase && openCase(v.id)}><ChannelChip channel={v.channel} /></td>
+                      <td onClick={() => openCase && openCase(v.id)}><Tag>{v.cat}</Tag></td>
+                      <td className="cell-content" title={v.content} onClick={() => openCase && openCase(v.id)}>{v.summary || v.content}</td>
+                      <td className="muted nowrap" onClick={() => openCase && openCase(v.id)}>{v.week || '-'}</td>
+                      <td onClick={() => openCase && openCase(v.id)}><StatBadge v={v.status} /></td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -628,8 +674,10 @@ function VOCInbox({ openCase, notify, added, setAdded }) {
 }
 
 /* ---------- [3] Classification Board ---------- */
-function ClassificationBoard({ openCase, notify, added }) {
+function ClassificationBoard({ openCase, notify, added, updateCases }) {
   const all = useMemo(() => [...(added || []), ...VOCS], [added])
+  const [dragCol, setDragCol] = useState(null)
+  const [dragId, setDragId] = useState(null)
   return (
     <div className="screen">
       <div className="board-top">
@@ -644,22 +692,29 @@ function ClassificationBoard({ openCase, notify, added }) {
         <div className="block-label" style={{ marginTop: '10px' }}>정형 그룹(닫힌 분류 · AI 재판단 불필요)</div>
         <div className="fixed-list">{Object.entries(FIXED_DEPTH2).map(([g, arr]) => <div key={g} className="fx-row"><GroupBadge v={g} /><span className="muted">{arr.join(' · ')}</span></div>)}</div>
       </div>
+      <div className="board-hint">💡 카드를 드래그해 다른 상태 열로 옮기면 진행상황이 바로 변경됩니다 (저장됨)</div>
       <div className="kanban">
         {KANBAN_COLS.map((col) => {
           const items = all.filter((v) => v.status === col)
           return (
-            <div key={col} className="kcol">
+            <div key={col} className={'kcol' + (dragCol === col ? ' kcol-over' : '')}
+              onDragOver={(e) => { e.preventDefault(); if (dragCol !== col) setDragCol(col) }}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragCol((c) => c === col ? null : c) }}
+              onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain') || dragId; if (id) { updateCases([id], { status: col }); notify.toast(`${id} → ${col} (저장됨)`) } setDragCol(null); setDragId(null) }}>
               <div className="kcol-head"><span>{col}</span><span className="kcount">{items.length}</span></div>
               <div className="kcol-body">
                 {items.map((v) => (
-                  <div key={v.id} className="kcard" onClick={() => openCase(v.id)}>
+                  <div key={v.id} className={'kcard' + (dragId === v.id ? ' kcard-drag' : '')} draggable
+                    onDragStart={(e) => { e.dataTransfer.setData('text/plain', v.id); e.dataTransfer.effectAllowed = 'move'; setDragId(v.id) }}
+                    onDragEnd={() => { setDragCol(null); setDragId(null) }}
+                    onClick={() => openCase(v.id)}>
                     <div className="kcard-top"><ChannelChip channel={v.channel} /><SevBadge v={v.severity} /></div>
                     <div className="kcard-content">{v.content}</div>
                     <div className="kcard-foot"><GroupBadge v={v.group} /></div>
                     <div className="kcard-foot"><Tag>{v.cat}</Tag><span className="muted">{v.action}</span></div>
                   </div>
                 ))}
-                {items.length === 0 && <div className="kempty">없음</div>}
+                {items.length === 0 && <div className="kempty">{dragCol === col ? '여기로 이동' : '없음'}</div>}
               </div>
             </div>
           )
@@ -910,6 +965,7 @@ export default function App() {
   const [toast, setToast] = useState('')
   const [modal, setModal] = useState({ open: false, title: '', body: '' })
   const [panelOpen, setPanelOpen] = useState(true)
+  const [selected, setSelected] = useState([]) // 체크박스로 선택한 케이스 id (대시보드 ↔ Agent 패널 공유)
   const [added, setAdded] = useState(loadAdded) // 입력/붙여넣은 VOC — localStorage에 저장되어 재접속 시 복원됨
   useEffect(() => {
     const ok = saveAdded(added)
@@ -930,16 +986,16 @@ export default function App() {
       <div className="main">
         <Topbar title={t} onTogglePanel={() => setPanelOpen((o) => !o)} panelOpen={panelOpen} />
         <div className="content">
-          {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} />}
+          {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} selected={selected} setSelected={setSelected} />}
           {screen === 'architecture' && <Architecture />}
           {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
-          {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} />}
+          {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
           {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} />}
           {screen === 'insight' && <InsightReport added={added} />}
           {screen === 'prompts' && <PromptTemplates notify={notify} />}
         </div>
       </div>
-      {panelOpen && <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} onClose={() => setPanelOpen(false)} updateCases={updateCases} />}
+      {panelOpen && <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} onClose={() => setPanelOpen(false)} updateCases={updateCases} selected={selected} setSelected={setSelected} />}
       <Toast msg={toast} onClose={() => setToast('')} />
       <Modal open={modal.open} title={modal.title} body={modal.body} onClose={() => setModal({ open: false, title: '', body: '' })} />
     </div>
