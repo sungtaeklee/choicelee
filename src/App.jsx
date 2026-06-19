@@ -392,10 +392,11 @@ function IconRail({ account, onLogout, notify }) {
 }
 function SubLNB({ screen, setScreen }) {
   const SECTIONS = [
-    { label: '현황', items: [['dashboard', '대시보드'], ['trends', '기간별·영역별 추이']] },
+    { label: '현황 · 분석', items: [['dashboard', '대시보드'], ['trends', '기간별·영역별 추이']] },
     { label: '수집 · 자동분류', items: [['inbox', 'VOC 수집·입력'], ['board', '분류 보드']] },
-    { label: '처리 · 반영', items: [['detail', '케이스 처리'], ['insight', '인사이트 리포트'], ['sentlog', '발송 이력']] },
-    { label: '설계 · 도구', items: [['architecture', '프로세스 플로우'], ['prompts', 'Copilot 프롬프트']] },
+    { label: '처리 · 개선', items: [['detail', '케이스 처리'], ['backlog', '개선 백로그'], ['insight', '인사이트 리포트'], ['sentlog', '발송 이력']] },
+    { label: '셀프 해결 · 엔진②', items: [['selfguide', '셀프 해결 가이드']] },
+    { label: '설계 · 도구', items: [['architecture', '솔루션 구조'], ['prompts', 'Copilot 프롬프트']] },
   ]
   return (
     <aside className="sublnb">
@@ -576,6 +577,13 @@ function VOCTrends({ added }) {
   const pv2 = useMemo(() => buildPivot(data, (d) => d.area1, (d) => d.area2), [data])
   const totalsByWeek = weeks.map((w) => ({ w, n: data.filter((d) => d.week === w).length }))
   const maxW = Math.max(1, ...totalsByWeek.map((t) => t.n))
+  // 발생영역 히트맵: 대응영역1 × 주차 집중도
+  const heat = useMemo(() => {
+    const rows = AREA1_LIST.filter((a) => data.some((d) => d.area1 === a))
+    const grid = rows.map((a) => ({ area: a, cells: weeks.map((w) => data.filter((d) => d.area1 === a && d.week === w).length), sum: data.filter((d) => d.area1 === a).length }))
+    const max = Math.max(1, ...grid.flatMap((r) => r.cells))
+    return { rows: grid, max }
+  }, [data, weeks])
   const results = data.filter((d) => (fw === '전체' || d.week === fw) && (fa === '전체' || d.area1 === fa) && (!q || (d.content || '').includes(q) || (d.summary || '').includes(q)))
   if (!data.length) return <div className="screen"><PageHead title="기간별·영역별 추이" sub="VOC구분·대응영역 추이와 원문 검색" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 입력하거나 붙여넣으면 추이·영역 피벗이 생성됩니다.</div></div>
   return (
@@ -587,6 +595,19 @@ function VOCTrends({ added }) {
       </div>
       <div className="panel"><div className="card-title">① 기간별 VOC 추이 <span className="muted">VOC구분1 · 구분2 × 주차</span></div><PivotView tree={pv1} weeks={weeks} l1order={GROUPS} /></div>
       <div className="panel"><div className="card-title">② 영역별 VOC <span className="muted">대응영역1 · 2 × 주차</span></div><PivotView tree={pv2} weeks={weeks} l1order={AREA1_LIST} /></div>
+      <div className="panel">
+        <div className="card-title">발생영역 히트맵 <span className="muted">문제 집중 구간 · 대응영역 × 주차</span></div>
+        <div className="table-wrap"><table className="vtable heatmap">
+          <thead><tr><th className="hm-rowh">대응영역</th>{weeks.map((w) => <th key={w} className="hm-col">{w}</th>)}<th className="hm-col">합계</th></tr></thead>
+          <tbody>{heat.rows.map((r) => (
+            <tr key={r.area}><td className="hm-area">{r.area}</td>{r.cells.map((n, i) => {
+              const o = n / heat.max
+              return <td key={i} className="hm-cell" style={{ background: n ? `rgba(230,0,126,${0.12 + o * 0.78})` : 'transparent', color: o > 0.5 ? '#fff' : 'var(--ink)' }}>{n || ''}</td>
+            })}<td className="hm-sum">{r.sum.toLocaleString()}</td></tr>
+          ))}</tbody>
+        </table></div>
+        <p className="micro">색이 진할수록 해당 주차·영역에 VOC가 집중됨을 의미합니다 (가장 진한 칸 = {heat.max}건).</p>
+      </div>
       <div className="panel">
         <div className="card-title">③ 기간·영역별 VOC 원문 검색</div>
         <div className="search-row">
@@ -654,6 +675,20 @@ function Dashboard({ go, added, openCase, selected, setSelected }) {
   const groupSeg = GROUPS.filter((g) => grpMap[g]).map((g, i) => ({ label: g, value: grpMap[g], color: DONUT_COLORS[i % DONUT_COLORS.length] }))
   const allIds = actionList.map((v) => v.id)
   const allChecked = allIds.length > 0 && allIds.every((id) => selected.includes(id))
+  // 이상 감지·알림: 최신 주차 vs 직전 주차 급증 (VOC구분1·대응영역 기준)
+  const weeksA = [...new Set(data.map((d) => d.week).filter(Boolean))].sort((a, b) => weekKey(a) - weekKey(b))
+  const alerts = []
+  if (weeksA.length >= 2) {
+    const cur = weeksA[weeksA.length - 1], prev = weeksA[weeksA.length - 2]
+    for (const [label, acc] of [['VOC구분1', (d) => d.group], ['대응영역', (d) => d.area1]]) {
+      for (const k of [...new Set(data.map(acc))]) {
+        const c = data.filter((d) => acc(d) === k && d.week === cur).length
+        const p = data.filter((d) => acc(d) === k && d.week === prev).length
+        if (c >= 5 && c > p) { const pc = p ? Math.round((c - p) / p * 100) : 100; if (pc >= 40) alerts.push({ label, k, cur, c, p, pc }) }
+      }
+    }
+    alerts.sort((a, b) => b.pc - a.pc)
+  }
   const toggle = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id])
   const toggleAll = () => setSelected(allChecked ? [] : allIds)
   return (
@@ -661,7 +696,7 @@ function Dashboard({ go, added, openCase, selected, setSelected }) {
       <div className="page-head">
         <div>
           <h1 className="page-title">VOC Action Copilot</h1>
-          <p className="page-sub">입력·붙여넣은 고객 VOC를 Copilot AI가 4그룹·22개 표준분류로 분류하고, 처리 액션과 개선 인사이트까지 연결합니다.</p>
+          <p className="page-sub">수집·자동 분류(엔진①)부터 고객 셀프 해결(엔진②)까지 — 사후 처리를 사전 예방으로 전환하는 VOC 인텔리전스 에이전트.</p>
         </div>
         <div className="page-actions">
           <button className="btn btn-ghost" onClick={() => go('insight')}>인사이트 보기</button>
@@ -678,6 +713,19 @@ function Dashboard({ go, added, openCase, selected, setSelected }) {
               <div className="kpi-main"><span className="kpi-v">{s.v}</span>{s.chip && <span className={'kpi-chip' + (s.cls ? ' ' + s.cls : '')}>{s.chip}</span>}</div>
             </div>
           ))}</div>
+          {alerts.length > 0 && (
+            <div className="panel alert-panel">
+              <div className="card-title">⚠ 이상 감지 · 자동 알림 <span className="muted">{alerts[0].cur} · 직전 주차 대비 급증</span></div>
+              <div className="alert-row">{alerts.slice(0, 4).map((a, i) => (
+                <div key={i} className="alert-card" onClick={() => go('trends')}>
+                  <div className="alert-top"><span className="alert-up">▲ {a.pc}%</span><span className="alert-scope">{a.label}</span></div>
+                  <div className="alert-k">{a.k}</div>
+                  <div className="alert-n">{a.c.toLocaleString()}건 <span className="muted">(전주 {a.p.toLocaleString()})</span></div>
+                </div>
+              ))}</div>
+              <p className="micro">급증·이상 패턴 자동 탐지 → 담당자 알림 (데모). 카드를 누르면 추이 화면으로 이동합니다.</p>
+            </div>
+          )}
           <h2 className="sec-title">분석 요약 <span className="sec-note">증상 유형 · 주요 이슈 · 진행상황</span></h2>
           <div className="chart3">
             <div className="panel chart-card">
@@ -1102,11 +1150,26 @@ function Architecture() {
     <div className="screen">
       <div className="page-head">
         <div>
-          <h1 className="page-title">개선안 프로세스 플로우</h1>
-          <p className="page-sub">VOC 수집·자동 분류부터 셀프 해결·상담 연결까지의 처리 흐름과 피드백 루프 (초안)</p>
+          <h1 className="page-title">솔루션 구조 (TO-BE)</h1>
+          <p className="page-sub">Copilot 데이터 파이프라인 + 두 개의 엔진으로 수집·분류부터 셀프 해결·예방까지 자동화.</p>
         </div>
       </div>
 
+      <div className="pipe-strip">{['데이터 수집', '정제 · 비식별화', '임베딩 · 자동 분류', '개선 인사이트', '셀프 가이드'].map((s, i, a) => (
+        <React.Fragment key={s}><span className={'pipe-step' + (i >= 2 ? ' on' : '')}>{s}</span>{i < a.length - 1 && <span className="pipe-ar">→</span>}</React.Fragment>
+      ))}</div>
+      <div className="eng-grid">
+        <div className="panel eng-card">
+          <div className="eng-h">엔진 ① <b>VOC 분류 · 분석 에이전트</b></div>
+          <ul className="eng-list">{['유형·발생영역 다중 라벨 자동 분류', '감성·긴급도 스코어링으로 우선순위화', '영역별 개선 과제를 원인·액션과 함께 자동 제안', '실시간 트렌드·발생영역 히트맵 대시보드 제공'].map((t) => <li key={t}>{t}</li>)}</ul>
+        </div>
+        <div className="panel eng-card eng-2">
+          <div className="eng-h">엔진 ② <b>고객 셀프 해결 가이드 에이전트</b></div>
+          <ul className="eng-list">{['상담 인입콜 STT(정답 데이터) 학습', '자주 묻는 VOC를 셀프 해결 시나리오로 변환', '접수 전 단계에서 고객 맞춤 가이드 노출', '미해결 건만 정제해 상담사 연결'].map((t) => <li key={t}>{t}</li>)}</ul>
+        </div>
+      </div>
+
+      <h2 className="sec-title">처리 흐름 (Flow Chart)</h2>
       <FlowMap />
 
       <h2 className="sec-title">단계별 상세 <span className="sec-note">3개 레인 · 수집부터 반영까지</span></h2>
@@ -1148,6 +1211,19 @@ function Architecture() {
 
       <div className="note-box"><b>흐름 요약</b> — 고객 VOC는 먼저 <b>셀프 가이드</b>로 해결을 시도해 인입콜·VOC 자체를 줄이고(레인 1), 미해결 건만 상담 연결로 접수됩니다. 접수된 VOC는 <b>수집·전처리·자동 분류</b>(레인 2)를 거쳐 <b>대시보드·인사이트·담당자 알림·고객 안내·서비스 반영</b>(레인 3)으로 처리되며, 처리결과는 다시 분류 모델 학습으로 되먹임됩니다.</div>
 
+      <h2 className="sec-title">활용 배경 · 문제 인식 (AS-IS)</h2>
+      <div className="two-col">
+        <div className="panel">
+          <div className="card-title">현재 처리 프로세스</div>
+          <ol className="asis-steps">{[['인입 · 수집', '채널별 VOC를 개별 채널에서 수집'], ['전처리', '중복·오탈자 정리 · 개인정보 비식별화'], ['수기 분석 · 분류', '유형·발생영역을 담당자가 판단·태깅'], ['집계 · 리포팅', '엑셀 취합 후 정기 리포트 수작성'], ['개선', '①~④ 텀으로 개선 반영 지연']].map(([t, d], i) => <li key={t}><b>{t}</b> — {d}</li>)}</ol>
+        </div>
+        <div className="panel">
+          <div className="card-title">페인포인트 · 근본 원인</div>
+          <div className="pain-chips">{['일일 150~200건', '분류·태깅 수작업', 'Edge case 지식 단절'].map((p) => <span key={p} className="pain-chip">{p}</span>)}</div>
+          <ul className="asis-pain">{['수기 처리로 분류 기준 불명확', '전처리·태깅에 리소스 집중 → 개선 액션 후순위', '동일 유형 VOC·인입콜 반복으로 업무 가중', '분류·분석을 사람에 의존 + 사후 처리 중심 + 셀프 채널 부재'].map((t) => <li key={t}>{t}</li>)}</ul>
+        </div>
+      </div>
+
       <h2 className="sec-title">Before / After</h2>
       <div className="ba-grid">
         <div className="panel ba-before"><div className="ba-tag">Before</div><ul className="ba-list">{['협력업체·사람이 VOC를 수작업 분류', '채널별로 흩어진 VOC를 수작업 취합', '상담사가 고객에게 다시 연락', '중요 이슈는 담당자가 별도로 판단', 'UX/개발 개선 과제 연결이 늦음', '상담 Call과 1:1 문의가 반복 발생'].map((b, i) => <li key={i}>{b}</li>)}</ul></div>
@@ -1157,7 +1233,99 @@ function Architecture() {
       <h2 className="sec-title">기대 효과</h2>
       <div className="effect-row">{[...EFFECTS, { t: '디지털 채널 고객불편 감소', d: '근본 원인 개선으로 재발 방지' }].map((e) => <div key={e.t} className="effect-card"><div className="effect-t">{e.t}</div><div className="effect-d">{e.d}</div></div>)}</div>
 
+      <h2 className="sec-title">구현 로드맵</h2>
+      <div className="roadmap">
+        <div className="rm-step rm-now"><div className="rm-t">PoC <span className="rm-badge">현재</span></div><div className="rm-d">핵심 분류·대시보드 프로토타입 동작</div></div>
+        <span className="rm-ar">→</span>
+        <div className="rm-step"><div className="rm-t">파일럿</div><div className="rm-d">실 VOC·STT 데이터로 정확도 고도화</div></div>
+        <span className="rm-ar">→</span>
+        <div className="rm-step"><div className="rm-t">전사 확산</div><div className="rm-d">CX 전 영역·타 채널로 확대 적용</div></div>
+      </div>
+
       <div className="note-box"><b>설계 메모</b> — 게이트(전문가 풀)로 정형/열림을 나눠 AI는 꼭 필요한 곳에만 쓰고, 생성–검증으로 사람이 마지막을 책임집니다. 현재 MVP는 입력·붙여넣은 데이터 기반이며, 향후 상담어드바이스·메달리아·앱스토어·고객센터 연동, 문자/메일 발송(담당자 검수 후), 개선 티켓 생성(고도화 단계 선택 적용)이 가능합니다.</div>
+    </div>
+  )
+}
+
+/* ---------- [엔진②] 고객 셀프 해결 가이드 ---------- */
+const SELF_GUIDE = {
+  '로그인불가/로그인풀림': ['앱을 최신 버전으로 업데이트 후 재실행', '비밀번호 재설정 또는 간편로그인(생체인증) 재등록', '기기 날짜·시간 자동설정 확인 → 인증 오류 방지'],
+  '회원/로그인/인증': ['본인인증 수단(통신사/PASS) 재시도', '아이디 찾기 · 비밀번호 재설정', '명의자 정보 일치 여부 확인'],
+  '회원/로그인 개선': ['간편로그인(생체인증) 등록으로 재로그인 최소화', '자동 로그아웃 주기 설정 확인', '여러 기기 동시 로그인 시 재인증 안내 확인'],
+  '요금/청구/납부/환불': ['MY > 요금조회에서 청구 상세 확인', '자동이체 · 카드 등록 상태 점검', '중복결제 의심 시 결제내역 캡처 후 문의'],
+  '앱/웹 기능오류': ['앱 캐시 삭제 후 재실행', '최신 버전으로 업데이트', '기기 재부팅 후 재시도'],
+  '앱/웹 접속불가': ['Wi-Fi ↔ 데이터 전환 후 재접속', '앱 최신 버전 확인', '잠시 후 재시도(일시적 부하 가능)'],
+  '앱/웹 속도 느림': ['백그라운드 앱 종료 후 재실행', '캐시 삭제 · 저장공간 확보', 'Wi-Fi 신호 강한 곳에서 재시도'],
+  '데이터(사용량/선물/충전)': ['MY > 데이터에서 잔여량 · 사용량 확인', '데이터 선물 · 충전 메뉴 이용', '안심차단 · 한도 설정 확인'],
+  '멤버십/쿠폰/혜택/VIP콕': ['멤버십 > VIP콕에서 당월 혜택 확인', '쿠폰함에서 사용 가능 쿠폰 확인', '제휴처 사용조건(시간 · 지점) 확인'],
+  '로밍': ['로밍 요금제 가입 여부 확인', '데이터 로밍 ON/OFF 설정 확인', '현지 도착 후 네트워크 수동 검색'],
+}
+const GUIDE_FALLBACK = ['앱을 최신 버전으로 업데이트', '캐시 삭제 후 재실행', '도움말 · FAQ에서 동일 증상 확인', '미해결 시 상담 연결']
+function SelfGuide({ added, notify }) {
+  const data = added || []
+  const total = data.length
+  const catMap = {}; data.forEach((v) => { catMap[v.cat] = (catMap[v.cat] || 0) + 1 })
+  const top = Object.entries(catMap).map(([cat, n]) => ({ cat, n })).sort((a, b) => b.n - a.n).slice(0, 8)
+  const covered = top.filter((t) => SELF_GUIDE[t.cat]).reduce((s, t) => s + t.n, 0)
+  const selfRate = total ? Math.round(covered / total * 100) : 0
+  if (!total) return <div className="screen"><PageHead title="고객 셀프 해결 가이드" sub="엔진② · 접수 전 셀프 해결 시나리오" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 추가하면 자주 묻는 유형이 셀프 해결 가이드로 변환됩니다.</div></div>
+  return (
+    <div className="screen">
+      <PageHead title="고객 셀프 해결 가이드" sub="엔진② · 상담 인입콜 STT(정답 데이터) 학습 → 자주 묻는 VOC를 접수 전 셀프 해결 시나리오로 제공" />
+      <div className="kpi-row">
+        <div className="kpi-card"><div className="kpi-l">자주 묻는 유형</div><div className="kpi-main"><span className="kpi-v">{top.length}</span><span className="kpi-chip">셀프 가이드화</span></div></div>
+        <div className="kpi-card accent brand"><div className="kpi-l">셀프 가이드 커버율</div><div className="kpi-main"><span className="kpi-v">{selfRate}%</span><span className="kpi-chip brand">상위 유형 기준</span></div></div>
+        <div className="kpi-card"><div className="kpi-l">예상 인입콜 감소</div><div className="kpi-main"><span className="kpi-v">{covered.toLocaleString()}</span><span className="kpi-chip">접수 전 자가 해결(데모)</span></div></div>
+      </div>
+      <h2 className="sec-title">자주 묻는 VOC → 셀프 해결 시나리오 <span className="sec-note">빈도 상위 {top.length}개 유형</span></h2>
+      <div className="guide-grid">{top.map((t) => {
+        const steps = SELF_GUIDE[t.cat] || GUIDE_FALLBACK
+        return (
+          <div key={t.cat} className="guide-card">
+            <div className="guide-head"><span className="guide-cat">{t.cat}</span><span className="guide-freq">{t.n.toLocaleString()}건</span></div>
+            <ol className="guide-steps">{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+            <div className="guide-foot"><button className="btn btn-ghost sm" onClick={() => notify.toast('셀프 해결 완료 (데모) — 인입콜 1건 예방')}>해결됐어요</button><button className="btn btn-ghost sm" onClick={() => notify.toast('미해결 — 상담사 연결 (데모)')}>상담 연결</button></div>
+          </div>
+        )
+      })}</div>
+      <div className="note-box"><b>엔진② 동작</b> — 상담 인입콜 STT(정답 데이터)를 학습해 자주 묻는 VOC를 셀프 해결 시나리오로 변환하고, 접수 전 단계에서 고객 맞춤 가이드를 노출합니다. <b>미해결 건만</b> 정제해 상담사에 연결하고, 처리결과는 분류 모델 학습으로 되먹임됩니다(피드백 루프).</div>
+    </div>
+  )
+}
+
+/* ---------- [개선 백로그] 우선순위 매긴 서비스 개선 과제 ---------- */
+function Backlog({ added, openCase }) {
+  const data = added || []
+  if (!data.length) return <div className="screen"><PageHead title="개선 백로그" sub="우선순위가 매겨진 서비스 개선 과제" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 추가하면 영역·유형별 개선 과제가 우선순위와 함께 정리됩니다.</div></div>
+  const map = {}
+  data.forEach((v) => {
+    const key = v.area1 + '||' + v.cat
+    const m = map[key] || (map[key] = { area1: v.area1, area2: v.area2, cat: v.cat, group: v.group, n: 0, high: 0, dev: 0, owner: v.owner, action: v.action, sample: '', sampleId: '' })
+    m.n++; if (v.severity === 'High') m.high++; if (v.devNeeded === 'Y') m.dev++
+    if (!m.sample) { m.sample = v.summary || v.content; m.sampleId = v.id }
+  })
+  const items = Object.values(map).map((m) => ({ ...m, score: m.high * 3 + m.n + (m.dev ? 2 : 0) })).sort((a, b) => b.score - a.score).slice(0, 20)
+  const pr = (i) => i < 3 ? 'P1' : i < 8 ? 'P2' : 'P3'
+  return (
+    <div className="screen">
+      <PageHead title="개선 백로그" sub="VOC 근거와 함께 원인·액션을 도출하고 빈도·심각도로 우선순위를 매긴 서비스 개선 과제" />
+      <div className="table-wrap"><table className="vtable backlog">
+        <thead><tr><th>우선순위</th><th>대응영역</th><th>유형</th><th>건수</th><th>High</th><th>개발</th><th>제안 액션</th><th>담당</th><th>대표 원문</th></tr></thead>
+        <tbody>{items.map((m, i) => (
+          <tr key={m.area1 + m.cat} onClick={() => m.sampleId && openCase(m.sampleId)} className="row-click">
+            <td><span className={'pr-badge pr-' + pr(i).toLowerCase()}>{pr(i)}</span></td>
+            <td className="nowrap muted">{m.area1} › {m.area2}</td>
+            <td className="nowrap"><GroupBadge v={m.group} /> <Tag>{m.cat}</Tag></td>
+            <td className="pv-num">{m.n.toLocaleString()}</td>
+            <td className="pv-num">{m.high || ''}</td>
+            <td className="pv-num">{m.dev ? 'Y' : ''}</td>
+            <td className="nowrap">{m.action}</td>
+            <td className="nowrap muted">{m.owner}</td>
+            <td className="cell-content" title={m.sample}>{m.sample}</td>
+          </tr>
+        ))}</tbody>
+      </table></div>
+      <p className="micro">우선순위 = High 건수×3 + 건수 + 개발대응 가중치. 행을 클릭하면 대표 케이스로 이동합니다. (실제 적용 시 Jira 백로그로 연계)</p>
     </div>
   )
 }
@@ -1234,7 +1402,9 @@ const TITLES = {
   dashboard: ['대시보드', 'VOC 운영 현황과 AI 분류 효과'],
   trends: ['기간별·영역별 추이', 'VOC구분·대응영역 추이와 원문 검색'],
   sentlog: ['발송 이력', '발송된 메일·문자 이력'],
-  architecture: ['프로세스 플로우', '개선안 처리 흐름 · Before/After · 기대효과'],
+  backlog: ['개선 백로그', '우선순위 매긴 서비스 개선 과제'],
+  selfguide: ['셀프 해결 가이드', '엔진② · 접수 전 셀프 해결 시나리오'],
+  architecture: ['솔루션 구조', 'AS-IS / TO-BE · 처리 흐름 · 로드맵'],
   inbox: ['VOC 수집·입력', '수집 VOC 목록 · 직접 입력 분류'],
   board: ['분류 보드', '4그룹 게이트 + 22개 표준분류'],
   detail: ['케이스 처리', '케이스 분석 및 액션'],
@@ -1284,6 +1454,8 @@ export default function App() {
                 {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
                 {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} />}
                 {screen === 'insight' && <InsightReport added={added} />}
+                {screen === 'backlog' && <Backlog added={added} openCase={openCase} />}
+                {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
                 {screen === 'sentlog' && <SentLog sentLog={sentLog} />}
                 {screen === 'prompts' && <PromptTemplates notify={notify} />}
               </div>

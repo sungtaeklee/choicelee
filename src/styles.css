@@ -544,3 +544,66 @@ h1,h2{margin:0}
 .kind{font:700 11px var(--sans);padding:3px 9px;border-radius:11px;white-space:nowrap}
 .kind-mail{background:#e7eefe;color:#2563eb}
 .kind-sms{background:var(--magenta-soft);color:var(--magenta-d)}
+
+/* ---------- 이상 감지·알림 (대시보드) ---------- */
+.alert-panel{border-left:3px solid var(--magenta)}
+.alert-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.alert-card{border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px;cursor:pointer;transition:.15s;background:#fff}
+.alert-card:hover{border-color:var(--magenta);box-shadow:var(--shadow-sm)}
+.alert-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.alert-up{font:800 13px var(--sans);color:var(--magenta-d)}
+.alert-scope{font-size:10px;color:var(--muted);background:#f3f0f7;padding:2px 7px;border-radius:8px}
+.alert-k{font:700 14px var(--sans);color:var(--ink)}
+.alert-n{font-size:12px;color:var(--ink);margin-top:3px}
+
+/* ---------- 발생영역 히트맵 ---------- */
+.heatmap th,.heatmap td{text-align:center;padding:7px 10px;border:1px solid #eef0f4}
+.heatmap .hm-rowh,.heatmap .hm-area{text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:0;background:#fff}
+.heatmap .hm-col{font-size:11px;color:var(--muted);font-weight:600}
+.hm-cell{font:700 12px var(--sans);font-variant-numeric:tabular-nums;min-width:42px}
+.hm-sum{font-weight:800;background:#f4f0fb}
+
+/* ---------- 셀프 가이드 (엔진②) ---------- */
+.guide-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.guide-card{border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px 16px;background:#fff;display:flex;flex-direction:column;gap:10px}
+.guide-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.guide-cat{font:700 14px var(--sans);color:var(--ink)}
+.guide-freq{font:700 11px var(--sans);color:var(--magenta-d);background:var(--magenta-soft);padding:3px 9px;border-radius:10px;white-space:nowrap}
+.guide-steps{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--slate);line-height:1.5}
+.guide-foot{display:flex;gap:8px;margin-top:auto;padding-top:4px}
+
+/* ---------- 개선 백로그 우선순위 ---------- */
+.pr-badge{font:800 11px var(--sans);padding:3px 9px;border-radius:8px;white-space:nowrap}
+.pr-p1{background:var(--magenta);color:#fff}
+.pr-p2{background:#fde0ef;color:var(--magenta-d)}
+.pr-p3{background:#eef0f4;color:var(--slate)}
+.row-click{cursor:pointer}
+.row-click:hover td{background:#faf6fb}
+
+/* ---------- TO-BE 파이프라인 + 엔진 카드 ---------- */
+.pipe-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 4px}
+.pipe-step{border:1px solid var(--line);border-radius:10px;padding:9px 14px;font:600 13px var(--sans);background:#fff;color:var(--slate)}
+.pipe-step.on{background:var(--magenta);border-color:var(--magenta);color:#fff}
+.pipe-ar{color:var(--magenta);font-weight:800}
+.eng-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.eng-grid{grid-template-columns:1fr}}
+.eng-card{border-top:3px solid var(--magenta)}
+.eng-card.eng-2{border-top-color:#b8005f}
+.eng-h{font-size:14px;color:var(--magenta-d);margin-bottom:8px}
+.eng-h b{color:var(--ink)}
+.eng-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--slate);line-height:1.5}
+
+/* ---------- AS-IS / 로드맵 ---------- */
+.asis-steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--slate);line-height:1.5}
+.asis-steps b{color:var(--ink)}
+.asis-pain{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--slate);line-height:1.5}
+.pain-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.pain-chip{font:700 12px var(--sans);background:var(--magenta-soft);color:var(--magenta-d);padding:5px 11px;border-radius:10px}
+.roadmap{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+.rm-step{flex:1;min-width:180px;border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px 16px;background:#fff}
+.rm-step.rm-now{background:var(--magenta);border-color:var(--magenta)}
+.rm-step.rm-now .rm-t,.rm-step.rm-now .rm-d{color:#fff}
+.rm-t{font:800 15px var(--sans);color:var(--ink);display:flex;align-items:center;gap:8px}
+.rm-badge{font:700 10px var(--sans);background:#fff;color:var(--magenta-d);padding:2px 7px;border-radius:7px}
+.rm-d{font-size:12px;color:var(--muted);margin-top:5px}
+.rm-ar{align-self:center;color:var(--magenta);font-weight:800}
