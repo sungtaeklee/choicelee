@@ -374,13 +374,13 @@ const RAIL_ICONS = {
   chat: 'M4 5h16v11H9l-4 4v-4H4z', bell: 'M6 16V11a6 6 0 1112 0v5l2 2H4zM10 21h4',
 }
 const RailIcon = ({ d }) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
-function IconRail({ account, onLogout, notify }) {
+function IconRail({ account, onLogout, notify, railView, setRail }) {
   const items = [['home', '홈'], ['grid', '전체메뉴'], ['mail', '메일'], ['cal', '일정'], ['org', '조직도'], ['pay', '결재']]
   return (
     <nav className="rail">
       <div className="rail-top">
-        {items.map(([k, l]) => <button key={k} className="rail-ic" title={`${l} · 데모 미구현`} onClick={() => notify.toast('이 데모에서는 Agent 화면만 동작합니다')}><RailIcon d={RAIL_ICONS[k]} /><span>{l}</span></button>)}
-        <button className="rail-ic on" title="Agent"><RailIcon d={RAIL_ICONS.chat} /><span>Agent</span></button>
+        {items.map(([k, l]) => <button key={k} className={'rail-ic' + (railView === k ? ' on' : '')} title={l} onClick={() => setRail(k)}><RailIcon d={RAIL_ICONS[k]} /><span>{l}</span></button>)}
+        <button className={'rail-ic' + (railView === 'agent' ? ' on' : '')} title="VOC Agent" onClick={() => setRail('agent')}><RailIcon d={RAIL_ICONS.chat} /><span>Agent</span></button>
       </div>
       <div className="rail-bot">
         <div className="rail-ai">AI</div>
@@ -1347,6 +1347,122 @@ function SentLog({ sentLog }) {
   )
 }
 
+/* ---------- 통합 홈(포털) + 업무 앱 (데모) ---------- */
+const PORTAL_TITLES = { home: '통합 홈', mail: '메일', cal: '일정', org: '조직도', pay: '결재', grid: '전체메뉴' }
+const DemoBanner = ({ children }) => <div className="demo-banner">데모 화면 — {children} 실제 적용 시 사내 시스템과 연동됩니다.</div>
+function HomePortal({ account, added, goAgent, setRail }) {
+  const data = added || []
+  const total = data.length
+  const todo = data.filter((v) => v.status === '처리 필요').length
+  const high = data.filter((v) => v.severity === 'High').length
+  const review = data.filter((v) => v.review).length
+  const autoRate = total ? Math.round(((total - review) / total) * 100) : 0
+  const name = (account || 'U+').split('@')[0]
+  const tiles = [['mail', '메일', '읽지 않음 3'], ['cal', '일정', '오늘 3건'], ['org', '조직도', 'CX 디지털'], ['pay', '결재', '대기 2건'], ['chat', 'VOC Agent', '처리 필요 ' + todo.toLocaleString()]]
+  return (
+    <div className="screen portal-screen">
+      <div className="home-hero">
+        <div><div className="home-hi">안녕하세요, <b>{name}</b>님</div><div className="home-sub">U+ 통합 업무 홈 · 오늘의 업무와 VOC 현황을 한 곳에서 확인하세요.</div></div>
+        <button className="btn btn-primary" onClick={() => goAgent('dashboard')}>VOC Agent 열기</button>
+      </div>
+      <div className="tile-row">{tiles.map(([k, l, s]) => (
+        <button key={l} className="home-tile" onClick={() => k === 'chat' ? goAgent('dashboard') : setRail(k)}>
+          <span className="tile-ic"><RailIcon d={RAIL_ICONS[k]} /></span>
+          <span className="tile-l">{l}</span><span className="tile-s">{s}</span>
+        </button>
+      ))}</div>
+      <div className="home-grid">
+        <div className="panel home-voc">
+          <div className="card-title">오늘의 VOC <span className="muted">VOC Action Copilot</span></div>
+          <div className="hv-kpis">
+            <div><div className="hv-v">{total.toLocaleString()}</div><div className="hv-l">전체</div></div>
+            <div><div className="hv-v">{todo.toLocaleString()}</div><div className="hv-l">처리 필요</div></div>
+            <div><div className="hv-v warn">{high.toLocaleString()}</div><div className="hv-l">High</div></div>
+            <div><div className="hv-v brand">{autoRate}%</div><div className="hv-l">자동분류율</div></div>
+          </div>
+          <div className="hv-links">
+            <button className="btn btn-ghost sm" onClick={() => goAgent('dashboard')}>대시보드</button>
+            <button className="btn btn-ghost sm" onClick={() => goAgent('inbox')}>VOC 입력</button>
+            <button className="btn btn-ghost sm" onClick={() => goAgent('selfguide')}>셀프 가이드</button>
+            <button className="btn btn-ghost sm" onClick={() => goAgent('backlog')}>개선 백로그</button>
+          </div>
+        </div>
+        <div className="panel"><div className="card-title">메일 <span className="muted">최근</span></div>
+          <ul className="home-list">{[['VOC 주간 리포트 공유', 'CX기획팀 · 10:24'], ['[결재] 4월 개선 과제 승인 요청', '김형걸 · 09:10'], ['앱스토어 평점 모니터링 알림', '운영봇 · 어제']].map(([t, m], i) => <li key={i}><span className="hl-t">{t}</span><span className="hl-m">{m}</span></li>)}</ul>
+        </div>
+        <div className="panel"><div className="card-title">오늘 일정</div>
+          <ul className="home-list">{[['10:00', 'VOC 분류 기준 리뷰'], ['14:00', '개선 백로그 우선순위 회의'], ['16:30', '셀프 가이드 시나리오 점검']].map(([tm, t], i) => <li key={i}><span className="hl-time">{tm}</span><span className="hl-t">{t}</span></li>)}</ul>
+        </div>
+        <div className="panel"><div className="card-title">결재 대기 <span className="muted">2건</span></div>
+          <ul className="home-list">{[['4월 VOC 개선 과제 승인', '대기'], ['셀프 가이드 콘텐츠 게시', '대기']].map(([t, s], i) => <li key={i}><span className="hl-t">{t}</span><span className="hl-badge">{s}</span></li>)}</ul>
+        </div>
+      </div>
+    </div>
+  )
+}
+function MailApp() {
+  const rows = [['VOC 주간 리포트 공유', 'CX기획팀', '오늘 10:24', true], ['[결재] 4월 개선 과제 승인 요청', '김형걸', '오늘 09:10', true], ['앱스토어 평점 모니터링 알림', '운영봇', '어제', false], ['셀프 가이드 콘텐츠 검수 요청', '디자인시스템스쿼드', '어제', false], ['장애/오류 급증 이상 감지 통보', 'VOC Agent', '2일 전', false]]
+  return (
+    <div className="screen portal-screen">
+      <PageHead title="메일" sub="사내 메일 · 데모" />
+      <DemoBanner>메일 목록은 예시이며,</DemoBanner>
+      <div className="panel"><ul className="mail-list">{rows.map(([t, f, d, un], i) => (
+        <li key={i} className={un ? 'unread' : ''}><span className="ml-dot" /><span className="ml-from">{f}</span><span className="ml-subj">{t}</span><span className="ml-date">{d}</span></li>
+      ))}</ul></div>
+    </div>
+  )
+}
+function CalendarApp() {
+  const sch = [['10:00', '11:00', 'VOC 분류 기준 리뷰', 'CX기획'], ['14:00', '15:00', '개선 백로그 우선순위 회의', '디지털CX'], ['16:30', '17:00', '셀프 가이드 시나리오 점검', '디자인시스템']]
+  return (
+    <div className="screen portal-screen">
+      <PageHead title="일정" sub="오늘 일정 · 데모" />
+      <DemoBanner>일정은 예시이며,</DemoBanner>
+      <div className="panel"><ul className="sched-list">{sch.map(([s, e, t, who], i) => (
+        <li key={i}><span className="sc-time">{s}<small>–{e}</small></span><span className="sc-bar" /><span className="sc-body"><b>{t}</b><span className="muted">{who}</span></span></li>
+      ))}</ul></div>
+    </div>
+  )
+}
+function OrgApp() {
+  const teams = [['디지털CX', ['CX기획팀', '디자인시스템스쿼드', 'VOC운영팀']], ['MY서비스', ['MY서비스팀', '회원/로그인팀']], ['커머스', ['커머스팀', '멤버십팀']], ['AI', ['AI검색팀', 'Copilot TF']]]
+  return (
+    <div className="screen portal-screen">
+      <PageHead title="조직도" sub="CX 디지털 조직 · 데모" />
+      <DemoBanner>조직 정보는 예시이며,</DemoBanner>
+      <div className="org-grid">{teams.map(([g, subs]) => (
+        <div key={g} className="panel org-card"><div className="org-h">{g}</div><ul className="org-subs">{subs.map((s) => <li key={s}>{s}</li>)}</ul></div>
+      ))}</div>
+    </div>
+  )
+}
+function ApprovalApp({ notify }) {
+  const rows = [['4월 VOC 개선 과제 승인', '디자인시스템스쿼드', '대기'], ['셀프 가이드 콘텐츠 게시', 'VOC운영팀', '대기'], ['3월 VOC 리포트 결재', 'CX기획팀', '완료']]
+  return (
+    <div className="screen portal-screen">
+      <PageHead title="결재" sub="결재 대기·이력 · 데모" />
+      <DemoBanner>결재 항목은 예시이며,</DemoBanner>
+      <div className="panel"><table className="vtable"><thead><tr><th>문서</th><th>상신</th><th>상태</th><th></th></tr></thead>
+        <tbody>{rows.map(([t, who, st], i) => (
+          <tr key={i}><td>{t}</td><td className="muted nowrap">{who}</td><td><span className={'appr ' + (st === '완료' ? 'appr-done' : 'appr-wait')}>{st}</span></td><td>{st === '대기' && <button className="btn btn-ghost sm" onClick={() => notify.toast('결재 승인 (데모)')}>승인</button>}</td></tr>
+        ))}</tbody></table></div>
+    </div>
+  )
+}
+function AllMenu({ goAgent, setRail }) {
+  const apps = [['home', '통합 홈'], ['mail', '메일'], ['cal', '일정'], ['org', '조직도'], ['pay', '결재']]
+  const agentScreens = [['dashboard', '대시보드'], ['trends', '기간별·영역별 추이'], ['inbox', 'VOC 수집·입력'], ['board', '분류 보드'], ['detail', '케이스 처리'], ['backlog', '개선 백로그'], ['insight', '인사이트 리포트'], ['selfguide', '셀프 해결 가이드'], ['sentlog', '발송 이력'], ['architecture', '솔루션 구조'], ['prompts', 'Copilot 프롬프트']]
+  return (
+    <div className="screen portal-screen">
+      <PageHead title="전체메뉴" sub="업무 앱과 VOC Agent 메뉴 바로가기" />
+      <h2 className="sec-title">업무 앱</h2>
+      <div className="tile-row">{apps.map(([k, l]) => <button key={k} className="home-tile" onClick={() => setRail(k)}><span className="tile-ic"><RailIcon d={RAIL_ICONS[k]} /></span><span className="tile-l">{l}</span></button>)}</div>
+      <h2 className="sec-title">VOC Agent</h2>
+      <div className="menu-grid">{agentScreens.map(([k, l]) => <button key={k} className="menu-cell" onClick={() => goAgent(k)}>{l}</button>)}</div>
+    </div>
+  )
+}
+
 /* ---------- 로그인 / 가입 게이트 ---------- */
 function Login({ onAuthed }) {
   const [mode, setMode] = useState('login')
@@ -1419,6 +1535,7 @@ export default function App() {
   const [toast, setToast] = useState('')
   const [modal, setModal] = useState({ open: false, title: '', body: '' })
   const [panelMode, setPanelMode] = useState('split') // 'split'(분할·기본) | 'collapsed'(Nav 전체) | 'expanded'(Agent 전체)
+  const [railView, setRail] = useState('home') // 'home'|'agent'|'mail'|'cal'|'org'|'pay'|'grid'
   const [selected, setSelected] = useState([]) // 체크박스로 선택한 케이스 id (대시보드 ↔ Agent 패널 공유)
   const [added, setAdded] = useState(loadAdded) // 입력/붙여넣은 VOC — localStorage에 저장되어 재접속 시 복원됨
   const [sentLog, setSentLog] = useState(loadSent)
@@ -1432,40 +1549,62 @@ export default function App() {
     toast: (m) => { setToast(m); window.clearTimeout(window.__t); window.__t = window.setTimeout(() => setToast(''), 2200) },
     modal: (title, body) => setModal({ open: true, title, body }),
   }), [])
-  const openCase = (id) => { setCaseId(id); setScreen('detail'); setPanelMode((m) => m === 'collapsed' ? 'split' : m) }
+  const openCase = (id) => { setRail('agent'); setCaseId(id); setScreen('detail'); setPanelMode((m) => m === 'collapsed' ? 'split' : m) }
+  const goAgent = (s) => { setRail('agent'); if (s) setScreen(s) }
   const updateCases = (ids, patch) => setAdded((prev) => prev.map((v) => ids.includes(v.id) ? { ...v, ...patch } : v))
   const [t] = TITLES[screen]
   const agentTitle = new Date().toISOString().slice(0, 10) + ' · 선제조치 Copilot'
   if (!authEmail) return <Login onAuthed={setAuthEmail} />
   return (
     <div className="app">
-      <IconRail account={authEmail} onLogout={() => { setSession(''); setAuthEmail('') }} notify={notify} />
-      <SubLNB screen={screen} setScreen={setScreen} />
-      <div className={'workspace mode-' + panelMode}>
-        <Topbar title={t} mode={panelMode} setMode={setPanelMode} agentTitle={agentTitle} />
-        <div className="workbody">
-          {panelMode !== 'expanded' && (
-            <main className="main-nav">
-              <div className="content">
-                {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} selected={selected} setSelected={setSelected} />}
-                {screen === 'trends' && <VOCTrends added={added} />}
-                {screen === 'architecture' && <Architecture />}
-                {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
-                {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
-                {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} />}
-                {screen === 'insight' && <InsightReport added={added} />}
-                {screen === 'backlog' && <Backlog added={added} openCase={openCase} />}
-                {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
-                {screen === 'sentlog' && <SentLog sentLog={sentLog} />}
-                {screen === 'prompts' && <PromptTemplates notify={notify} />}
-              </div>
-            </main>
-          )}
-          {panelMode !== 'collapsed' && (
-            <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} updateCases={updateCases} selected={selected} setSelected={setSelected} />
-          )}
+      <IconRail account={authEmail} onLogout={() => { setSession(''); setAuthEmail('') }} notify={notify} railView={railView} setRail={setRail} />
+      {railView === 'agent' ? (
+        <>
+          <SubLNB screen={screen} setScreen={setScreen} />
+          <div className={'workspace mode-' + panelMode}>
+            <Topbar title={t} mode={panelMode} setMode={setPanelMode} agentTitle={agentTitle} />
+            <div className="workbody">
+              {panelMode !== 'expanded' && (
+                <main className="main-nav">
+                  <div className="content">
+                    {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} selected={selected} setSelected={setSelected} />}
+                    {screen === 'trends' && <VOCTrends added={added} />}
+                    {screen === 'architecture' && <Architecture />}
+                    {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
+                    {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
+                    {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} />}
+                    {screen === 'insight' && <InsightReport added={added} />}
+                    {screen === 'backlog' && <Backlog added={added} openCase={openCase} />}
+                    {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
+                    {screen === 'sentlog' && <SentLog sentLog={sentLog} />}
+                    {screen === 'prompts' && <PromptTemplates notify={notify} />}
+                  </div>
+                </main>
+              )}
+              {panelMode !== 'collapsed' && (
+                <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} updateCases={updateCases} selected={selected} setSelected={setSelected} />
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="workspace portal">
+          <header className="portal-top">
+            <div className="crumb">U+ Work<span className="crumb-sep">›</span><b>{PORTAL_TITLES[railView]}</b></div>
+            <span className="ai-pill">● 통합 업무 · 데모</span>
+          </header>
+          <main className="portal-body">
+            <div className="content">
+              {railView === 'home' && <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} />}
+              {railView === 'mail' && <MailApp />}
+              {railView === 'cal' && <CalendarApp />}
+              {railView === 'org' && <OrgApp />}
+              {railView === 'pay' && <ApprovalApp notify={notify} />}
+              {railView === 'grid' && <AllMenu goAgent={goAgent} setRail={setRail} />}
+            </div>
+          </main>
         </div>
-      </div>
+      )}
       <Toast msg={toast} onClose={() => setToast('')} />
       <Modal open={modal.open} title={modal.title} body={modal.body} onClose={() => setModal({ open: false, title: '', body: '' })} />
     </div>
