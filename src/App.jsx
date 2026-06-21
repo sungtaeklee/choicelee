@@ -1210,24 +1210,44 @@ function SentLogTable({ sentLog }) {
 /* ---------- 통합 홈(포털) + 업무 앱 (데모) ---------- */
 const PORTAL_TITLES = { home: '통합 홈', mail: '메일', cal: '일정', org: '조직도', pay: '결재', grid: '전체메뉴' }
 const DemoBanner = ({ children }) => <div className="demo-banner">데모 화면 — {children} 실제 적용 시 사내 시스템과 연동됩니다.</div>
-function HomePortal({ account, added, goAgent, setRail }) {
+/* ---------- 홈 공통: 섹션 헤더 · 시그니처 AI 제안 박스 ---------- */
+const Chev = () => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+function CardHead({ title, sub, onMore }) {
+  return (
+    <div className="card-head">
+      <span className="ch-title">{title}{sub && <span className="muted">{sub}</span>}</span>
+      {onMore && <button className="ch-more" onClick={onMore} aria-label="더보기"><Chev /></button>}
+    </div>
+  )
+}
+function AiBox({ q, rows, acts, dismissable = true }) {
+  const [open, setOpen] = useState(true)
+  if (!open) return null
+  return (
+    <div className="ai-box">
+      {dismissable && <button className="ai-x" onClick={() => setOpen(false)} aria-label="닫기">×</button>}
+      <div className="ai-box-q"><span className="ai-spark">✦</span>{q}</div>
+      {rows && rows.length > 0 && <div className="ai-rows">{rows.map((r, i) => (
+        <div key={i} className="ai-row"><span className={'ai-tag ' + r.tag}>{r.label}</span><span>{r.text}</span></div>
+      ))}</div>}
+      {acts && acts.length > 0 && <div className="ai-acts">{acts.map((a, i) => (
+        <button key={i} className={'ai-pill-btn' + (a.primary ? ' primary' : '')} onClick={a.onClick}>{a.label}</button>
+      ))}</div>}
+    </div>
+  )
+}
+function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
   const data = added || []
   const total = data.length
   const todo = data.filter((v) => v.status === '처리 필요').length
   const high = data.filter((v) => v.severity === 'High').length
+  const doing = data.filter((v) => v.status === '처리 중').length
   const review = data.filter((v) => v.review).length
   const autoRate = total ? Math.round(((total - review) / total) * 100) : 0
   const pct = (n) => total ? Math.round((n / total) * 100) : 0
   const name = (account || 'U+').split('@')[0]
-  const tiles = [['mail', '메일', '읽지 않음 3'], ['cal', '일정', '오늘 3건'], ['org', '조직도', 'CX 디지털'], ['pay', '결재', '대기 2건'], ['chat', 'VOC Agent', '처리 필요 ' + todo.toLocaleString()]]
-  const stats = [
-    { v: total.toLocaleString(), l: '전체 VOC', chip: '수집 누적' },
-    { v: autoRate + '%', l: '자동 분류율', chip: '검토불요 기준', accent: true, cls: 'brand' },
-    { v: todo.toLocaleString(), l: '처리 필요', chip: `전체의 ${pct(todo)}%` },
-    { v: high.toLocaleString(), l: 'High 리스크', chip: `전체의 ${pct(high)}%`, warn: true, cls: 'up' },
-    { v: review.toLocaleString(), l: '검토 필요', chip: '사람 확인' },
-  ]
-  // 큰틀 집계 — 증상유형(도넛) · 주요이슈 TOP5 · 진행상황 · 채널
+  const [caseTab, setCaseTab] = useState('high')
+  // 집계
   const grpMap = {}; data.forEach((v) => { grpMap[v.group] = (grpMap[v.group] || 0) + 1 })
   const groupSeg = GROUPS.filter((g) => grpMap[g]).map((g, i) => ({ label: g, value: grpMap[g], color: DONUT_COLORS[i % DONUT_COLORS.length] }))
   const catMap = {}; data.forEach((v) => { catMap[v.cat] = (catMap[v.cat] || 0) + 1 })
@@ -1236,7 +1256,9 @@ function HomePortal({ account, added, goAgent, setRail }) {
   const maxStatus = Math.max(1, ...statusDist.map((s) => s.n))
   const chMap = {}; data.forEach((v) => { chMap[v.channel] = (chMap[v.channel] || 0) + 1 })
   const channels = Object.entries(chMap).map(([key, n]) => ({ key, n })).sort((a, b) => b.n - a.n)
-  // 이상 감지·알림: 최신 주차 vs 직전 주차 급증 (VOC구분1·대응영역 기준)
+  const areaMap = {}; data.forEach((v) => { if (v.area1) areaMap[v.area1] = (areaMap[v.area1] || 0) + 1 })
+  const topArea = Object.entries(areaMap).map(([t, n]) => ({ t, n })).sort((a, b) => b.n - a.n).slice(0, 3)
+  // 이상 감지: 최신 주차 vs 직전 주차 급증
   const weeksA = [...new Set(data.map((d) => d.week).filter(Boolean))].sort((a, b) => weekKey(a) - weekKey(b))
   const alerts = []
   if (weeksA.length >= 2) {
@@ -1250,89 +1272,231 @@ function HomePortal({ account, added, goAgent, setRail }) {
     }
     alerts.sort((a, b) => b.pc - a.pc)
   }
-  return (
-    <div className="screen portal-screen">
-      <div className="home-hero">
-        <div><div className="home-hi">안녕하세요, <b>{name}</b>님</div><div className="home-sub">U+ 통합 업무 홈 · 오늘의 업무와 VOC 현황을 한 곳에서 확인하세요.</div></div>
-        <button className="btn btn-primary" onClick={() => goAgent('inbox')}>VOC Agent 열기</button>
-      </div>
-      <div className="tile-row">{tiles.map(([k, l, s]) => (
-        <button key={l} className="home-tile" onClick={() => k === 'chat' ? goAgent('inbox') : setRail(k)}>
-          <span className="tile-ic"><RailIcon d={RAIL_ICONS[k]} /></span>
-          <span className="tile-l">{l}</span><span className="tile-s">{s}</span>
-        </button>
-      ))}</div>
+  const a0 = alerts[0]
+  // 조치 필요 케이스 (탭)
+  const caseSets = {
+    high: data.filter((v) => v.severity === 'High'),
+    review: data.filter((v) => v.review),
+    doing: data.filter((v) => v.status === '처리 중'),
+  }
+  const caseList = (caseSets[caseTab] || []).slice(0, 4)
+  // 우측 AI 브리핑
+  const brief = []
+  if (todo) brief.push({ t: `처리 필요 VOC ${todo.toLocaleString()}건`, imp: 'hi' })
+  if (a0) brief.push({ t: `${a0.k} 급증 ▲${a0.pc}%`, imp: 'hi' })
+  if (high) brief.push({ t: `High 리스크 ${high.toLocaleString()}건 집중 관리`, imp: 'mid' })
+  brief.push({ t: `자동 분류율 ${autoRate}%`, imp: 'mid' })
+  if (review) brief.push({ t: `검토 필요 ${review.toLocaleString()}건`, imp: 'mid' })
+  const askDemo = (label) => notify && notify.toast(`Copilot에 요청했어요 — ${label} (데모)`)
+  const sendDemo = (el) => { const v = (el.value || '').trim(); if (!v) return; if (notify) notify.toast('Copilot에 전달했어요 (데모)'); el.value = '' }
 
-      {/* VOC 현황 큰틀 — 에이전트 대시보드를 홈으로 통합 */}
-      <div className="home-secline">
-        <h2 className="sec-title">VOC 현황 <span className="sec-note">VOC Action Copilot · 전체 누적 기준</span></h2>
-        <div className="hv-links">
-          <button className="btn btn-ghost sm" onClick={() => goAgent('trends')}>추이 상세</button>
-          <button className="btn btn-ghost sm" onClick={() => goAgent('inbox')}>VOC 입력</button>
-          <button className="btn btn-ghost sm" onClick={() => goAgent('selfguide')}>셀프 가이드</button>
-          <button className="btn btn-ghost sm" onClick={() => goAgent('backlog')}>개선 백로그</button>
+  const aiPanel = (
+    <aside className="home-ai">
+      <div className="ai-badge">✦ VOC Copilot</div>
+      <h3>무엇을 도와드릴까요?</h3>
+      <div className="brief-l">오늘의 VOC 브리핑</div>
+      <div className="brief-box">{(brief.slice(0, 4)).map((b, i) => (
+        <div key={i} className="brief-item"><span className="b-t">{b.t}</span><span className={'imp ' + b.imp}>{b.imp === 'hi' ? '중요도 높음' : '중요도 보통'}</span></div>
+      ))}</div>
+      <div className="chips">
+        <button className="chip-btn" onClick={() => goAgent('trends')}>이상 징후 요약</button>
+        <button className="chip-btn" onClick={() => goAgent('detail')}>처리 필요 정리</button>
+        <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위</button>
+      </div>
+      <div className="ai-input">
+        <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
+        <input placeholder="VOC 관련 무엇이든 물어보세요" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
+        <div className="ai-i-bot">
+          <div className="ai-i-tools"><span onClick={() => askDemo('리서치')}>⌕ 리서치</span><span onClick={() => askDemo('툴')}>✎ 툴</span></div>
+          <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.ai-input').querySelector('input'))}>↑</button>
         </div>
       </div>
+      <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다.</p>
+    </aside>
+  )
+
+  return (
+    <div className="portal-screen home-wide">
+      <div className="home-head">
+        <h1>안녕하세요, <b>{name}</b> 님<span className="dot">.</span></h1>
+        <p>Simply U+로 더 나은 VOC 운영을 만들어요 · 오늘의 현황과 처리할 일을 한 곳에서.</p>
+      </div>
+
       {total === 0 ? (
-        <div className="panel empty-panel">아직 VOC 데이터가 없습니다. <b>VOC Agent › VOC 수집·입력</b>에서 입력하거나 엑셀을 붙여넣으면 여기에 현황이 집계됩니다.<div><button className="btn btn-primary" onClick={() => goAgent('inbox')}>VOC 입력하러 가기</button></div></div>
+        <div className="home2">
+          <div className="home-cols">
+            <div className="hcard">
+              <CardHead title="VOC 현황" sub="아직 데이터 없음" />
+              <div className="empty-mini">수집된 VOC가 아직 없어요. <b>VOC 수집·입력</b>에서 직접 입력하거나 엑셀을 붙여넣으면 이상 감지·증상 유형·처리 현황이 자동으로 집계됩니다.</div>
+              <div className="ai-acts"><button className="ai-pill-btn primary" onClick={() => goAgent('inbox')}>VOC 입력하러 가기</button><button className="ai-pill-btn" onClick={() => setRail('grid')}>전체메뉴</button></div>
+            </div>
+          </div>
+          {aiPanel}
+        </div>
       ) : (
-        <>
-          <div className="kpi-row">{stats.map((s) => (
-            <div key={s.l} className={'kpi-card' + (s.accent ? ' accent' : '') + (s.warn ? ' warn' : '')}>
-              <div className="kpi-l">{s.l}</div>
-              <div className="kpi-main"><span className="kpi-v">{s.v}</span>{s.chip && <span className={'kpi-chip' + (s.cls ? ' ' + s.cls : '')}>{s.chip}</span>}</div>
+        <div className="home2">
+          <div className="home-cols">
+
+            {/* 내 VOC Agent */}
+            <div className="hcard">
+              <CardHead title="내 VOC Agent" sub="엔진 바로가기" onMore={() => setRail('grid')} />
+              <div className="agent-slots">
+                <button className="agent-slot" onClick={() => goAgent('inbox')}><div className="as-k"><b>필수</b> · 분류 엔진①</div><div className="as-v">Copilot 분류</div></button>
+                <button className="agent-slot" onClick={() => goAgent('selfguide')}><div className="as-k">업무 · 엔진②</div><div className="as-v">셀프 가이드</div></button>
+                <button className="agent-slot" onClick={() => setRail('grid')}><div className="as-k">＋ 더보기</div><div className="as-v">둘러보기</div></button>
+              </div>
             </div>
-          ))}</div>
-          {alerts.length > 0 && (
-            <div className="panel alert-panel">
-              <div className="card-title">⚠ 이상 감지 · 자동 알림 <span className="muted">{alerts[0].cur} · 직전 주차 대비 급증</span></div>
-              <div className="alert-row">{alerts.slice(0, 4).map((a, i) => (
-                <div key={i} className="alert-card" onClick={() => goAgent('trends')}>
-                  <div className="alert-top"><span className="alert-up">▲ {a.pc}%</span><span className="alert-scope">{a.label}</span></div>
-                  <div className="alert-k">{a.k}</div>
-                  <div className="alert-n">{a.c.toLocaleString()}건 <span className="muted">(전주 {a.p.toLocaleString()})</span></div>
-                </div>
-              ))}</div>
-              <p className="micro">급증·이상 패턴 자동 탐지 → 담당자 알림 (데모). 카드를 누르면 추이 상세로 이동합니다.</p>
+
+            {/* 오늘의 VOC (To-do 스탯) */}
+            <div className="hcard">
+              <CardHead title="오늘의 VOC" sub={`자동 분류율 ${autoRate}%`} onMore={() => goAgent('inbox')} />
+              <div className="stat-row">
+                <div className="stat-col"><div className="stat-l">처리 필요</div><div className="stat-v">{todo.toLocaleString()}</div></div>
+                <div className="stat-col"><div className="stat-l">High 리스크</div><div className="stat-v warn">{high.toLocaleString()}</div></div>
+                <div className="stat-col"><div className="stat-l">검토 필요</div><div className="stat-v">{review.toLocaleString()}</div></div>
+              </div>
             </div>
-          )}
-          <div className="chart3">
-            <div className="panel chart-card">
-              <div className="card-title">증상 유형 분류 <span className="muted">전체 누적</span></div>
+
+            {/* 이상 감지 · 자동 알림 (시그니처) */}
+            <div className="hcard signature">
+              <CardHead title="이상 감지 · 자동 알림" sub={a0 ? `${a0.cur} · 직전 주차 대비` : '최근 안정'} onMore={() => goAgent('trends')} />
+              {a0 ? (
+                <>
+                  <div className="metric">
+                    <div className="metric-l">{a0.label} · {a0.k}</div>
+                    <div className="metric-main">
+                      <span className="metric-delta"><span className="arrow">▲</span> {a0.pc}%</span>
+                      <span className="metric-side">최근 주차 <b>{a0.c.toLocaleString()}</b>건 <span className="muted">(전주 {a0.p.toLocaleString()})</span></span>
+                    </div>
+                  </div>
+                  <AiBox
+                    q="급증 원인과 대응 방안을 정리했어요. 바로 진행할까요?"
+                    rows={[
+                      { tag: 'cause', label: '원인분석', text: `${a0.k} 관련 VOC가 직전 주차 대비 ${a0.pc}% 급증` },
+                      { tag: 'act', label: '조치결과', text: `최근 주차 ${a0.c.toLocaleString()}건 집중 발생 · 담당 영역 확인 필요` },
+                      { tag: 'next', label: '후속방안', text: '추이 상세 확인 → 담당 배정 · 셀프 가이드 보강' },
+                    ]}
+                    acts={[
+                      { label: '추이 상세 보기', onClick: () => goAgent('trends') },
+                      { label: '처리 시작', primary: true, onClick: () => goAgent('board') },
+                    ]}
+                  />
+                </>
+              ) : (
+                <div className="calm">최근 주차에서 급증 패턴이 감지되지 않았어요. 추이는 안정적입니다. <button className="link-btn" onClick={() => goAgent('trends')}>추이 상세 보기</button></div>
+              )}
+            </div>
+
+            {/* 조치 필요 VOC (탭 + AI 박스) */}
+            <div className="hcard">
+              <CardHead title="조치 필요 VOC" onMore={() => goAgent('detail')} />
+              <div className="card-tabs">
+                <button className={'card-tab' + (caseTab === 'high' ? ' on' : '')} onClick={() => setCaseTab('high')}>High<span className="cnt">{high}</span></button>
+                <button className={'card-tab' + (caseTab === 'review' ? ' on' : '')} onClick={() => setCaseTab('review')}>검토필요<span className="cnt">{review}</span></button>
+                <button className={'card-tab' + (caseTab === 'doing' ? ' on' : '')} onClick={() => setCaseTab('doing')}>처리중<span className="cnt">{doing}</span></button>
+              </div>
+              <div className="case-mini">
+                {caseList.length ? caseList.map((v) => (
+                  <div key={v.id} className="case-mini-row" onClick={() => openCase && openCase(v.id)}>
+                    {v.severity === 'High' && <span className="badge-sev">High</span>}
+                    <span className="mini-t">{v.summary || v.content}</span>
+                    <span className="mini-n">{v.cat}</span>
+                  </div>
+                )) : <div className="empty-mini">해당 조건의 케이스가 없어요.</div>}
+              </div>
+              <AiBox
+                q={`처리 필요 ${todo.toLocaleString()}건을 제안 액션으로 한 번에 정리할 수 있어요.`}
+                acts={[
+                  { label: '일괄 처리 시작', primary: true, onClick: () => goAgent('board') },
+                  { label: '개별 확인', onClick: () => goAgent('detail') },
+                ]}
+              />
+            </div>
+
+            {/* 증상 유형 분류 (도넛) */}
+            <div className="hcard">
+              <CardHead title="증상 유형 분류" sub="전체 누적" onMore={() => goAgent('trends')} />
               <div className="donut-wrap">
                 <Donut segments={groupSeg} total={total} centerLabel="전체 VOC" />
                 <ul className="donut-legend">{groupSeg.map((s) => <li key={s.label}><span className="lg-dot" style={{ background: s.color }} />{s.label}<b>{pct(s.value)}%</b></li>)}</ul>
               </div>
             </div>
-            <div className="panel chart-card"><div className="card-title">주요 이슈 TOP 5 <span className="muted">표준분류 기준</span></div><ol className="top-list">{topCat.map((it, i) => <li key={it.t}><span className="rank">{i + 1}</span><span className="top-t">{it.t}</span><span className="top-n">{it.n.toLocaleString()}건</span></li>)}</ol></div>
-            <div className="panel chart-card"><div className="card-title">진행상황 분포</div><div className="funnel">{statusDist.map((f) => <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>)}</div></div>
-          </div>
-          <div className="panel">
-            <div className="card-title">채널별 분포 <span className="muted">합계 {total.toLocaleString()}건</span></div>
-            <div className="hbars">{channels.slice(0, 7).map((c) => (
-              <div key={c.key} className="hbar-row">
-                <span className="hbar-k"><ChannelIcon channel={c.key} size={15} />{c.key}</span>
-                <div className="hbar-track"><div className="hbar-fill" style={{ width: Math.max(3, c.n / channels[0].n * 100) + '%' }} /></div>
-                <span className="hbar-n">{c.n.toLocaleString()}건</span>
-              </div>
-            ))}</div>
-          </div>
-        </>
-      )}
 
-      {/* 업무 포털 요약 */}
-      <h2 className="sec-title">오늘의 업무 <span className="sec-note">메일 · 일정 · 결재</span></h2>
-      <div className="home-grid">
-        <div className="panel"><div className="card-title">메일 <span className="muted">최근</span></div>
-          <ul className="home-list">{[['VOC 주간 리포트 공유', 'CX기획팀 · 10:24'], ['[결재] 4월 개선 과제 승인 요청', '김형걸 · 09:10'], ['앱스토어 평점 모니터링 알림', '운영봇 · 어제']].map(([t, m], i) => <li key={i}><span className="hl-t">{t}</span><span className="hl-m">{m}</span></li>)}</ul>
+            {/* 주요 이슈 TOP 5 */}
+            <div className="hcard">
+              <CardHead title="주요 이슈 TOP 5" sub="표준분류 기준" onMore={() => goAgent('insight')} />
+              <ul className="mini-list">{topCat.map((it, i) => (
+                <li key={it.t}><span className="mini-rank">{i + 1}</span><span className="mini-t">{it.t}</span><span className="mini-n">{it.n.toLocaleString()}건</span></li>
+              ))}</ul>
+            </div>
+
+            {/* 진행상황 분포 */}
+            <div className="hcard">
+              <CardHead title="진행상황 분포" onMore={() => goAgent('board')} />
+              <div className="funnel">{statusDist.map((f) => (
+                <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>
+              ))}</div>
+            </div>
+
+            {/* 채널별 분포 */}
+            <div className="hcard">
+              <CardHead title="채널별 분포" sub={`합계 ${total.toLocaleString()}건`} />
+              <div className="hbars">{channels.slice(0, 6).map((c) => (
+                <div key={c.key} className="hbar-row">
+                  <span className="hbar-k"><ChannelIcon channel={c.key} size={15} />{c.key}</span>
+                  <div className="hbar-track"><div className="hbar-fill" style={{ width: Math.max(3, c.n / channels[0].n * 100) + '%' }} /></div>
+                  <span className="hbar-n">{c.n.toLocaleString()}건</span>
+                </div>
+              ))}</div>
+            </div>
+
+            {/* 셀프 해결 & 개선 */}
+            <div className="hcard">
+              <CardHead title="셀프 해결 & 개선" sub="접수 전 차단 · 과제화" />
+              <div className="sub-block">
+                <div className="sub-l">자주 묻는 유형 → 셀프 가이드</div>
+                <ul className="mini-list">{topCat.slice(0, 3).map((it) => (
+                  <li key={it.t}><span className="mini-t">{it.t}</span><span className="mini-n">{it.n.toLocaleString()}건</span></li>
+                ))}</ul>
+              </div>
+              <div className="sub-block">
+                <div className="sub-l">개선 백로그 후보 (대응영역)</div>
+                <ul className="mini-list">{topArea.map((it) => (
+                  <li key={it.t}><span className="mini-t">{it.t}</span><span className="mini-n">{it.n.toLocaleString()}건</span></li>
+                ))}</ul>
+              </div>
+              <div className="ai-acts"><button className="ai-pill-btn" onClick={() => goAgent('selfguide')}>셀프 가이드</button><button className="ai-pill-btn" onClick={() => goAgent('backlog')}>개선 백로그</button></div>
+            </div>
+
+            {/* 즐겨찾는 메뉴 */}
+            <div className="hcard">
+              <CardHead title="즐겨찾는 메뉴" onMore={() => setRail('grid')} />
+              <div className="fav-grid">
+                {[['inbox', 'VOC 입력'], ['board', '분류 보드'], ['trends', '추이'], ['detail', '케이스 처리'], ['insight', '인사이트'], ['selfguide', '셀프 가이드']].map(([k, l]) => (
+                  <button key={k} className="fav-cell" onClick={() => goAgent(k)}>{l}</button>
+                ))}
+              </div>
+              <AiBox q="자주 보는 화면을 홈에 더 추가해드릴까요?" acts={[{ label: '메뉴 편집', onClick: () => askDemo('즐겨찾기 편집') }]} />
+            </div>
+
+            {/* 오늘의 업무 (포털 데모) */}
+            <div className="hcard">
+              <CardHead title="오늘의 업무" sub="메일 · 일정 · 결재" />
+              <div className="sub-block">
+                <div className="sub-l">메일</div>
+                <ul className="home-list">{[['VOC 주간 리포트 공유', 'CX기획팀 · 10:24'], ['앱스토어 평점 모니터링 알림', '운영봇 · 어제']].map(([t, m], i) => <li key={i}><span className="hl-t">{t}</span><span className="hl-m">{m}</span></li>)}</ul>
+              </div>
+              <div className="sub-block">
+                <div className="sub-l">오늘 일정</div>
+                <ul className="home-list">{[['10:00', 'VOC 분류 기준 리뷰'], ['14:00', '개선 백로그 우선순위 회의']].map(([tm, t], i) => <li key={i}><span className="hl-time">{tm}</span><span className="hl-t">{t}</span></li>)}</ul>
+              </div>
+              <div className="ai-acts"><button className="ai-pill-btn" onClick={() => setRail('mail')}>메일</button><button className="ai-pill-btn" onClick={() => setRail('cal')}>일정</button><button className="ai-pill-btn" onClick={() => setRail('pay')}>결재</button></div>
+            </div>
+
+          </div>
+          {aiPanel}
         </div>
-        <div className="panel"><div className="card-title">오늘 일정</div>
-          <ul className="home-list">{[['10:00', 'VOC 분류 기준 리뷰'], ['14:00', '개선 백로그 우선순위 회의'], ['16:30', '셀프 가이드 시나리오 점검']].map(([tm, t], i) => <li key={i}><span className="hl-time">{tm}</span><span className="hl-t">{t}</span></li>)}</ul>
-        </div>
-        <div className="panel"><div className="card-title">결재 대기 <span className="muted">2건</span></div>
-          <ul className="home-list">{[['4월 VOC 개선 과제 승인', '대기'], ['셀프 가이드 콘텐츠 게시', '대기']].map(([t, s], i) => <li key={i}><span className="hl-t">{t}</span><span className="hl-badge">{s}</span></li>)}</ul>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -1543,7 +1707,7 @@ export default function App() {
           </header>
           <main className="portal-body">
             <div className="content">
-              {railView === 'home' && <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} />}
+              {railView === 'home' && <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} openCase={openCase} notify={notify} />}
               {railView === 'mail' && <MailApp sentLog={sentLog} />}
               {railView === 'cal' && <CalendarApp />}
               {railView === 'org' && <OrgApp />}
