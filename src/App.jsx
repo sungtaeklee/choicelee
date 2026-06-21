@@ -392,11 +392,10 @@ function IconRail({ account, onLogout, notify, railView, setRail }) {
 }
 function SubLNB({ screen, setScreen }) {
   const SECTIONS = [
-    { label: '현황 · 분석', items: [['dashboard', '대시보드'], ['trends', '기간별·영역별 추이']] },
+    { label: '현황 · 분석', items: [['trends', '기간별·영역별 추이']] },
     { label: '수집 · 자동분류', items: [['inbox', 'VOC 수집·입력'], ['board', '분류 보드']] },
-    { label: '처리 · 개선', items: [['detail', '케이스 처리'], ['backlog', '개선 백로그'], ['insight', '인사이트 리포트'], ['sentlog', '발송 이력']] },
+    { label: '처리 · 개선', items: [['detail', '케이스 처리'], ['backlog', '개선 백로그'], ['insight', '인사이트 리포트']] },
     { label: '셀프 해결 · 엔진②', items: [['selfguide', '셀프 해결 가이드']] },
-    { label: '설계 · 도구', items: [['architecture', '솔루션 구조'], ['prompts', 'Copilot 프롬프트']] },
   ]
   return (
     <aside className="sublnb">
@@ -628,7 +627,7 @@ function VOCTrends({ added }) {
   )
 }
 
-/* ---------- [1] Dashboard (실데이터 집계) ---------- */
+/* ---------- 공통: 도넛 차트 + 색상 (홈 현황 요약에서 사용) ---------- */
 const DONUT_COLORS = ['#e6007e', '#6938ef', '#1570ef', '#12b76a', '#f79009', '#98a2b3']
 function Donut({ segments, total, centerLabel }) {
   const sum = segments.reduce((a, s) => a + s.value, 0) || 1
@@ -644,142 +643,6 @@ function Donut({ segments, total, centerLabel }) {
     </svg>
   )
 }
-function Dashboard({ go, added, openCase, selected, setSelected }) {
-  const data = added || []
-  const total = data.length
-  const reviewCnt = data.filter((v) => v.review).length
-  const highCnt = data.filter((v) => v.severity === 'High').length
-  const todoCnt = data.filter((v) => v.status === '처리 필요').length
-  const autoRate = total ? Math.round(((total - reviewCnt) / total) * 100) : 0
-  const pct = (n) => total ? Math.round((n / total) * 100) : 0
-  const stats = [
-    { v: total.toLocaleString(), l: '전체 VOC', chip: '수집 누적' },
-    { v: autoRate + '%', l: '자동 분류율', chip: '검토불요 기준', accent: true, cls: 'brand' },
-    { v: todoCnt.toLocaleString(), l: '처리 필요', chip: `전체의 ${pct(todoCnt)}%` },
-    { v: highCnt.toLocaleString(), l: 'High 리스크', chip: `전체의 ${pct(highCnt)}%`, warn: true, cls: 'up' },
-    { v: reviewCnt.toLocaleString(), l: '검토 필요', chip: '사람 확인' },
-  ]
-  // 채널별 집계
-  const chMap = {}; data.forEach((v) => { chMap[v.channel] = (chMap[v.channel] || 0) + 1 })
-  const channels = Object.entries(chMap).map(([key, n]) => ({ key, n })).sort((a, b) => b.n - a.n)
-  // 표준분류 TOP 5
-  const catMap = {}; data.forEach((v) => { catMap[v.cat] = (catMap[v.cat] || 0) + 1 })
-  const top = Object.entries(catMap).map(([t, n]) => ({ t, n })).sort((a, b) => b.n - a.n).slice(0, 5)
-  // 진행상황 분포
-  const statusDist = KANBAN_COLS.map((k) => ({ k, n: data.filter((v) => v.status === k).length }))
-  const maxStatus = Math.max(1, ...statusDist.map((s) => s.n))
-  // 조치 필요(High) 리스트 — 우측 Agent의 일괄 조치가 여기 상태로 반영됨 (선택은 High 기준이라 조치 후에도 행 유지)
-  const actionList = data.filter((v) => v.severity === 'High').slice(0, 10)
-  // 그룹(증상 유형) 분포 — 도넛
-  const grpMap = {}; data.forEach((v) => { grpMap[v.group] = (grpMap[v.group] || 0) + 1 })
-  const groupSeg = GROUPS.filter((g) => grpMap[g]).map((g, i) => ({ label: g, value: grpMap[g], color: DONUT_COLORS[i % DONUT_COLORS.length] }))
-  const allIds = actionList.map((v) => v.id)
-  const allChecked = allIds.length > 0 && allIds.every((id) => selected.includes(id))
-  // 이상 감지·알림: 최신 주차 vs 직전 주차 급증 (VOC구분1·대응영역 기준)
-  const weeksA = [...new Set(data.map((d) => d.week).filter(Boolean))].sort((a, b) => weekKey(a) - weekKey(b))
-  const alerts = []
-  if (weeksA.length >= 2) {
-    const cur = weeksA[weeksA.length - 1], prev = weeksA[weeksA.length - 2]
-    for (const [label, acc] of [['VOC구분1', (d) => d.group], ['대응영역', (d) => d.area1]]) {
-      for (const k of [...new Set(data.map(acc))]) {
-        const c = data.filter((d) => acc(d) === k && d.week === cur).length
-        const p = data.filter((d) => acc(d) === k && d.week === prev).length
-        if (c >= 5 && c > p) { const pc = p ? Math.round((c - p) / p * 100) : 100; if (pc >= 40) alerts.push({ label, k, cur, c, p, pc }) }
-      }
-    }
-    alerts.sort((a, b) => b.pc - a.pc)
-  }
-  const toggle = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id])
-  const toggleAll = () => setSelected(allChecked ? [] : allIds)
-  return (
-    <div className="screen">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">VOC Action Copilot</h1>
-          <p className="page-sub">수집·자동 분류(엔진①)부터 고객 셀프 해결(엔진②)까지 — 사후 처리를 사전 예방으로 전환하는 VOC 인텔리전스 에이전트.</p>
-        </div>
-        <div className="page-actions">
-          <button className="btn btn-ghost" onClick={() => go('insight')}>인사이트 보기</button>
-          <button className="btn btn-primary" onClick={() => go('inbox')}>VOC 입력 시작</button>
-        </div>
-      </div>
-      {total === 0 ? (
-        <div className="panel empty-panel">아직 데이터가 없습니다. <b>VOC Inbox</b>에서 VOC를 입력하거나 엑셀을 붙여넣으면 여기에 실시간 집계됩니다.<div><button className="btn btn-primary" onClick={() => go('inbox')}>VOC 입력하러 가기</button></div></div>
-      ) : (
-        <>
-          <div className="kpi-row">{stats.map((s) => (
-            <div key={s.l} className={'kpi-card' + (s.accent ? ' accent' : '') + (s.warn ? ' warn' : '')}>
-              <div className="kpi-l">{s.l}</div>
-              <div className="kpi-main"><span className="kpi-v">{s.v}</span>{s.chip && <span className={'kpi-chip' + (s.cls ? ' ' + s.cls : '')}>{s.chip}</span>}</div>
-            </div>
-          ))}</div>
-          {alerts.length > 0 && (
-            <div className="panel alert-panel">
-              <div className="card-title">⚠ 이상 감지 · 자동 알림 <span className="muted">{alerts[0].cur} · 직전 주차 대비 급증</span></div>
-              <div className="alert-row">{alerts.slice(0, 4).map((a, i) => (
-                <div key={i} className="alert-card" onClick={() => go('trends')}>
-                  <div className="alert-top"><span className="alert-up">▲ {a.pc}%</span><span className="alert-scope">{a.label}</span></div>
-                  <div className="alert-k">{a.k}</div>
-                  <div className="alert-n">{a.c.toLocaleString()}건 <span className="muted">(전주 {a.p.toLocaleString()})</span></div>
-                </div>
-              ))}</div>
-              <p className="micro">급증·이상 패턴 자동 탐지 → 담당자 알림 (데모). 카드를 누르면 추이 화면으로 이동합니다.</p>
-            </div>
-          )}
-          <h2 className="sec-title">분석 요약 <span className="sec-note">증상 유형 · 주요 이슈 · 진행상황</span></h2>
-          <div className="chart3">
-            <div className="panel chart-card">
-              <div className="card-title">증상 유형 분류 <span className="muted">전체 누적</span></div>
-              <div className="donut-wrap">
-                <Donut segments={groupSeg} total={total} centerLabel="전체 VOC" />
-                <ul className="donut-legend">{groupSeg.map((s) => <li key={s.label}><span className="lg-dot" style={{ background: s.color }} />{s.label}<b>{pct(s.value)}%</b></li>)}</ul>
-              </div>
-            </div>
-            <div className="panel chart-card"><div className="card-title">주요 이슈 TOP 5 <span className="muted">표준분류 기준</span></div><ol className="top-list">{top.map((it, i) => <li key={it.t}><span className="rank">{i + 1}</span><span className="top-t">{it.t}</span><span className="top-n">{it.n.toLocaleString()}건</span></li>)}</ol></div>
-            <div className="panel chart-card"><div className="card-title">진행상황 분포</div><div className="funnel">{statusDist.map((f) => <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>)}</div></div>
-          </div>
-          <div className="panel">
-            <div className="card-title">채널별 분포 <span className="muted">합계 {total.toLocaleString()}건</span></div>
-            <div className="hbars">{channels.slice(0, 7).map((c) => (
-              <div key={c.key} className="hbar-row">
-                <span className="hbar-k"><ChannelIcon channel={c.key} size={15} />{c.key}</span>
-                <div className="hbar-track"><div className="hbar-fill" style={{ width: Math.max(3, c.n / channels[0].n * 100) + '%' }} /></div>
-                <span className="hbar-n">{c.n.toLocaleString()}건</span>
-              </div>
-            ))}</div>
-          </div>
-          {actionList.length > 0 && (
-            <>
-              <h2 className="sec-title">조치 필요 VOC <span className="sec-note">High 리스크 {actionList.length}건 · 체크 후 우측 Agent에서 ‘선택 조치’, 미선택 시 ‘전체 조치’{selected.length ? ` · ${selected.length}건 선택됨` : ''}</span></h2>
-              <div className="table-wrap">
-                <table className="vtable">
-                  <thead><tr><th className="cbx-col"><input type="checkbox" checked={allChecked} onChange={toggleAll} /></th><th>ID</th><th>고객번호</th><th>채널</th><th>표준분류</th><th>원인(요약)</th><th>주차</th><th>상태</th></tr></thead>
-                  <tbody>{actionList.map((v) => (
-                    <tr key={v.id} className={(v.status === '처리 완료' ? 'row-done' : '') + (selected.includes(v.id) ? ' row-sel' : '')}>
-                      <td className="cbx-col" onClick={(e) => { e.stopPropagation(); toggle(v.id) }}><input type="checkbox" checked={selected.includes(v.id)} onChange={() => toggle(v.id)} /></td>
-                      <td className="mono" onClick={() => openCase && openCase(v.id)}>{v.id}</td>
-                      <td className="muted nowrap" onClick={() => openCase && openCase(v.id)}>{v.customer}</td>
-                      <td onClick={() => openCase && openCase(v.id)}><ChannelChip channel={v.channel} /></td>
-                      <td onClick={() => openCase && openCase(v.id)}><Tag>{v.cat}</Tag></td>
-                      <td className="cell-content" title={v.content} onClick={() => openCase && openCase(v.id)}>{v.summary || v.content}</td>
-                      <td className="muted nowrap" onClick={() => openCase && openCase(v.id)}>{v.week || '-'}</td>
-                      <td onClick={() => openCase && openCase(v.id)}><StatBadge v={v.status} /></td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            </>
-          )}
-          <div className="panel effect-panel">
-            <div className="card-title">기대 효과</div>
-            <div className="effect-row">{EFFECTS.map((e) => <div key={e.t} className="effect-card"><div className="effect-t">{e.t}</div><div className="effect-d">{e.d}</div></div>)}</div>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 /* ---------- [2] VOC Inbox (채널 수집 + 화면 직접 입력) ---------- */
 const INPUT_CHANNELS = ['고객의소리', 'Call', 'Medallia', 'App Store', '고객센터']
 function VOCInbox({ openCase, notify, added, setAdded }) {
@@ -946,7 +809,7 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
   const doSend = () => {
     if (!snd.to.trim() || !snd.body.trim()) { notify.toast('수신·내용을 입력하세요'); return }
     if (addSent) addSent({ caseId: c.id, kind: snd.kind, owner: own || c.owner || '미지정', to: snd.to.trim(), content: snd.body.trim() })
-    notify.toast(`${snd.kind} 발송 기록됨 (데모) — 발송 이력에 추가`)
+    notify.toast(`${snd.kind} 발송 기록됨 (데모) — 메일 › 발송 이력에 추가`)
   }
   if (!c) return <div className="screen"><div className="panel empty-panel">표시할 케이스가 없습니다. VOC Inbox에서 VOC를 입력하거나 엑셀을 붙여넣어 추가하세요.</div></div>
   const canReveal = c.customerRaw && c.customerRaw !== c.customer
@@ -1002,7 +865,7 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
             <label className="of-row"><span>수신</span><input value={snd.to} onChange={(e) => setSnd({ ...snd, to: e.target.value })} placeholder="수신 번호/이메일" /></label>
             <textarea className="of-area" value={snd.body} onChange={(e) => setSnd({ ...snd, body: e.target.value })} placeholder="발송 내용" />
             <button className="btn btn-primary" onClick={doSend}>발송 (데모)</button>
-            <p className="micro">발송 시 ‘발송 이력’ 메뉴에 담당자·수신·내용·발송일이 기록됩니다. 최종 발송·개발 반영은 담당자 검수 후 진행됩니다.</p>
+            <p className="micro">발송 시 ‘메일 › 발송 이력’에 담당자·수신·내용·발송일이 기록됩니다. 최종 발송·개발 반영은 담당자 검수 후 진행됩니다.</p>
           </div>
         </div>
       </div>
@@ -1330,20 +1193,17 @@ function Backlog({ added, openCase }) {
   )
 }
 
-/* ---------- [발송 이력] 메일·문자 발송 이력 ---------- */
-function SentLog({ sentLog }) {
+/* ---------- [발송 이력] 메일·문자 발송 이력 — 메일 앱에 임베드 ---------- */
+function SentLogTable({ sentLog }) {
   const log = sentLog || []
-  if (!log.length) return <div className="screen"><PageHead title="발송 이력" sub="발송된 메일·문자 전체 이력" /><div className="panel empty-panel">아직 발송 이력이 없습니다. <b>케이스 처리</b> 화면에서 메일/문자를 발송(데모)하면 담당자·수신·내용·발송일이 여기에 기록됩니다.</div></div>
+  if (!log.length) return <div className="panel empty-panel">아직 발송 이력이 없습니다. <b>VOC Agent › 케이스 처리</b>에서 메일/문자를 발송(데모)하면 담당자·수신·내용·발송일이 여기에 기록됩니다.</div>
   return (
-    <div className="screen">
-      <PageHead title="발송 이력" sub={`발송된 메일·문자 ${log.length}건 · 담당자/수신/내용/발송일`} />
-      <div className="table-wrap"><table className="vtable">
-        <thead><tr><th>발송일시</th><th>유형</th><th>담당자</th><th>수신</th><th>케이스</th><th>내용</th></tr></thead>
-        <tbody>{log.map((s) => (
-          <tr key={s.id}><td className="nowrap muted">{s.date}</td><td><span className={'kind ' + (s.kind === '메일' ? 'kind-mail' : 'kind-sms')}>{s.kind}</span></td><td className="nowrap">{s.owner}</td><td className="nowrap">{s.to}</td><td className="mono nowrap">{s.caseId}</td><td className="cell-content" title={s.content}>{s.content}</td></tr>
-        ))}</tbody>
-      </table></div>
-    </div>
+    <div className="table-wrap"><table className="vtable">
+      <thead><tr><th>발송일시</th><th>유형</th><th>담당자</th><th>수신</th><th>케이스</th><th>내용</th></tr></thead>
+      <tbody>{log.map((s) => (
+        <tr key={s.id}><td className="nowrap muted">{s.date}</td><td><span className={'kind ' + (s.kind === '메일' ? 'kind-mail' : 'kind-sms')}>{s.kind}</span></td><td className="nowrap">{s.owner}</td><td className="nowrap">{s.to}</td><td className="mono nowrap">{s.caseId}</td><td className="cell-content" title={s.content}>{s.content}</td></tr>
+      ))}</tbody>
+    </table></div>
   )
 }
 
@@ -1357,36 +1217,112 @@ function HomePortal({ account, added, goAgent, setRail }) {
   const high = data.filter((v) => v.severity === 'High').length
   const review = data.filter((v) => v.review).length
   const autoRate = total ? Math.round(((total - review) / total) * 100) : 0
+  const pct = (n) => total ? Math.round((n / total) * 100) : 0
   const name = (account || 'U+').split('@')[0]
   const tiles = [['mail', '메일', '읽지 않음 3'], ['cal', '일정', '오늘 3건'], ['org', '조직도', 'CX 디지털'], ['pay', '결재', '대기 2건'], ['chat', 'VOC Agent', '처리 필요 ' + todo.toLocaleString()]]
+  const stats = [
+    { v: total.toLocaleString(), l: '전체 VOC', chip: '수집 누적' },
+    { v: autoRate + '%', l: '자동 분류율', chip: '검토불요 기준', accent: true, cls: 'brand' },
+    { v: todo.toLocaleString(), l: '처리 필요', chip: `전체의 ${pct(todo)}%` },
+    { v: high.toLocaleString(), l: 'High 리스크', chip: `전체의 ${pct(high)}%`, warn: true, cls: 'up' },
+    { v: review.toLocaleString(), l: '검토 필요', chip: '사람 확인' },
+  ]
+  // 큰틀 집계 — 증상유형(도넛) · 주요이슈 TOP5 · 진행상황 · 채널
+  const grpMap = {}; data.forEach((v) => { grpMap[v.group] = (grpMap[v.group] || 0) + 1 })
+  const groupSeg = GROUPS.filter((g) => grpMap[g]).map((g, i) => ({ label: g, value: grpMap[g], color: DONUT_COLORS[i % DONUT_COLORS.length] }))
+  const catMap = {}; data.forEach((v) => { catMap[v.cat] = (catMap[v.cat] || 0) + 1 })
+  const topCat = Object.entries(catMap).map(([t, n]) => ({ t, n })).sort((a, b) => b.n - a.n).slice(0, 5)
+  const statusDist = KANBAN_COLS.map((k) => ({ k, n: data.filter((v) => v.status === k).length }))
+  const maxStatus = Math.max(1, ...statusDist.map((s) => s.n))
+  const chMap = {}; data.forEach((v) => { chMap[v.channel] = (chMap[v.channel] || 0) + 1 })
+  const channels = Object.entries(chMap).map(([key, n]) => ({ key, n })).sort((a, b) => b.n - a.n)
+  // 이상 감지·알림: 최신 주차 vs 직전 주차 급증 (VOC구분1·대응영역 기준)
+  const weeksA = [...new Set(data.map((d) => d.week).filter(Boolean))].sort((a, b) => weekKey(a) - weekKey(b))
+  const alerts = []
+  if (weeksA.length >= 2) {
+    const cur = weeksA[weeksA.length - 1], prev = weeksA[weeksA.length - 2]
+    for (const [label, acc] of [['VOC구분1', (d) => d.group], ['대응영역', (d) => d.area1]]) {
+      for (const k of [...new Set(data.map(acc))]) {
+        const c = data.filter((d) => acc(d) === k && d.week === cur).length
+        const p = data.filter((d) => acc(d) === k && d.week === prev).length
+        if (c >= 5 && c > p) { const pc = p ? Math.round((c - p) / p * 100) : 100; if (pc >= 40) alerts.push({ label, k, cur, c, p, pc }) }
+      }
+    }
+    alerts.sort((a, b) => b.pc - a.pc)
+  }
   return (
     <div className="screen portal-screen">
       <div className="home-hero">
         <div><div className="home-hi">안녕하세요, <b>{name}</b>님</div><div className="home-sub">U+ 통합 업무 홈 · 오늘의 업무와 VOC 현황을 한 곳에서 확인하세요.</div></div>
-        <button className="btn btn-primary" onClick={() => goAgent('dashboard')}>VOC Agent 열기</button>
+        <button className="btn btn-primary" onClick={() => goAgent('inbox')}>VOC Agent 열기</button>
       </div>
       <div className="tile-row">{tiles.map(([k, l, s]) => (
-        <button key={l} className="home-tile" onClick={() => k === 'chat' ? goAgent('dashboard') : setRail(k)}>
+        <button key={l} className="home-tile" onClick={() => k === 'chat' ? goAgent('inbox') : setRail(k)}>
           <span className="tile-ic"><RailIcon d={RAIL_ICONS[k]} /></span>
           <span className="tile-l">{l}</span><span className="tile-s">{s}</span>
         </button>
       ))}</div>
-      <div className="home-grid">
-        <div className="panel home-voc">
-          <div className="card-title">오늘의 VOC <span className="muted">VOC Action Copilot</span></div>
-          <div className="hv-kpis">
-            <div><div className="hv-v">{total.toLocaleString()}</div><div className="hv-l">전체</div></div>
-            <div><div className="hv-v">{todo.toLocaleString()}</div><div className="hv-l">처리 필요</div></div>
-            <div><div className="hv-v warn">{high.toLocaleString()}</div><div className="hv-l">High</div></div>
-            <div><div className="hv-v brand">{autoRate}%</div><div className="hv-l">자동분류율</div></div>
-          </div>
-          <div className="hv-links">
-            <button className="btn btn-ghost sm" onClick={() => goAgent('dashboard')}>대시보드</button>
-            <button className="btn btn-ghost sm" onClick={() => goAgent('inbox')}>VOC 입력</button>
-            <button className="btn btn-ghost sm" onClick={() => goAgent('selfguide')}>셀프 가이드</button>
-            <button className="btn btn-ghost sm" onClick={() => goAgent('backlog')}>개선 백로그</button>
-          </div>
+
+      {/* VOC 현황 큰틀 — 에이전트 대시보드를 홈으로 통합 */}
+      <div className="home-secline">
+        <h2 className="sec-title">VOC 현황 <span className="sec-note">VOC Action Copilot · 전체 누적 기준</span></h2>
+        <div className="hv-links">
+          <button className="btn btn-ghost sm" onClick={() => goAgent('trends')}>추이 상세</button>
+          <button className="btn btn-ghost sm" onClick={() => goAgent('inbox')}>VOC 입력</button>
+          <button className="btn btn-ghost sm" onClick={() => goAgent('selfguide')}>셀프 가이드</button>
+          <button className="btn btn-ghost sm" onClick={() => goAgent('backlog')}>개선 백로그</button>
         </div>
+      </div>
+      {total === 0 ? (
+        <div className="panel empty-panel">아직 VOC 데이터가 없습니다. <b>VOC Agent › VOC 수집·입력</b>에서 입력하거나 엑셀을 붙여넣으면 여기에 현황이 집계됩니다.<div><button className="btn btn-primary" onClick={() => goAgent('inbox')}>VOC 입력하러 가기</button></div></div>
+      ) : (
+        <>
+          <div className="kpi-row">{stats.map((s) => (
+            <div key={s.l} className={'kpi-card' + (s.accent ? ' accent' : '') + (s.warn ? ' warn' : '')}>
+              <div className="kpi-l">{s.l}</div>
+              <div className="kpi-main"><span className="kpi-v">{s.v}</span>{s.chip && <span className={'kpi-chip' + (s.cls ? ' ' + s.cls : '')}>{s.chip}</span>}</div>
+            </div>
+          ))}</div>
+          {alerts.length > 0 && (
+            <div className="panel alert-panel">
+              <div className="card-title">⚠ 이상 감지 · 자동 알림 <span className="muted">{alerts[0].cur} · 직전 주차 대비 급증</span></div>
+              <div className="alert-row">{alerts.slice(0, 4).map((a, i) => (
+                <div key={i} className="alert-card" onClick={() => goAgent('trends')}>
+                  <div className="alert-top"><span className="alert-up">▲ {a.pc}%</span><span className="alert-scope">{a.label}</span></div>
+                  <div className="alert-k">{a.k}</div>
+                  <div className="alert-n">{a.c.toLocaleString()}건 <span className="muted">(전주 {a.p.toLocaleString()})</span></div>
+                </div>
+              ))}</div>
+              <p className="micro">급증·이상 패턴 자동 탐지 → 담당자 알림 (데모). 카드를 누르면 추이 상세로 이동합니다.</p>
+            </div>
+          )}
+          <div className="chart3">
+            <div className="panel chart-card">
+              <div className="card-title">증상 유형 분류 <span className="muted">전체 누적</span></div>
+              <div className="donut-wrap">
+                <Donut segments={groupSeg} total={total} centerLabel="전체 VOC" />
+                <ul className="donut-legend">{groupSeg.map((s) => <li key={s.label}><span className="lg-dot" style={{ background: s.color }} />{s.label}<b>{pct(s.value)}%</b></li>)}</ul>
+              </div>
+            </div>
+            <div className="panel chart-card"><div className="card-title">주요 이슈 TOP 5 <span className="muted">표준분류 기준</span></div><ol className="top-list">{topCat.map((it, i) => <li key={it.t}><span className="rank">{i + 1}</span><span className="top-t">{it.t}</span><span className="top-n">{it.n.toLocaleString()}건</span></li>)}</ol></div>
+            <div className="panel chart-card"><div className="card-title">진행상황 분포</div><div className="funnel">{statusDist.map((f) => <div key={f.k} className="fun-row"><span className="fun-k">{f.k}</span><div className="fun-bar-wrap"><div className="fun-bar" style={{ width: (f.n / maxStatus * 100) + '%' }}>{f.n.toLocaleString()}</div></div></div>)}</div></div>
+          </div>
+          <div className="panel">
+            <div className="card-title">채널별 분포 <span className="muted">합계 {total.toLocaleString()}건</span></div>
+            <div className="hbars">{channels.slice(0, 7).map((c) => (
+              <div key={c.key} className="hbar-row">
+                <span className="hbar-k"><ChannelIcon channel={c.key} size={15} />{c.key}</span>
+                <div className="hbar-track"><div className="hbar-fill" style={{ width: Math.max(3, c.n / channels[0].n * 100) + '%' }} /></div>
+                <span className="hbar-n">{c.n.toLocaleString()}건</span>
+              </div>
+            ))}</div>
+          </div>
+        </>
+      )}
+
+      {/* 업무 포털 요약 */}
+      <h2 className="sec-title">오늘의 업무 <span className="sec-note">메일 · 일정 · 결재</span></h2>
+      <div className="home-grid">
         <div className="panel"><div className="card-title">메일 <span className="muted">최근</span></div>
           <ul className="home-list">{[['VOC 주간 리포트 공유', 'CX기획팀 · 10:24'], ['[결재] 4월 개선 과제 승인 요청', '김형걸 · 09:10'], ['앱스토어 평점 모니터링 알림', '운영봇 · 어제']].map(([t, m], i) => <li key={i}><span className="hl-t">{t}</span><span className="hl-m">{m}</span></li>)}</ul>
         </div>
@@ -1400,15 +1336,18 @@ function HomePortal({ account, added, goAgent, setRail }) {
     </div>
   )
 }
-function MailApp() {
+function MailApp({ sentLog }) {
   const rows = [['VOC 주간 리포트 공유', 'CX기획팀', '오늘 10:24', true], ['[결재] 4월 개선 과제 승인 요청', '김형걸', '오늘 09:10', true], ['앱스토어 평점 모니터링 알림', '운영봇', '어제', false], ['셀프 가이드 콘텐츠 검수 요청', '디자인시스템스쿼드', '어제', false], ['장애/오류 급증 이상 감지 통보', 'VOC Agent', '2일 전', false]]
+  const sentN = (sentLog || []).length
   return (
     <div className="screen portal-screen">
-      <PageHead title="메일" sub="사내 메일 · 데모" />
+      <PageHead title="메일" sub="사내 메일 · VOC 발송 이력" />
       <DemoBanner>메일 목록은 예시이며,</DemoBanner>
       <div className="panel"><ul className="mail-list">{rows.map(([t, f, d, un], i) => (
         <li key={i} className={un ? 'unread' : ''}><span className="ml-dot" /><span className="ml-from">{f}</span><span className="ml-subj">{t}</span><span className="ml-date">{d}</span></li>
       ))}</ul></div>
+      <h2 className="sec-title">발송 이력 <span className="sec-note">VOC Agent에서 발송한 메일·문자{sentN ? ` ${sentN}건` : ''} · 담당자/수신/내용/발송일</span></h2>
+      <SentLogTable sentLog={sentLog} />
     </div>
   )
 }
@@ -1449,9 +1388,20 @@ function ApprovalApp({ notify }) {
     </div>
   )
 }
-function AllMenu({ goAgent, setRail }) {
+function AllMenu({ goAgent, setRail, notify }) {
+  const [doc, setDoc] = useState(null) // null | 'architecture' | 'prompts'
   const apps = [['home', '통합 홈'], ['mail', '메일'], ['cal', '일정'], ['org', '조직도'], ['pay', '결재']]
-  const agentScreens = [['dashboard', '대시보드'], ['trends', '기간별·영역별 추이'], ['inbox', 'VOC 수집·입력'], ['board', '분류 보드'], ['detail', '케이스 처리'], ['backlog', '개선 백로그'], ['insight', '인사이트 리포트'], ['selfguide', '셀프 해결 가이드'], ['sentlog', '발송 이력'], ['architecture', '솔루션 구조'], ['prompts', 'Copilot 프롬프트']]
+  const agentScreens = [['trends', '기간별·영역별 추이'], ['inbox', 'VOC 수집·입력'], ['board', '분류 보드'], ['detail', '케이스 처리'], ['backlog', '개선 백로그'], ['insight', '인사이트 리포트'], ['selfguide', '셀프 해결 가이드']]
+  const docs = [['architecture', '솔루션 구조', 'AS-IS / TO-BE · 처리 흐름 · 로드맵'], ['prompts', 'Copilot 프롬프트', 'VOC 분류·액션 재현 프롬프트']]
+  if (doc) {
+    return (
+      <div className="screen portal-screen">
+        <button className="btn btn-ghost sm back-btn" onClick={() => setDoc(null)}>← 전체메뉴</button>
+        {doc === 'architecture' && <Architecture />}
+        {doc === 'prompts' && <PromptTemplates notify={notify} />}
+      </div>
+    )
+  }
   return (
     <div className="screen portal-screen">
       <PageHead title="전체메뉴" sub="업무 앱과 VOC Agent 메뉴 바로가기" />
@@ -1459,6 +1409,12 @@ function AllMenu({ goAgent, setRail }) {
       <div className="tile-row">{apps.map(([k, l]) => <button key={k} className="home-tile" onClick={() => setRail(k)}><span className="tile-ic"><RailIcon d={RAIL_ICONS[k]} /></span><span className="tile-l">{l}</span></button>)}</div>
       <h2 className="sec-title">VOC Agent</h2>
       <div className="menu-grid">{agentScreens.map(([k, l]) => <button key={k} className="menu-cell" onClick={() => goAgent(k)}>{l}</button>)}</div>
+      <h2 className="sec-title">설계 · 도구 <span className="sec-note">솔루션 구조와 Copilot 프롬프트는 여기에서 확인합니다</span></h2>
+      <div className="tile-row">{docs.map(([k, l, d]) => (
+        <button key={k} className="home-tile" onClick={() => setDoc(k)}>
+          <span className="tile-l">{l}</span><span className="tile-s">{d}</span>
+        </button>
+      ))}</div>
     </div>
   )
 }
@@ -1515,22 +1471,18 @@ function Login({ onAuthed }) {
 
 /* ---------- App ---------- */
 const TITLES = {
-  dashboard: ['대시보드', 'VOC 운영 현황과 AI 분류 효과'],
   trends: ['기간별·영역별 추이', 'VOC구분·대응영역 추이와 원문 검색'],
-  sentlog: ['발송 이력', '발송된 메일·문자 이력'],
   backlog: ['개선 백로그', '우선순위 매긴 서비스 개선 과제'],
   selfguide: ['셀프 해결 가이드', '엔진② · 접수 전 셀프 해결 시나리오'],
-  architecture: ['솔루션 구조', 'AS-IS / TO-BE · 처리 흐름 · 로드맵'],
   inbox: ['VOC 수집·입력', '수집 VOC 목록 · 직접 입력 분류'],
   board: ['분류 보드', '4그룹 게이트 + 22개 표준분류'],
   detail: ['케이스 처리', '케이스 분석 및 액션'],
   insight: ['인사이트 리포트', '개선 인사이트와 기대효과'],
-  prompts: ['Copilot 프롬프트', 'VOC 분류·액션 재현 프롬프트'],
 }
 
 export default function App() {
   const [authEmail, setAuthEmail] = useState(getSession)
-  const [screen, setScreen] = useState('dashboard')
+  const [screen, setScreen] = useState('inbox')
   const [caseId, setCaseId] = useState('VOC-1001')
   const [toast, setToast] = useState('')
   const [modal, setModal] = useState({ open: false, title: '', body: '' })
@@ -1567,17 +1519,13 @@ export default function App() {
               {panelMode !== 'expanded' && (
                 <main className="main-nav">
                   <div className="content">
-                    {screen === 'dashboard' && <Dashboard go={setScreen} added={added} openCase={openCase} selected={selected} setSelected={setSelected} />}
                     {screen === 'trends' && <VOCTrends added={added} />}
-                    {screen === 'architecture' && <Architecture />}
                     {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
                     {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
                     {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} />}
                     {screen === 'insight' && <InsightReport added={added} />}
                     {screen === 'backlog' && <Backlog added={added} openCase={openCase} />}
                     {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
-                    {screen === 'sentlog' && <SentLog sentLog={sentLog} />}
-                    {screen === 'prompts' && <PromptTemplates notify={notify} />}
                   </div>
                 </main>
               )}
@@ -1596,11 +1544,11 @@ export default function App() {
           <main className="portal-body">
             <div className="content">
               {railView === 'home' && <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} />}
-              {railView === 'mail' && <MailApp />}
+              {railView === 'mail' && <MailApp sentLog={sentLog} />}
               {railView === 'cal' && <CalendarApp />}
               {railView === 'org' && <OrgApp />}
               {railView === 'pay' && <ApprovalApp notify={notify} />}
-              {railView === 'grid' && <AllMenu goAgent={goAgent} setRail={setRail} />}
+              {railView === 'grid' && <AllMenu goAgent={goAgent} setRail={setRail} notify={notify} />}
             </div>
           </main>
         </div>

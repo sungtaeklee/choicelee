@@ -635,6 +635,9 @@ h1,h2{margin:0}
 .hv-v.warn{color:#d4296b}.hv-v.brand{color:var(--magenta)}
 .hv-l{font-size:11px;color:var(--muted)}
 .hv-links{display:flex;gap:8px;flex-wrap:wrap}
+.home-secline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:6px}
+.home-secline .sec-title{margin-top:0}
+.back-btn{align-self:flex-start;margin-bottom:14px}
 .home-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
 .home-list li{display:flex;align-items:center;gap:10px;font-size:13px}
 .hl-t{color:var(--ink);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
