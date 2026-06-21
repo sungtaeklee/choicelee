@@ -1247,6 +1247,7 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
   const pct = (n) => total ? Math.round((n / total) * 100) : 0
   const name = (account || 'U+').split('@')[0]
   const [caseTab, setCaseTab] = useState('high')
+  const [aiOpen, setAiOpen] = useState(false)
   // 집계
   const grpMap = {}; data.forEach((v) => { grpMap[v.group] = (grpMap[v.group] || 0) + 1 })
   const groupSeg = GROUPS.filter((g) => grpMap[g]).map((g, i) => ({ label: g, value: grpMap[g], color: DONUT_COLORS[i % DONUT_COLORS.length] }))
@@ -1280,6 +1281,14 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
     doing: data.filter((v) => v.status === '처리 중'),
   }
   const caseList = (caseSets[caseTab] || []).slice(0, 4)
+  // AI 워크스페이스(펼치기)용 — 이상탐지 막대 · 검토 인용 · 처리 스텝퍼
+  const wkTot = weeksA.map((w) => data.filter((d) => d.week === w).length)
+  const barPrev = a0 ? a0.p : (wkTot.length >= 2 ? wkTot[wkTot.length - 2] : 0)
+  const barCur = a0 ? a0.c : (wkTot.length ? wkTot[wkTot.length - 1] : total)
+  const barMax = Math.max(1, barPrev, barCur)
+  const sampleCase = data.find((v) => v.review) || data.find((v) => v.severity === 'High') || data[0]
+  const clsDoneN = data.filter((v) => v.status === '분류 완료').length
+  const doneN = data.filter((v) => v.status === '처리 완료').length
   // 우측 AI 브리핑
   const brief = []
   if (todo) brief.push({ t: `처리 필요 VOC ${todo.toLocaleString()}건`, imp: 'hi' })
@@ -1290,9 +1299,79 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
   const askDemo = (label) => notify && notify.toast(`Copilot에 요청했어요 — ${label} (데모)`)
   const sendDemo = (el) => { const v = (el.value || '').trim(); if (!v) return; if (notify) notify.toast('Copilot에 전달했어요 (데모)'); el.value = '' }
 
+  const cardAgent = (
+    <div className="hcard">
+      <CardHead title="내 VOC Agent" sub="엔진 바로가기" onMore={() => setRail('grid')} />
+      <div className="agent-slots">
+        <button className="agent-slot" onClick={() => goAgent('inbox')}><div className="as-k"><b>필수</b> · 분류 엔진①</div><div className="as-v">Copilot 분류</div></button>
+        <button className="agent-slot" onClick={() => goAgent('selfguide')}><div className="as-k">업무 · 엔진②</div><div className="as-v">셀프 가이드</div></button>
+        <button className="agent-slot" onClick={() => setRail('grid')}><div className="as-k">＋ 더보기</div><div className="as-v">둘러보기</div></button>
+      </div>
+    </div>
+  )
+  const cardAnomaly = (
+    <div className="hcard signature">
+      <CardHead title="이상 감지 · 자동 알림" sub={a0 ? `${a0.cur} · 직전 주차 대비` : '최근 안정'} onMore={() => goAgent('trends')} />
+      {a0 ? (
+        <>
+          <div className="metric">
+            <div className="metric-l">{a0.label} · {a0.k}</div>
+            <div className="metric-main">
+              <span className="metric-delta"><span className="arrow">▲</span> {a0.pc}%</span>
+              <span className="metric-side">최근 주차 <b>{a0.c.toLocaleString()}</b>건 <span className="muted">(전주 {a0.p.toLocaleString()})</span></span>
+            </div>
+          </div>
+          <AiBox
+            q="급증 원인과 대응 방안을 정리했어요. 바로 진행할까요?"
+            rows={[
+              { tag: 'cause', label: '원인분석', text: `${a0.k} 관련 VOC가 직전 주차 대비 ${a0.pc}% 급증` },
+              { tag: 'act', label: '조치결과', text: `최근 주차 ${a0.c.toLocaleString()}건 집중 발생 · 담당 영역 확인 필요` },
+              { tag: 'next', label: '후속방안', text: '추이 상세 확인 → 담당 배정 · 셀프 가이드 보강' },
+            ]}
+            acts={[
+              { label: '추이 상세 보기', onClick: () => goAgent('trends') },
+              { label: '처리 시작', primary: true, onClick: () => goAgent('board') },
+            ]}
+          />
+        </>
+      ) : (
+        <div className="calm">최근 주차에서 급증 패턴이 감지되지 않았어요. 추이는 안정적입니다. <button className="link-btn" onClick={() => goAgent('trends')}>추이 상세 보기</button></div>
+      )}
+    </div>
+  )
+  const cardCase = (
+    <div className="hcard">
+      <CardHead title="조치 필요 VOC" onMore={() => goAgent('detail')} />
+      <div className="card-tabs">
+        <button className={'card-tab' + (caseTab === 'high' ? ' on' : '')} onClick={() => setCaseTab('high')}>High<span className="cnt">{high}</span></button>
+        <button className={'card-tab' + (caseTab === 'review' ? ' on' : '')} onClick={() => setCaseTab('review')}>검토필요<span className="cnt">{review}</span></button>
+        <button className={'card-tab' + (caseTab === 'doing' ? ' on' : '')} onClick={() => setCaseTab('doing')}>처리중<span className="cnt">{doing}</span></button>
+      </div>
+      <div className="case-mini">
+        {caseList.length ? caseList.map((v) => (
+          <div key={v.id} className="case-mini-row" onClick={() => openCase && openCase(v.id)}>
+            {v.severity === 'High' && <span className="badge-sev">High</span>}
+            <span className="mini-t">{v.summary || v.content}</span>
+            <span className="mini-n">{v.cat}</span>
+          </div>
+        )) : <div className="empty-mini">해당 조건의 케이스가 없어요.</div>}
+      </div>
+      <AiBox
+        q={`처리 필요 ${todo.toLocaleString()}건을 제안 액션으로 한 번에 정리할 수 있어요.`}
+        acts={[
+          { label: '일괄 처리 시작', primary: true, onClick: () => goAgent('board') },
+          { label: '개별 확인', onClick: () => goAgent('detail') },
+        ]}
+      />
+    </div>
+  )
+
   const aiPanel = (
     <aside className="home-ai">
-      <div className="ai-badge">✦ VOC Copilot</div>
+      <div className="ai-top-row">
+        <div className="ai-badge">✦ VOC Copilot</div>
+        <button className="ai-expand" onClick={() => setAiOpen(true)}>펼치기 <span className="ex-ic">⤢</span></button>
+      </div>
       <h3>무엇을 도와드릴까요?</h3>
       <div className="brief-l">오늘의 VOC 브리핑</div>
       <div className="brief-box">{(brief.slice(0, 4)).map((b, i) => (
@@ -1313,6 +1392,80 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
       </div>
       <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다.</p>
     </aside>
+  )
+
+  const aiWorkspace = (
+    <div className="home-ai-work">
+      <div className="aiw-side">
+        {cardAgent}
+        {cardAnomaly}
+        {cardCase}
+      </div>
+      <div className="aiw-main">
+        <div className="aiw-band">
+          <div className="ai-toggle"><button className="on">AI</button><button onClick={() => setAiOpen(false)}>홈</button></div>
+          <span className="aiw-sub">VOC 시작하기 · 펼침 보기</span>
+        </div>
+        <div className="aiw-body">
+          <div className="aiw-hero">
+            <div className="aiw-spark">✦</div>
+            <h2>무엇을 도와드릴까요, <b>{name}</b> 님?</h2>
+          </div>
+          <div className="aiw-inputbox">
+            <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
+            <input placeholder="VOC 관련 무엇이든 물어보세요 — 분류 · 추이 · 개선" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
+            <div className="ai-i-bot">
+              <div className="ai-i-tools"><span onClick={() => askDemo('리서치')}>⌕ 리서치</span><span onClick={() => askDemo('툴')}>✎ 툴</span></div>
+              <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.aiw-inputbox').querySelector('input'))}>↑</button>
+            </div>
+          </div>
+          <div className="aiw-chips">
+            <button className="chip-btn" onClick={() => goAgent('trends')}>오늘 급증 VOC 정리해줘</button>
+            <button className="chip-btn" onClick={() => goAgent('detail')}>검토필요 케이스 보여줘</button>
+            <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위 알려줘</button>
+          </div>
+          <div className="todo-rec">
+            <span className="tr-l">오늘의 todo 추천</span>
+            <button className="refresh" onClick={() => askDemo('todo 새로고침')}>↻ 새로고침</button>
+          </div>
+          <div className="todo-cards">
+            <div className="todo-card">
+              <div className="tc-head"><span>이상 탐지 현황 알림</span></div>
+              <div className="tc-bars">
+                <div className="tc-bar"><div className="tc-bcol" style={{ height: Math.max(6, Math.round(barPrev / barMax * 100)) + '%' }} /><span className="tc-bn">{barPrev.toLocaleString()}건</span><span className="tc-bl">직전 주차</span></div>
+                <div className="tc-bar"><div className="tc-bcol mag" style={{ height: Math.max(6, Math.round(barCur / barMax * 100)) + '%' }} /><span className="tc-bn">{barCur.toLocaleString()}건</span><span className="tc-bl">최근 주차</span></div>
+              </div>
+              <div className="tc-cap">{a0 ? `${a0.k} ▲${a0.pc}% 급증` : '급증 패턴 없음 · 안정'}</div>
+              <button className="ai-pill-btn" onClick={() => goAgent('trends')}>추이 상세</button>
+            </div>
+            <div className="todo-card">
+              <div className="tc-head"><span>검토 필요 케이스 정리</span></div>
+              <div className="tc-quote">“{sampleCase ? (sampleCase.summary || sampleCase.content) : '검토 대상이 없어요'}”</div>
+              <div className="tc-cap">검토필요 {review.toLocaleString()}건 · 분류 확인 필요</div>
+              <button className="ai-pill-btn" onClick={() => sampleCase ? (openCase && openCase(sampleCase.id)) : goAgent('detail')}>케이스 열기</button>
+            </div>
+            <div className="todo-card">
+              <div className="tc-head"><span>처리 라인 진행</span></div>
+              <div className="tc-stepper">
+                <div className="step done"><span className="dot">{clsDoneN}</span><span className="s-l">분류 완료</span></div>
+                <span className="step-line" />
+                <div className="step doing"><span className="dot">{doing}</span><span className="s-l">처리 중</span></div>
+                <span className="step-line" />
+                <div className="step"><span className="dot">{doneN}</span><span className="s-l">처리 완료</span></div>
+              </div>
+              <button className="ai-pill-btn primary" onClick={() => goAgent('board')}>분류 보드 열기</button>
+            </div>
+          </div>
+          <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다. todo는 수집된 VOC 기준 추천입니다.</p>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (aiOpen) return (
+    <div className="portal-screen home-wide">
+      {aiWorkspace}
+    </div>
   )
 
   return (
@@ -1337,15 +1490,8 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
         <div className="home2">
           <div className="home-cols">
 
-            {/* 내 VOC Agent */}
-            <div className="hcard">
-              <CardHead title="내 VOC Agent" sub="엔진 바로가기" onMore={() => setRail('grid')} />
-              <div className="agent-slots">
-                <button className="agent-slot" onClick={() => goAgent('inbox')}><div className="as-k"><b>필수</b> · 분류 엔진①</div><div className="as-v">Copilot 분류</div></button>
-                <button className="agent-slot" onClick={() => goAgent('selfguide')}><div className="as-k">업무 · 엔진②</div><div className="as-v">셀프 가이드</div></button>
-                <button className="agent-slot" onClick={() => setRail('grid')}><div className="as-k">＋ 더보기</div><div className="as-v">둘러보기</div></button>
-              </div>
-            </div>
+            {/* 핵심 카드 — 펼침 사이드와 공유 */}
+            {cardAgent}
 
             {/* 오늘의 VOC (To-do 스탯) */}
             <div className="hcard">
@@ -1357,61 +1503,9 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
               </div>
             </div>
 
-            {/* 이상 감지 · 자동 알림 (시그니처) */}
-            <div className="hcard signature">
-              <CardHead title="이상 감지 · 자동 알림" sub={a0 ? `${a0.cur} · 직전 주차 대비` : '최근 안정'} onMore={() => goAgent('trends')} />
-              {a0 ? (
-                <>
-                  <div className="metric">
-                    <div className="metric-l">{a0.label} · {a0.k}</div>
-                    <div className="metric-main">
-                      <span className="metric-delta"><span className="arrow">▲</span> {a0.pc}%</span>
-                      <span className="metric-side">최근 주차 <b>{a0.c.toLocaleString()}</b>건 <span className="muted">(전주 {a0.p.toLocaleString()})</span></span>
-                    </div>
-                  </div>
-                  <AiBox
-                    q="급증 원인과 대응 방안을 정리했어요. 바로 진행할까요?"
-                    rows={[
-                      { tag: 'cause', label: '원인분석', text: `${a0.k} 관련 VOC가 직전 주차 대비 ${a0.pc}% 급증` },
-                      { tag: 'act', label: '조치결과', text: `최근 주차 ${a0.c.toLocaleString()}건 집중 발생 · 담당 영역 확인 필요` },
-                      { tag: 'next', label: '후속방안', text: '추이 상세 확인 → 담당 배정 · 셀프 가이드 보강' },
-                    ]}
-                    acts={[
-                      { label: '추이 상세 보기', onClick: () => goAgent('trends') },
-                      { label: '처리 시작', primary: true, onClick: () => goAgent('board') },
-                    ]}
-                  />
-                </>
-              ) : (
-                <div className="calm">최근 주차에서 급증 패턴이 감지되지 않았어요. 추이는 안정적입니다. <button className="link-btn" onClick={() => goAgent('trends')}>추이 상세 보기</button></div>
-              )}
-            </div>
+            {cardAnomaly}
 
-            {/* 조치 필요 VOC (탭 + AI 박스) */}
-            <div className="hcard">
-              <CardHead title="조치 필요 VOC" onMore={() => goAgent('detail')} />
-              <div className="card-tabs">
-                <button className={'card-tab' + (caseTab === 'high' ? ' on' : '')} onClick={() => setCaseTab('high')}>High<span className="cnt">{high}</span></button>
-                <button className={'card-tab' + (caseTab === 'review' ? ' on' : '')} onClick={() => setCaseTab('review')}>검토필요<span className="cnt">{review}</span></button>
-                <button className={'card-tab' + (caseTab === 'doing' ? ' on' : '')} onClick={() => setCaseTab('doing')}>처리중<span className="cnt">{doing}</span></button>
-              </div>
-              <div className="case-mini">
-                {caseList.length ? caseList.map((v) => (
-                  <div key={v.id} className="case-mini-row" onClick={() => openCase && openCase(v.id)}>
-                    {v.severity === 'High' && <span className="badge-sev">High</span>}
-                    <span className="mini-t">{v.summary || v.content}</span>
-                    <span className="mini-n">{v.cat}</span>
-                  </div>
-                )) : <div className="empty-mini">해당 조건의 케이스가 없어요.</div>}
-              </div>
-              <AiBox
-                q={`처리 필요 ${todo.toLocaleString()}건을 제안 액션으로 한 번에 정리할 수 있어요.`}
-                acts={[
-                  { label: '일괄 처리 시작', primary: true, onClick: () => goAgent('board') },
-                  { label: '개별 확인', onClick: () => goAgent('detail') },
-                ]}
-              />
-            </div>
+            {cardCase}
 
             {/* 증상 유형 분류 (도넛) */}
             <div className="hcard">
