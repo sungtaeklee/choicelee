@@ -928,13 +928,13 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
 /* ---------- [4] Case Detail ---------- */
 function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
   const [showNum, setShowNum] = useState(false)
-  const [own, setOwn] = useState(''); const [jira, setJira] = useState('')
+  const [own, setOwn] = useState(''); const [jira, setJira] = useState(''); const [note, setNote] = useState('')
   const [snd, setSnd] = useState({ kind: '문자', to: '', body: '' })
   const all = [...(added || []), ...VOCS]
   const c = all.find((v) => v.id === caseId) || all[0]
   useEffect(() => {
     if (!c) return
-    setOwn(c.owner || ''); setJira(c.jiraUrl || '')
+    setOwn(c.owner || ''); setJira(c.jiraUrl || ''); setNote(c.ownerNote || '')
     setSnd({ kind: '문자', to: c.customerRaw || c.customer || '', body: c.sms || '' })
   }, [c && c.id])
   const copy = (t, l) => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => notify.toast(l + ' 복사됨')).catch(() => notify.toast('복사 실패')); else notify.toast('복사 불가') }
@@ -992,6 +992,11 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
             <label className="of-row"><span>담당자</span><input value={own} onChange={(e) => setOwn(e.target.value)} onBlur={() => updateCases && updateCases([c.id], { owner: own })} placeholder="영역 담당자" /></label>
             <label className="of-row"><span>Jira URL</span><input value={jira} onChange={(e) => setJira(e.target.value)} onBlur={() => updateCases && updateCases([c.id], { jiraUrl: jira })} placeholder="https://jira… (표시용)" /></label>
             {c.jiraUrl && <a className="jira-link" href={c.jiraUrl} target="_blank" rel="noreferrer">티켓 열기 ↗</a>}
+            <div className="of-note">
+              <span className="of-note-k">담당자 메모</span>
+              <textarea className="of-area" value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => updateCases && updateCases([c.id], { ownerNote: note })} placeholder="처리 경과·확인 사항·인계 내용을 적어주세요 (자동 저장)" />
+              <span className="micro">입력 후 다른 곳을 클릭하면 자동 저장됩니다{c.ownerNote ? ' · 저장됨' : ''}. 공유 저장소 모드면 다른 담당자에게도 반영돼요.</span>
+            </div>
             <button className="btn btn-ghost sm" onClick={() => notify.modal('개선 요청 등록', '실제 적용 시 사내 업무시스템(Jira 등)에 개선 요청이 등록됩니다. 본 MVP는 데모 표시입니다.')}>개선 요청 등록</button>
           </div>
           <div className="panel">
