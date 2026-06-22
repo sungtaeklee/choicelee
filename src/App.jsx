@@ -599,12 +599,11 @@ const RAIL_ICONS = {
 }
 const RailIcon = ({ d }) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 function IconRail({ account, onLogout, notify, railView, setRail }) {
-  const items = [['home', '홈'], ['grid', '솔루션 설명'], ['mail', '메일'], ['org', '조직도']]
+  const items = [['home', '홈'], ['grid', '솔루션 설명'], ['agent', 'Agent'], ['mail', '메일'], ['org', '조직도']]
   return (
     <nav className="rail">
       <div className="rail-top">
-        {items.map(([k, l]) => <button key={k} className={'rail-ic' + (railView === k ? ' on' : '')} title={l} onClick={() => setRail(k)}><RailIcon d={RAIL_ICONS[k]} /><span>{l}</span></button>)}
-        <button className={'rail-ic' + (railView === 'agent' ? ' on' : '')} title="VOC Agent" onClick={() => setRail('agent')}><RailIcon d={RAIL_ICONS.chat} /><span>Agent</span></button>
+        {items.map(([k, l]) => <button key={k} className={'rail-ic' + (railView === k ? ' on' : '')} title={k === 'agent' ? 'VOC Agent' : l} onClick={() => setRail(k)}><RailIcon d={RAIL_ICONS[k === 'agent' ? 'chat' : k]} /><span>{l}</span></button>)}
       </div>
       <div className="rail-bot">
         <div className="rail-ai">AI</div>
