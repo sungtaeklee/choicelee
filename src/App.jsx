@@ -291,12 +291,15 @@ function hydrate(recs) {
   if (!Array.isArray(recs)) return []
   return recs.map((r) => {
     const e = enrichRow({ channel: r.c, content: r.t, customer: r.n, date: r.d, week: r.w, occur: r.o }, r.id)
-    return { ...e, status: r.s || e.status, owner: r.ow || e.owner, jiraUrl: r.j || '', ownerNote: r.on || '' }
+    return {
+      ...e, status: r.s || e.status, owner: r.ow || e.owner, jiraUrl: r.j || '', ownerNote: r.on || '',
+      group: r.gr || e.group, cat: r.ct || e.cat, area1: r.a1 || e.area1, area2: r.a2 || e.area2, severity: r.sv || e.severity,
+    }
   })
 }
 // 보강 레코드 → 압축 레코드 (저장·내보내기 공통)
 function toCompact(arr) {
-  return (arr || []).map((v) => ({ id: v.id, c: v.channel, t: v.content, n: v.customerRaw || '', d: v.date || '', w: v.week || '', o: v.occur || '', s: v.status, ow: v.owner, j: v.jiraUrl || '', on: v.ownerNote || '' }))
+  return (arr || []).map((v) => ({ id: v.id, c: v.channel, t: v.content, n: v.customerRaw || '', d: v.date || '', w: v.week || '', o: v.occur || '', s: v.status, ow: v.owner, j: v.jiraUrl || '', on: v.ownerNote || '', gr: v.group, ct: v.cat, a1: v.area1, a2: v.area2, sv: v.severity }))
 }
 function loadAdded() {
   try {
@@ -990,6 +993,9 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
   }
   if (!c) return <div className="screen"><div className="panel empty-panel">표시할 케이스가 없습니다. VOC Inbox에서 VOC를 입력하거나 엑셀을 붙여넣어 추가하세요.</div></div>
   const canReveal = c.customerRaw && c.customerRaw !== c.customer
+  const catOpts = (g) => g === '단순 문의/불만/기타' ? CAT22 : (FIXED_DEPTH2[g] || CAT22)
+  const withCur = (opts, cur) => (cur && !opts.includes(cur)) ? [cur, ...opts] : opts
+  const setField = (patch) => updateCases && updateCases([c.id], patch)
   return (
     <div className="screen">
       <PageHead title="케이스 처리" sub="분류 결과 확인 · 문자/메일 초안 · 처리 상태 관리" />
@@ -1005,12 +1011,13 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
               <div className="kv-i"><span className="kv-k">월 내 주차</span><span className="kv-v">{c.week || '-'}</span></div>
               <div className="kv-i"><span className="kv-k">발생일자</span><span className="kv-v">{c.occur || '-'}</span></div>
             </div>
-            <div className="block-label">분류 · 처리 정보</div>
+            <div className="block-label">분류 · 처리 정보 <span className="muted" style={{ fontWeight: 400 }}>· 담당자가 수정하면 저장됩니다</span></div>
             <div className="kv">
-              <div className="kv-i"><span className="kv-k">VOC구분1</span><span className="kv-v"><GroupBadge v={c.group} /></span></div>
-              <div className="kv-i"><span className="kv-k">표준분류(구분2)</span><span className="kv-v"><Tag>{c.cat}</Tag></span></div>
-              <div className="kv-i"><span className="kv-k">대응 영역</span><span className="kv-v">{[c.area1, c.area2].filter(Boolean).join(' › ') || '-'}</span></div>
-              <div className="kv-i"><span className="kv-k">심각도</span><span className="kv-v"><SevBadge v={c.severity} /></span></div>
+              <div className="kv-i"><span className="kv-k">VOC구분1</span><span className="kv-v"><select className="kv-sel" value={c.group} onChange={(e) => { const g = e.target.value; setField({ group: g, cat: (catOpts(g)[0] || c.cat) }) }}>{GROUPS.map((g) => <option key={g}>{g}</option>)}</select></span></div>
+              <div className="kv-i"><span className="kv-k">표준분류(구분2)</span><span className="kv-v"><select className="kv-sel" value={c.cat} onChange={(e) => setField({ cat: e.target.value })}>{withCur(catOpts(c.group), c.cat).map((x) => <option key={x}>{x}</option>)}</select></span></div>
+              <div className="kv-i"><span className="kv-k">대응영역1</span><span className="kv-v"><select className="kv-sel" value={c.area1} onChange={(e) => { const a = e.target.value; setField({ area1: a, area2: ((AREA_TREE[a] || [])[0] || '') }) }}>{withCur(AREA1_LIST, c.area1).map((a) => <option key={a}>{a}</option>)}</select></span></div>
+              <div className="kv-i"><span className="kv-k">대응영역2</span><span className="kv-v"><select className="kv-sel" value={c.area2} onChange={(e) => setField({ area2: e.target.value })}>{withCur(AREA_TREE[c.area1] || [], c.area2).map((a) => <option key={a}>{a}</option>)}</select></span></div>
+              <div className="kv-i"><span className="kv-k">심각도</span><span className="kv-v"><select className="kv-sel" value={c.severity} onChange={(e) => setField({ severity: e.target.value })}>{['High', 'Medium', 'Low'].map((s) => <option key={s}>{s}</option>)}</select></span></div>
               <div className="kv-i"><span className="kv-k">감성</span><span className="kv-v"><SentBadge v={c.sentiment} /></span></div>
               <div className="kv-i"><span className="kv-k">신뢰도</span><span className="kv-v"><ConfBadge v={c.conf} /></span></div>
               <div className="kv-i"><span className="kv-k">검토필요</span><span className="kv-v">{c.review ? <span className="rev-y">Y</span> : 'N'}</span></div>
