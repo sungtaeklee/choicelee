@@ -1392,3 +1392,28 @@ svg.ltrend .lt-line:hover{opacity:1}
   .pd-frame { width: 100%; max-width: 300px; }
   .mr-from { width: 84px; } .mr-date { width: 86px; }
 }
+
+/* ---------- 연동: VOC 결과 불러오기 (JSON → 카드) ---------- */
+.imp-ta{width:100%;box-sizing:border-box;min-height:160px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font:13px/1.6 var(--mono,ui-monospace,SFMono-Regular,Menlo,monospace);color:var(--ink);background:var(--bg);margin-top:10px}
+.imp-ta:focus{outline:none;border-color:var(--muted);background:#fff}
+.imp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.imp-row{display:flex;gap:12px;padding:8px 0;border-top:1px solid var(--line-2);font-size:13.5px;line-height:1.55}
+.imp-row:first-of-type{border-top:0}
+.imp-k{flex:0 0 132px;color:var(--muted);font-weight:600;font-size:12.5px;padding-top:1px}
+.imp-pills{display:flex;flex-wrap:wrap;gap:6px}
+.imp-pill{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid transparent}
+.imp-hi{background:#fdecec;color:#c0322b;border-color:#f5c6c2}
+.imp-mid{background:#fff4e0;color:#9a6a00;border-color:#f6dca8}
+.imp-lo{background:#e9f7ee;color:#1a7f43;border-color:#bfe6cd}
+.imp-neu{background:var(--bg);color:var(--slate);border-color:var(--line)}
+.imp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.imp-chip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:7px;font-size:12px;background:var(--bg);border:1px solid var(--line);color:var(--slate)}
+.imp-voc{color:var(--slate)}
+.imp-intent{margin:2px 0 0;font-size:15px;font-weight:700;color:var(--ink);line-height:1.5}
+.imp-list{margin:4px 0 0;padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--slate)}
+.imp-list li{margin:1px 0}
+.imp-mail-t{font-weight:700;color:var(--ink);margin-bottom:6px}
+@media(max-width:860px){
+  .imp-row{flex-direction:column;gap:4px}
+  .imp-k{flex-basis:auto}
+}

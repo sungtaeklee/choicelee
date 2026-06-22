@@ -613,12 +613,97 @@ function IconRail({ account, onLogout, notify, railView, setRail }) {
     </nav>
   )
 }
+/* ---------- [연동] 사내 에이전트 JSON 붙여넣기 → 카드 렌더링 (LLM 호출 없음) ---------- */
+function parsePastedJSON(text) {
+  if (!text || !text.trim()) return { error: '붙여넣은 내용이 없습니다.' }
+  let s = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
+  const a = s.indexOf('{'), b = s.lastIndexOf('}')
+  if (a >= 0 && b > a) s = s.slice(a, b + 1)
+  try { return { data: JSON.parse(s) } }
+  catch { return { error: 'JSON을 읽지 못했습니다. 앞뒤 설명 문장·코드펜스를 빼고 { … } 객체만 붙여넣어 주세요.' } }
+}
+const IMP_SAMPLE = {
+  voc: '앱 로그인 시 인증문자 요청 후 계속 실패하고, 재시도해도 안 됩니다.',
+  classification: { group: '장애/오류', category: '회원/로그인/인증', depth1: 'MY', depth2: '회원/로그인/ID', severity: '높음', sentiment: '부정', urgency: '높음', signals: ['로그인', '인증문자 실패', '재시도 반복'] },
+  insight: { intent: '인증문자 오류로 로그인 불가', risk: '서비스 이용 차단' },
+  actions: { ownerTeam: ['인증/계정 시스템', 'SMS Gateway', '앱 인증 플로우'], checkpoints: ['SMS 발송 로그 확인', '수신 차단 여부', '장애 확산 여부'] },
+  response: {
+    customerMessage: '안녕하세요 고객님, 로그인 인증문자 오류로 불편을 드려 죄송합니다. 현재 인증 단계 오류 여부를 확인하고 있으며, 앱 최신 버전 확인 후 재시도를 부탁드립니다. 계속 실패하시면 즉시 복구 도와드리겠습니다(확인 필요).',
+    pushMessage: '[U+] 고객님, 로그인 인증문자 오류를 확인 중입니다. 앱 최신 버전 확인 후 재시도 부탁드립니다.',
+    internalMail: { title: '[긴급] 로그인 인증문자 실패 반복 VOC', body: '안녕하세요. 앱 로그인 인증문자 실패 VOC가 반복 인입되어 공유드립니다. SMS 발송 로그·수신 차단·장애 확산 여부 점검 부탁드립니다.' },
+  },
+  improvements: ['대체 인증수단 제공', '에러 메시지 개선', '발송 모니터링 강화'],
+}
+function ImpPill({ v }) {
+  if (!v) return null
+  const s = String(v)
+  const t = /높|high|부정|negative/i.test(s) ? 'hi' : /보통|중간|medium|중립|neutral/i.test(s) ? 'mid' : /낮|low|긍정|positive/i.test(s) ? 'lo' : 'neu'
+  return <span className={'imp-pill imp-' + t}>{s}</span>
+}
+function ImportResult({ notify }) {
+  const [raw, setRaw] = useState(''); const [res, setRes] = useState(null); const [err, setErr] = useState('')
+  const copy = (t, l) => { if (t && navigator.clipboard) navigator.clipboard.writeText(t).then(() => notify && notify.toast(l + ' 복사됨')).catch(() => { }) }
+  const load = () => { const { data, error } = parsePastedJSON(raw); if (error) { setErr(error); setRes(null) } else { setErr(''); setRes(data) } }
+  const c = (res && res.classification) || {}, ins = (res && res.insight) || {}, act = (res && res.actions) || {}, rsp = (res && res.response) || {}, mail = rsp.internalMail || {}, imp = (res && res.improvements) || []
+  return (
+    <div className="screen">
+      <PageHead title="VOC 결과 불러오기" sub="사내 에이전트가 출력한 JSON을 붙여넣으면 카드로 즉시 표시됩니다 · LLM 호출 없음(사내망 무관)" />
+      <div className="panel">
+        <div className="card-title">에이전트 JSON 붙여넣기 <span className="muted">코드펜스·앞뒤 설명 문장이 섞여 있어도 됩니다</span></div>
+        <textarea className="imp-ta" value={raw} onChange={(e) => setRaw(e.target.value)} placeholder={'{\n  "voc": "...",\n  "classification": { "group": "...", "category": "...", "depth1": "...", "depth2": "...", "severity": "...", "sentiment": "...", "urgency": "...", "signals": [] },\n  "insight": { "intent": "...", "risk": "..." },\n  "actions": { "ownerTeam": [], "checkpoints": [] },\n  "response": { "customerMessage": "...", "pushMessage": "...", "internalMail": { "title": "...", "body": "..." } },\n  "improvements": []\n}'} />
+        <div className="imp-actions">
+          <button className="btn btn-primary" onClick={load}>카드로 표시</button>
+          <button className="btn btn-ghost" onClick={() => { setRaw(JSON.stringify(IMP_SAMPLE, null, 2)); setErr('') }}>예시 채우기</button>
+          {(raw || res) && <button className="btn btn-ghost" onClick={() => { setRaw(''); setRes(null); setErr('') }}>지우기</button>}
+        </div>
+        {err && <div className="ai-err">{err}</div>}
+      </div>
+      {res && (
+        <>
+          <div className="panel">
+            <div className="card-title">요약</div>
+            <div className="imp-row"><span className="imp-k">VOC 구분</span><span>{c.group ? <GroupBadge v={c.group} /> : '—'} {c.category && <Tag>{c.category}</Tag>}</span></div>
+            <div className="imp-row"><span className="imp-k">대응영역</span><span>{[c.depth1, c.depth2].filter(Boolean).join(' › ') || '—'}</span></div>
+            <div className="imp-row"><span className="imp-k">심각도 · 감성 · 긴급도</span><span className="imp-pills"><ImpPill v={c.severity} /><ImpPill v={c.sentiment} /><ImpPill v={c.urgency} /></span></div>
+            {Array.isArray(c.signals) && c.signals.length > 0 && <div className="imp-row"><span className="imp-k">신호어</span><span className="imp-chips">{c.signals.map((s, i) => <span key={i} className="imp-chip">{s}</span>)}</span></div>}
+            {res.voc && <div className="imp-row"><span className="imp-k">원문</span><span className="imp-voc">{res.voc}</span></div>}
+          </div>
+          {(ins.intent || ins.risk) && (
+            <div className="panel">
+              <div className="card-title">의도 · 리스크</div>
+              {ins.intent && <p className="imp-intent">{ins.intent}</p>}
+              {ins.risk && <div className="imp-row"><span className="imp-k">리스크</span><span>{ins.risk}</span></div>}
+            </div>
+          )}
+          {(((act.ownerTeam || []).length) || ((act.checkpoints || []).length)) ? (
+            <div className="two-col">
+              <div className="panel"><div className="card-title">담당팀</div><ul className="imp-list">{(act.ownerTeam || []).map((t, i) => <li key={i}>{t}</li>)}</ul></div>
+              <div className="panel"><div className="card-title">확인 체크포인트</div><ul className="imp-list">{(act.checkpoints || []).map((t, i) => <li key={i}>{t}</li>)}</ul></div>
+            </div>
+          ) : null}
+          {(rsp.customerMessage || rsp.pushMessage || mail.body || mail.title) && (
+            <div className="panel">
+              <div className="card-title">응대 초안 <span className="muted">검수 후 사용</span></div>
+              {rsp.customerMessage && <div className="ai-ans"><div className="ai-ans-k">고객 응대문</div><div className="draft">{rsp.customerMessage}</div><button className="btn btn-ghost sm" onClick={() => copy(rsp.customerMessage, '고객 응대문')}>복사</button></div>}
+              {rsp.pushMessage && <div className="ai-ans"><div className="ai-ans-k">문자/푸시</div><div className="draft">{rsp.pushMessage}</div><button className="btn btn-ghost sm" onClick={() => copy(rsp.pushMessage, '문자/푸시')}>복사</button></div>}
+              {(mail.title || mail.body) && <div className="ai-ans"><div className="ai-ans-k">담당자 메일</div><div className="draft">{mail.title && <div className="imp-mail-t">{mail.title}</div>}{mail.body}</div><button className="btn btn-ghost sm" onClick={() => copy((mail.title ? mail.title + '\n\n' : '') + (mail.body || ''), '담당자 메일')}>복사</button></div>}
+            </div>
+          )}
+          {Array.isArray(imp) && imp.length > 0 && (
+            <div className="panel"><div className="card-title">개선 제안</div><ul className="imp-list">{imp.map((t, i) => <li key={i}>{t}</li>)}</ul></div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
 function SubLNB({ screen, setScreen }) {
   const SECTIONS = [
     { label: '현황 · 분석', items: [['trends', '기간별·영역별 추이']] },
     { label: '수집 · 자동분류', items: [['inbox', 'VOC 수집·입력'], ['board', '분류 보드']] },
     { label: '처리 · 개선', items: [['detail', 'VOC 처리'], ['insight', '인사이트 리포트']] },
     { label: '셀프 해결 · 엔진②', items: [['selfguide', '셀프 해결 가이드']] },
+    { label: '연동 · 사내 에이전트', items: [['import', 'VOC 결과 불러오기']] },
   ]
   return (
     <aside className="sublnb">
@@ -2785,6 +2870,7 @@ const TITLES = {
   board: ['분류 보드', '4그룹 게이트 + 22개 표준분류'],
   detail: ['VOC 처리', '케이스 분석 및 액션'],
   insight: ['인사이트 리포트', '개선 인사이트와 기대효과'],
+  import: ['VOC 결과 불러오기', '사내 에이전트 JSON → 카드'],
 }
 
 /* ---------- 자동 시연 (심사용): 화면 자동 이동 + 음성(브라우저 TTS) + 자막 ---------- */
@@ -2990,6 +3076,7 @@ export default function App() {
                     {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} openCase={openCase} />}
                     {screen === 'insight' && <InsightReport added={added} openCase={openCase} />}
                     {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
+                    {screen === 'import' && <ImportResult notify={notify} />}
                   </div>
                 </main>
               )}
