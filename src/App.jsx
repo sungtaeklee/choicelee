@@ -2261,18 +2261,129 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
     </div>
   )
 }
-function MailApp({ sentLog }) {
-  const rows = [['VOC 주간 리포트 공유', 'CX기획팀', '오늘 10:24', true], ['[결재] 4월 개선 과제 승인 요청', '김형걸', '오늘 09:10', true], ['앱스토어 평점 모니터링 알림', '운영봇', '어제', false], ['셀프 가이드 콘텐츠 검수 요청', '디자인시스템스쿼드', '어제', false], ['장애/오류 급증 이상 감지 통보', 'VOC Agent', '2일 전', false]]
-  const sentN = (sentLog || []).length
+/* ---------- [메일] 사내 웹메일 유사 UI (데모 받은함 + VOC 발송 이력=보낸함) ---------- */
+const MAIL_FOLDERS = [
+  ['inbox', '받은메일함'], ['sent', '보낸메일함'], ['draft', '임시보관함'],
+  ['sched', '예약메일함'], ['spam', '스팸메일함'], ['trash', '휴지통'],
+]
+const MAIL_ARCHIVE = ['VOC 리포트', '셀프가이드', '개선 과제']
+const INBOX_DEMO = [
+  { id: 'm1', type: 'B', from: 'U+ VOICE · VOC Agent', ext: false, subj: '[VOC High] 요금/청구 이중납부 급증 — 담당 전달 요청', size: '12.4KB', date: '26.06.22 09:41', star: true, attach: false, unread: true, body: '금주 요금/청구 영역에서 이중납부 관련 VOC가 전주 대비 38% 증가했습니다.\nHigh 우선순위 6건을 담당 조직에 전달합니다.\n\n· 대응영역: MY › 요금/납부/청구\n· 대표 사례: VOC-2026-0612 외 5건\n· 권장 조치: 청구 내역 점검 → 정정/환불, 안내 문자 발송\n\n— U+ VOICE · VOC Action Copilot (데모)' },
+  { id: 'm2', type: 'B', from: 'U+ VOICE · VOC Agent', ext: false, subj: '[이상 감지] 장애/오류 그룹 급증 알림 (02월 4주차)', size: '9.1KB', date: '26.06.22 08:30', star: false, attach: false, unread: true, body: '앱/웹 접속불가 관련 VOC가 단시간 급증했습니다. 추이 화면에서 확인하세요. (데모)' },
+  { id: 'm3', type: 'Ex', from: 'Figma', ext: true, subj: '2 new comments in 너겟 3.0 / VOC 대시보드', size: '58.2KB', date: '26.06.21 17:05', star: false, attach: false, unread: true, body: 'VOC 대시보드 시안에 코멘트 2건이 추가되었습니다. (데모)' },
+  { id: 'm4', type: 'T', from: 'CX기획팀', ext: false, subj: 'VOC 주간 리포트 공유 (06/16~06/22)', size: '176.9KB', date: '26.06.21 15:35', star: true, attach: true, unread: false, body: '금주 VOC 주간 리포트를 공유합니다. 첨부 참고 바랍니다. (데모)' },
+  { id: 'm5', type: 'T', from: '디자인시스템스쿼드', ext: false, subj: '[검수요청] 셀프 가이드 콘텐츠 1차 검수', size: '431.3KB', date: '26.06.20 08:13', star: false, attach: true, unread: false, body: '셀프 가이드 콘텐츠 초안 검수를 요청드립니다. (데모)' },
+  { id: 'm6', type: 'Ex', from: 'Jira', ext: true, subj: '[Jira] DCBGIT-40580 에서 사용자를 멘션했습니다', size: '19.1KB', date: '26.06.20 10:34', star: false, attach: false, unread: false, body: 'VOC 분류 개선 티켓에 멘션되었습니다. (데모)' },
+  { id: 'm7', type: 'T', from: 'Work Innovation CoE', ext: false, subj: '데이터 설계 과정 교육 신청 안내 (~6/25)', size: '88.0KB', date: '26.06.19 15:35', star: false, attach: false, unread: false, body: '데이터 설계 교육 신청 안내입니다. (데모)' },
+  { id: 'm8', type: 'B', from: 'App Store 모니터링', ext: false, subj: '앱스토어 평점 모니터링 알림 — 평균 4.3 (▲0.1)', size: '7.7KB', date: '26.06.19 09:27', star: false, attach: false, unread: false, body: '주간 앱스토어 평점이 0.1 상승했습니다. (데모)' },
+  { id: 'm9', type: 'Ex', from: 'Figma', ext: true, subj: '1 new file pinned to 디지털사업트라이브', size: '46.8KB', date: '26.06.18 10:35', star: false, attach: false, unread: false, body: '새 파일이 고정되었습니다. (데모)' },
+  { id: 'm10', type: 'T', from: 'CX운영팀', ext: false, subj: '[공지] 하반기 VOC 처리 SLA 기준 변경 안내', size: '24.4KB', date: '26.06.18 14:43', star: false, attach: false, unread: false, body: '하반기 VOC 처리 SLA 기준이 변경됩니다. (데모)' },
+  { id: 'm11', type: 'B', from: 'U+ VOICE · VOC Agent', ext: false, subj: '[VOC] 로밍 문의 패턴 리포트 — 출국 전 가입 안내 강화 제안', size: '11.2KB', date: '26.06.17 11:20', star: false, attach: false, unread: false, body: '로밍 문의가 출국 직전에 집중됩니다. 사전 안내 푸시를 제안합니다. (데모)' },
+  { id: 'm12', type: 'T', from: '맹희경/디지털가입CX', ext: false, subj: '너겟 3.0 / 친구추천 고도화 검토 회신', size: '52.2KB', date: '26.06.17 09:52', star: false, attach: false, unread: false, body: '검토 의견 회신드립니다. (데모)' },
+]
+const MailType = ({ t }) => <span className={'mtype mtype-' + t} title={t === 'Ex' ? '외부' : t === 'B' ? '시스템' : '사내'}>{t}</span>
+const Clip = () => <svg className="mclip" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+function MailApp({ sentLog, notify }) {
+  const [folder, setFolder] = useState('inbox')
+  const [q, setQ] = useState('')
+  const [page, setPage] = useState(1)
+  const [open, setOpen] = useState(null)
+  const PAGE = 10
+  const sent = (sentLog || []).map((s) => ({
+    id: s.id, type: s.kind === '메일' ? 'T' : 'B', from: s.owner || '담당자', ext: false,
+    subj: `[${s.kind}] ${s.content}`, size: '—', date: s.date, star: false, attach: false, unread: false,
+    body: `유형: ${s.kind}\n수신: ${s.to}\n케이스: ${s.caseId}\n\n${s.content}` }))
+  const source = folder === 'inbox' ? INBOX_DEMO : folder === 'sent' ? sent : []
+  const list = q ? source.filter((m) => (m.subj + ' ' + m.from).toLowerCase().includes(q.toLowerCase())) : source
+  const pages = Math.max(1, Math.ceil(list.length / PAGE))
+  const cur = Math.min(page, pages)
+  const items = list.slice((cur - 1) * PAGE, cur * PAGE)
+  const unread = INBOX_DEMO.filter((m) => m.unread).length
+  const go = (f) => { setFolder(f); setPage(1); setQ(''); setOpen(null) }
+  const demo = (label) => notify && notify.toast(`${label} (데모 — 실제 동작 안 함)`)
+  const count = (f) => f === 'inbox' ? unread : f === 'sent' ? sent.length : f === 'trash' ? 0 : 0
   return (
-    <div className="screen portal-screen">
-      <PageHead title="메일" sub="사내 메일 · VOC 발송 이력" />
-      <DemoBanner>메일 목록은 예시이며,</DemoBanner>
-      <div className="panel"><ul className="mail-list">{rows.map(([t, f, d, un], i) => (
-        <li key={i} className={un ? 'unread' : ''}><span className="ml-dot" /><span className="ml-from">{f}</span><span className="ml-subj">{t}</span><span className="ml-date">{d}</span></li>
-      ))}</ul></div>
-      <h2 className="sec-title">발송 이력 <span className="sec-note">VOC Agent에서 발송한 메일·문자{sentN ? ` ${sentN}건` : ''} · 담당자/수신/내용/발송일</span></h2>
-      <SentLogTable sentLog={sentLog} />
+    <div className="screen portal-screen mailwrap">
+      <DemoBanner>받은메일함은 예시 데이터이며, 보낸메일함은 VOC Agent 발송 이력과 연동됩니다.</DemoBanner>
+      <div className="mailapp">
+        <aside className="mbox-side">
+          <button className="mbox-compose" onClick={() => demo('메일쓰기')}>메일쓰기</button>
+          <div className="mbox-quick">
+            <button onClick={() => demo('안읽음')}><b>{unread}</b><span>안읽음</span></button>
+            <button onClick={() => demo('별표')}><b>★</b><span>별표</span></button>
+            <button onClick={() => demo('첨부')}><b>◍</b><span>첨부</span></button>
+          </div>
+          <div className="mbox-group">
+            <div className="mbox-gh">메일함</div>
+            {MAIL_FOLDERS.map(([k, l]) => (
+              <button key={k} className={'mbox-item' + (folder === k ? ' on' : '')} onClick={() => go(k)}>
+                <span>{l}</span>{count(k) > 0 && <span className="mbox-count">{count(k)}</span>}
+              </button>
+            ))}
+          </div>
+          <div className="mbox-group">
+            <div className="mbox-gh">보관함</div>
+            {MAIL_ARCHIVE.map((a) => <button key={a} className="mbox-item sub" onClick={() => demo(a)}><span>{a}</span></button>)}
+          </div>
+          <div className="mbox-storage"><div className="mbox-bar"><span style={{ width: '12%' }} /></div><span className="micro">136.8MB / 2GB</span></div>
+        </aside>
+
+        <section className="mbox-main">
+          {open ? (
+            <div className="mread">
+              <div className="mbox-toolbar">
+                <button className="mt-btn" onClick={() => setOpen(null)}>← 목록</button>
+                <button className="mt-btn" onClick={() => demo('답장')}>답장</button>
+                <button className="mt-btn" onClick={() => demo('전달')}>전달</button>
+                <button className="mt-btn" onClick={() => demo('삭제')}>삭제</button>
+              </div>
+              <div className="mread-head">
+                <h2>{open.subj}</h2>
+                <div className="mread-meta"><MailType t={open.type} />{open.ext && <span className="ext-badge">외부메일</span>}<span className="mr-from">{open.from}</span><span className="mr-date">{open.date}</span></div>
+              </div>
+              <pre className="mread-body">{open.body || '(내용 없음)'}</pre>
+            </div>
+          ) : (
+            <>
+              <div className="mbox-toolbar">
+                <div className="mt-title">{MAIL_FOLDERS.find(([k]) => k === folder)[1]}</div>
+                <div className="mt-search"><input value={q} onChange={(e) => { setQ(e.target.value); setPage(1) }} placeholder="메일 검색 (제목·보낸사람)" /></div>
+                <div className="mt-tools">
+                  {['읽음', '삭제', '이동', '답장', '전달', '스팸신고'].map((b) => <button key={b} className="mt-btn" onClick={() => demo(b)}>{b}</button>)}
+                </div>
+              </div>
+              <div className="mbox-listhead">
+                <span className="ml-c">전체 <b>{list.length}</b></span>
+                <span className="ml-sort">보낸사람 · 제목 · 크기 · <b>날짜▾</b></span>
+              </div>
+              {items.length ? (
+                <ul className="mbox-list">
+                  {items.map((m) => (
+                    <li key={m.id} className={'mbox-row' + (m.unread ? ' unread' : '')} onClick={() => setOpen(m)}>
+                      <MailType t={m.type} />
+                      <span className="mr-star">{m.star ? '★' : ''}</span>
+                      <span className="mr-from" title={m.from}>{m.from}</span>
+                      {m.ext && <span className="ext-badge">외부메일</span>}
+                      <span className="mr-subj">{m.subj}{m.attach && <Clip />}</span>
+                      <span className="mr-size">{m.size}</span>
+                      <span className="mr-date">{m.date}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="panel empty-panel">{folder === 'sent' ? 'VOC Agent › VOC 처리에서 메일/문자를 발송(데모)하면 여기에 보낸 메일로 기록됩니다.' : '메일이 없습니다.'}</div>
+              )}
+              {pages > 1 && (
+                <div className="mbox-pager">
+                  {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                    <button key={p} className={p === cur ? 'on' : ''} onClick={() => setPage(p)}>{p}</button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </div>
     </div>
   )
 }
@@ -2288,15 +2399,117 @@ function CalendarApp() {
     </div>
   )
 }
-function OrgApp() {
-  const teams = [['디지털CX', ['CX기획팀', '디자인시스템스쿼드', 'VOC운영팀']], ['MY서비스', ['MY서비스팀', '회원/로그인팀']], ['커머스', ['커머스팀', '멤버십팀']], ['AI', ['AI검색팀', 'Copilot TF']]]
+/* ---------- [조직도] 사내 조직 디렉터리 유사 UI (트리 + 프로필 · 데모/마스킹) ---------- */
+const ORG_TREE = {
+  name: 'LG유플러스', children: [
+    { name: 'CEO' },
+    { name: 'Consumer부문', children: [
+      { name: 'Consumer기획담당' },
+      { name: 'Consumer인사담당' },
+      { name: '모바일/디지털사업그룹', children: [
+        { name: '모바일사업담당' },
+        { name: '요금상품담당' },
+        { name: '디바이스/Seg담당' },
+        { name: '디지털CX트라이브', children: [
+          { name: '디지털CX전략팀' },
+          { name: '디지털커머스CX팀' },
+          { name: '디지털통합CX팀', people: ['p_t1', 'p_t2'] },
+          { name: '디자인시스템스쿼드', people: ['p_lead', 'p_ux', 'p_fe', 'p_res', 'p_pm'] },
+          { name: '디지털혜택CX팀' },
+          { name: '디지털가입CX스쿼드' },
+          { name: 'AI검색TF' },
+        ] },
+      ] },
+      { name: 'MVNO사업담당' },
+    ] },
+  ],
+}
+const ORG_OPEN_DEFAULT = ['LG유플러스', 'Consumer부문', '모바일/디지털사업그룹', '디지털CX트라이브', '디자인시스템스쿼드']
+const BREAD = 'Consumer부문 › 모바일/디지털사업그룹 › 디지털CX트라이브'
+const ORG_PROFILES = {
+  p_lead: { name: '강도현', title: '스쿼드 리드', team: '디자인시스템스쿼드', email: 'ds.lead@uplus-demo.kr', phone: '010-****-****', work: ['Design System Lead', '[2024~] CX 디자인시스템 총괄', '- 너겟 / VOC Action Copilot'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
+  p_ux: { name: '이도현', title: 'UX Architect', team: '디자인시스템스쿼드', email: 'ds.ux@uplus-demo.kr', phone: '010-****-****', work: ['UX Architect', '[2025~] Communication service UX', '- 너겟 / VOC Action Copilot'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
+  p_fe: { name: '정우진', title: 'Frontend Engineer', team: '디자인시스템스쿼드', email: 'ds.fe@uplus-demo.kr', phone: '010-****-****', work: ['Frontend Engineer', 'React · 디자인시스템 컴포넌트', '- VOC Action Copilot 프로토타입'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
+  p_res: { name: '김하늘', title: 'UX Researcher', team: '디자인시스템스쿼드', email: 'ds.res@uplus-demo.kr', phone: '010-****-****', work: ['UX Researcher', 'VOC·사용성 리서치', '- 셀프 가이드 콘텐츠 검증'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
+  p_pm: { name: '최민재', title: 'Product Manager', team: '디자인시스템스쿼드', email: 'ds.pm@uplus-demo.kr', phone: '010-****-****', work: ['Product Manager', 'CX 프로덕트 기획', '- VOC 대응 프로세스 개선'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
+  p_t1: { name: '한지우', title: 'CX 기획', team: '디지털통합CX팀', email: 'cx.plan@uplus-demo.kr', phone: '010-****-****', work: ['CX Planner', 'VOC 운영·리포팅'], mission: '고객을 위한 디지털통합CX팀 미션' },
+  p_t2: { name: '오세훈', title: 'CX 데이터', team: '디지털통합CX팀', email: 'cx.data@uplus-demo.kr', phone: '010-****-****', work: ['CX Data Analyst', 'VOC 분류·지표 분석'], mission: '고객을 위한 디지털통합CX팀 미션' },
+}
+function initials(n) { return (n || '·').slice(0, 1) }
+function OrgApp({ notify }) {
+  const [sel, setSel] = useState('p_ux')
+  const [openSet, setOpenSet] = useState(() => new Set(ORG_OPEN_DEFAULT))
+  const [q, setQ] = useState('')
+  const toggle = (n) => setOpenSet((s) => { const x = new Set(s); x.has(n) ? x.delete(n) : x.add(n); return x })
+  const demo = (l) => notify && notify.toast(`${l} (데모 — 실제 동작 안 함)`)
+  const p = ORG_PROFILES[sel] || ORG_PROFILES.p_ux
+  const matches = q ? Object.entries(ORG_PROFILES).filter(([, v]) => (v.name + v.title + v.team).toLowerCase().includes(q.toLowerCase())) : null
+  const Node = ({ node, depth }) => {
+    const kids = node.children, ppl = node.people
+    const hasKids = !!(kids || ppl)
+    const isOpen = openSet.has(node.name)
+    return (
+      <div>
+        <div className="org-node" style={{ paddingLeft: depth * 13 + 8 }} onClick={() => hasKids && toggle(node.name)}>
+          <span className="org-tog">{hasKids ? (isOpen ? '▾' : '▸') : ''}</span>
+          <span className="org-nm">{node.name}</span>
+        </div>
+        {isOpen && kids && kids.map((c, i) => <Node key={i} node={c} depth={depth + 1} />)}
+        {isOpen && ppl && ppl.map((id) => {
+          const pp = ORG_PROFILES[id] || { name: id }
+          return <div key={id} className={'org-person' + (sel === id ? ' on' : '')} style={{ paddingLeft: (depth + 1) * 13 + 14 }} onClick={() => setSel(id)}><span className="org-pdot" />{pp.name} 님</div>
+        })}
+      </div>
+    )
+  }
   return (
-    <div className="screen portal-screen">
-      <PageHead title="조직도" sub="CX 디지털 조직 · 데모" />
-      <DemoBanner>조직 정보는 예시이며,</DemoBanner>
-      <div className="org-grid">{teams.map(([g, subs]) => (
-        <div key={g} className="panel org-card"><div className="org-h">{g}</div><ul className="org-subs">{subs.map((s) => <li key={s}>{s}</li>)}</ul></div>
-      ))}</div>
+    <div className="screen portal-screen mailwrap">
+      <DemoBanner>조직 정보·연락처는 데모용 예시이며(개인정보 마스킹),</DemoBanner>
+      <div className="orgapp">
+        <aside className="org-side">
+          <div className="org-search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="사원 / 부서 검색" />{q && <button onClick={() => setQ('')}>×</button>}</div>
+          <div className="org-tree">
+            {matches ? (
+              matches.length ? matches.map(([id, v]) => (
+                <div key={id} className={'org-person' + (sel === id ? ' on' : '')} style={{ paddingLeft: 12 }} onClick={() => setSel(id)}><span className="org-pdot" />{v.name} 님 <span className="muted">· {v.team}</span></div>
+              )) : <div className="org-empty">검색 결과가 없습니다.</div>
+            ) : <Node node={ORG_TREE} depth={0} />}
+          </div>
+        </aside>
+
+        <section className="org-profile">
+          <div className="op-banner">
+            <div className="op-banner-actions">
+              <button onClick={() => demo('프로필 정보 수정')}>프로필 정보 수정</button>
+              <button onClick={() => demo('배경이미지 변경')}>배경이미지 변경</button>
+            </div>
+          </div>
+          <div className="op-card">
+            <div className="op-id">
+              <div className="op-avatar">{initials(p.name)}</div>
+              <div className="op-idmain">
+                <div className="op-name">{p.name} <span className="op-title">· {p.title}</span></div>
+                <div className="op-bread">{BREAD} › {p.team}</div>
+                <div className="op-contact">
+                  <span className="op-mode">선택근무(09:30~21:00)</span>
+                  <span className="op-c"><b>이메일</b> {p.email}</span>
+                  <span className="op-c"><b>연락처</b> {p.phone}</span>
+                  <span className="op-c"><b>근무지</b> 서울 강서구 마곡 (용산사옥) · 데모</span>
+                </div>
+                <div className="op-btns">
+                  <button onClick={() => demo('칭찬/감사 메시지 보내기')}>칭찬/감사 메시지 보내기</button>
+                  <button onClick={() => demo('칭찬/감사 메시지함')}>칭찬/감사 메시지함</button>
+                </div>
+              </div>
+            </div>
+            <div className="op-stats">
+              <div className="ops-row"><div className="ops-k">도전 등록률</div><div className="ops-v"><div className="ring"><span>0%</span></div></div><div className="ops-d"><b className="magenta">{p.mission}</b></div></div>
+              <div className="ops-row"><div className="ops-k">과제 공감수</div><div className="ops-v"><span className="heart">♥ 0</span></div><div className="ops-d">AX 기반 일하는 방식 변화를 위한 나의 과제를 등록해주세요. <span className="muted">(데모)</span></div></div>
+              <div className="ops-row"><div className="ops-k">현재 업무</div><div className="ops-v" /><div className="ops-d"><ul className="op-work">{p.work.map((w, i) => <li key={i}>{w}</li>)}</ul></div></div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
@@ -2532,9 +2745,9 @@ export default function App() {
               <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} openCase={openCase} notify={notify} aiMode={homeAi} setAiMode={setHomeAi} />
             ) : (
               <div className="content">
-                {railView === 'mail' && <MailApp sentLog={sentLog} />}
+                {railView === 'mail' && <MailApp sentLog={sentLog} notify={notify} />}
                 {railView === 'cal' && <CalendarApp />}
-                {railView === 'org' && <OrgApp />}
+                {railView === 'org' && <OrgApp notify={notify} />}
                 {railView === 'pay' && <ApprovalApp notify={notify} />}
                 {railView === 'grid' && <AllMenu goAgent={goAgent} setRail={setRail} notify={notify} />}
               </div>
