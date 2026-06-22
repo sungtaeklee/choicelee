@@ -452,7 +452,7 @@ function ShareBadge({ state }) {
   const [label, cls] = map[state] || map.connecting
   return <span className={'share-badge ' + cls}>{label}</span>
 }
-function Topbar({ title, mode, setMode, agentTitle, shareState }) {
+function Topbar({ title, mode, setMode, agentTitle, shareState, sharedEnabled, onShareTools }) {
   return (
     <header className="topbar">
       {mode !== 'expanded' && (
@@ -460,6 +460,7 @@ function Topbar({ title, mode, setMode, agentTitle, shareState }) {
           <div className="crumb">U+ Agent<span className="crumb-sep">›</span>VOC Action Copilot<span className="crumb-sep">›</span><b>{title}</b></div>
           <div className="tb-main-right">
             <ShareBadge state={shareState} />
+            {sharedEnabled && <button className="tb-share-btn" onClick={onShareTools} title="공유 저장소 도구 (데모)">⚙ 공유 저장소 도구</button>}
             <span className="ai-pill">● Copilot 연결됨 (데모)</span>
             {mode === 'collapsed' && <button className="tb-open" onClick={() => setMode('split')} title="Agent 패널 열기"><span className="tb-open-i">‹</span>Agent</button>}
           </div>
@@ -477,9 +478,11 @@ function Topbar({ title, mode, setMode, agentTitle, shareState }) {
     </header>
   )
 }
-function AgentPanel({ screen, caseId, added, notify, updateCases, selected, setSelected }) {
+function AgentPanel({ screen, caseId, added, notify, updateCases, selected, setSelected, openCase }) {
   const data = added || []
   const [done, setDone] = useState(null)
+  const [reply, setReply] = useState(null)
+  const inputRef = useRef(null)
   const single = (screen === 'detail') ? data.find((v) => v.id === caseId) : null
   const todo = data.filter((v) => v.status === '처리 필요')
   const sel = selected || []
@@ -496,7 +499,26 @@ function AgentPanel({ screen, caseId, added, notify, updateCases, selected, setS
     if (setSelected) setSelected([])
     notify.toast(`${ids.length}건 처리 완료 — 가운데 뷰어에 반영됨`)
   }
-  const send = (el) => { const v = (el.value || '').trim(); if (!v) return; notify.toast('Copilot에 전달했습니다 (데모)'); el.value = '' }
+  const send = () => {
+    const el = inputRef.current
+    const text = ((el && el.value) || '').trim()
+    if (!text) return
+    const t = text.replace(/\s+/g, '')
+    const wantsAction = /(처리|조치|완료|반영|해결|끝)/.test(t)
+    const wantsSel = /(선택|고른|체크)/.test(t)
+    const wantsAll = /(전부|모두|모든|일괄|한번에|전체|다)/.test(t)
+    if (wantsAction && wantsSel && sel.length) {
+      actIds(sel); setReply({ q: text, a: `선택한 ${sel.length}건을 처리하고 가운데 뷰어에 반영했어요.` })
+    } else if (wantsAction && todo.length) {
+      const ids = todo.map((v) => v.id); actIds(ids)
+      setReply({ q: text, a: `조치 필요 ${ids.length}건을 ${wantsAll ? '일괄 ' : ''}처리하고 가운데 뷰어에 반영했어요.` })
+    } else if (wantsAction) {
+      setReply({ q: text, a: '지금 조치 필요한 건이 없어요. VOC를 입력·붙여넣으면 여기서 바로 처리할 수 있어요.' })
+    } else {
+      setReply({ q: text, a: '무엇을 반영할지 알려주시면 처리할게요. 예) "조치 필요 건 전부 처리해줘", "선택한 건 처리".' })
+    }
+    if (el) el.value = ''
+  }
   const ViewerResult = () => !done ? null : (
     <div className="ap-viewer">
       <div className="ap-viewer-h">뷰어 수정 <span className="ap-applied">✓ 반영완료</span></div>
@@ -531,7 +553,9 @@ function AgentPanel({ screen, caseId, added, notify, updateCases, selected, setS
             <div className="ap-greet">조치 필요 {todo.length}건</div>
             <div className="ap-mut">아래 건들을 한 번에 처리하고, 진행상황을 가운데 뷰어에 바로 반영해요.</div>
             {todo.slice(0, 6).map((v) => (
-              <div key={v.id} className="ap-item">
+              <div key={v.id} className="ap-item ap-item-click" role="button" tabIndex={0}
+                onClick={() => openCase && openCase(v.id)}
+                onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && openCase) { e.preventDefault(); openCase(v.id) } }}>
                 <div className="ap-item-h"><b>{v.customer}</b> <span className="ap-mut">{v.channel}{v.week ? ` · ${v.week}` : ''}</span><span className="dot dot-todo">조치필요</span></div>
                 <div className="ap-mut">{v.cat} · {v.summary}</div>
                 <div className="ap-item-act">{proposed(v)}</div>
@@ -550,10 +574,16 @@ function AgentPanel({ screen, caseId, added, notify, updateCases, selected, setS
             <ViewerResult />
           </>
         )}
+        {reply && (
+          <div className="ap-reply">
+            <div className="ap-reply-q">{reply.q}</div>
+            <div className="ap-reply-a">{reply.a}</div>
+          </div>
+        )}
       </div>
       <div className="ap-input">
-        <input placeholder="고칠 내용을 말하면 뷰어에 반영해요" onKeyDown={(e) => { if (e.key === 'Enter') send(e.currentTarget) }} />
-        <button className="ap-send" title="전달" onClick={(e) => send(e.currentTarget.previousSibling)}>↑</button>
+        <input ref={inputRef} placeholder="고칠 내용을 말하면 뷰어에 반영해요" onKeyDown={(e) => { if (e.key === 'Enter') send() }} />
+        <button className="ap-send" title="전달" onClick={send}>↑</button>
       </div>
     </aside>
   )
@@ -831,12 +861,11 @@ function PasteSheetModal({ onClose, onSubmit }) {
     </div>
   )
 }
-function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, clearShared }) {
+function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert }) {
   const [fch, setFch] = useState('전체'); const [fgrp, setFgrp] = useState('전체'); const [fst, setFst] = useState('전체')
   const [channel, setChannel] = useState('고객의소리'); const [customer, setCustomer] = useState(''); const [text, setText] = useState('')
   const [vDate, setVDate] = useState(''); const [vWeek, setVWeek] = useState(''); const [vOccur, setVOccur] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [showShared, setShowShared] = useState(false)
   const [result, setResult] = useState(null)
   const [seq, setSeq] = useState(() => added.reduce((m, v) => { const n = parseInt(String(v.id).replace(/\D/g, ''), 10); return n > m ? n : m }, 0) + 1)
   const all = useMemo(() => [...added, ...VOCS], [added])
@@ -866,39 +895,9 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
     setSheetOpen(false)
     notify.toast(`${vs.length}건 분류·추가됨`)
   }
-  const seedShared = async () => {
-    try {
-      const r = await fetch(`${import.meta.env.BASE_URL}seed.json`, { cache: 'no-store' })
-      const recs = await r.json()
-      if (!Array.isArray(recs) || !recs.length) { notify.toast('seed.json이 비어 있어요'); return }
-      sharedInsert(recs)
-      notify.toast(`샘플 ${recs.length.toLocaleString()}건을 공유 저장소에 넣었어요 (잠시 후 모두에게 표시)`)
-    } catch { notify.toast('샘플 시드를 넣지 못했어요') }
-  }
-  const wipeShared = async () => {
-    if (!window.confirm('공유 저장소의 모든 VOC를 삭제합니다.\n로그인한 모든 사용자에게 반영됩니다. 계속할까요?')) return
-    try { await clearShared(); setAdded([]); notify.toast('공유 데이터를 비웠어요') } catch { notify.toast('삭제하지 못했어요 — 네트워크를 확인하세요') }
-  }
   return (
     <div className="screen">
       <PageHead title="VOC 수집·입력" sub="채널 수집 + 화면 직접 입력 → Copilot이 4그룹·22분류·대응영역·초안까지 자동 생성 (담당자 검수 후 처리)" />
-      {shared && (
-        <div className="inbox-top">
-          <button className="btn btn-ghost sm" onClick={() => setShowShared(true)}>⚙ 공유 저장소 도구 (데모)</button>
-        </div>
-      )}
-      {shared && showShared && (
-        <div className="modal-overlay" onClick={() => setShowShared(false)}>
-          <div className="modal share-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head"><b>공유 저장소 도구 <span className="muted" style={{ fontWeight: 400 }}>· 공모전 데모용</span></b><button className="modal-x" aria-label="닫기" onClick={() => setShowShared(false)}>✕</button></div>
-            <p className="modal-note">입력·붙여넣은 VOC가 공유 저장소에 적재되어 로그인한 모든 사용자 화면에 수 초 내 누적 표시됩니다. 현재 <b>{added.length.toLocaleString()}</b>건 공유 중.</p>
-            <div className="ip-actions">
-              <button className="btn btn-ghost" onClick={() => { seedShared() }}>공유 데이터에 샘플 시드 넣기</button>
-              <button className="btn btn-ghost danger" onClick={() => { wipeShared() }}>공유 데이터 비우기</button>
-            </div>
-          </div>
-        </div>
-      )}
       <div className="panel input-panel">
         <div className="ip-head">VOC 직접 입력 → Copilot 분류·추가 <span className="ip-note">내용(또는 상담콜 STT 전사)을 붙여넣으면 VOC구분1/2·대응영역·요약·예상답안·개발대응·진행상황을 채워 목록에 추가 (데모: 키워드 기반 · 담당자 검수 후 처리)</span></div>
         <div className="input-grid">
@@ -2091,6 +2090,7 @@ export default function App() {
   const [added, setAdded] = useState(() => (sharedEnabled ? [] : loadAdded())) // 공유 모드면 서버에서, 아니면 localStorage에서
   const [sentLog, setSentLog] = useState(loadSent)
   const [shareState, setShareState] = useState(sharedEnabled ? 'connecting' : 'local') // 'connecting'|'online'|'error'|'local'
+  const [showShared, setShowShared] = useState(false) // 공유 저장소 도구 모달 (상단바에서 열기)
   const seededRef = useRef(false)
   const lastTsRef = useRef('')
 
@@ -2150,6 +2150,20 @@ export default function App() {
   const goAgent = (s) => { setRail('agent'); if (s) setScreen(s) }
   // 공유 모드: 새 VOC를 서버에 적재(누적). 압축 레코드 배열을 받는다.
   const sharedInsert = (compactRecs) => { if (sharedEnabled) insertMany(compactRecs).catch(() => setToast('공유 저장소 적재 실패 — 네트워크를 확인하세요')) }
+  // 공유 저장소 도구(데모): 샘플 시드 / 비우기 — 상단바 버튼에서 호출
+  const seedShared = async () => {
+    try {
+      const r = await fetch(`${import.meta.env.BASE_URL}seed.json`, { cache: 'no-store' })
+      const recs = await r.json()
+      if (!Array.isArray(recs) || !recs.length) { notify.toast('seed.json이 비어 있어요'); return }
+      sharedInsert(recs)
+      notify.toast(`샘플 ${recs.length.toLocaleString()}건을 공유 저장소에 넣었어요 (잠시 후 모두에게 표시)`)
+    } catch { notify.toast('샘플 시드를 넣지 못했어요') }
+  }
+  const wipeShared = async () => {
+    if (!window.confirm('공유 저장소의 모든 VOC를 삭제합니다.\n로그인한 모든 사용자에게 반영됩니다. 계속할까요?')) return
+    try { await clearAll(); setAdded([]); notify.toast('공유 데이터를 비웠어요') } catch { notify.toast('삭제하지 못했어요 — 네트워크를 확인하세요') }
+  }
   const updateCases = (ids, patch) => setAdded((prev) => {
     const next = prev.map((v) => ids.includes(v.id) ? { ...v, ...patch } : v)
     if (sharedEnabled) { const changed = next.filter((v) => ids.includes(v.id)); insertMany(toCompact(changed), true).catch(() => { }) }
@@ -2165,13 +2179,13 @@ export default function App() {
         <>
           <SubLNB screen={screen} setScreen={setScreen} />
           <div className={'workspace mode-' + panelMode}>
-            <Topbar title={t} mode={panelMode} setMode={setPanelMode} agentTitle={agentTitle} shareState={shareState} />
+            <Topbar title={t} mode={panelMode} setMode={setPanelMode} agentTitle={agentTitle} shareState={shareState} sharedEnabled={sharedEnabled} onShareTools={() => setShowShared(true)} />
             <div className="workbody">
               {panelMode !== 'expanded' && (
                 <main className="main-nav">
                   <div className="content">
                     {screen === 'trends' && <VOCTrends added={added} />}
-                    {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} clearShared={clearAll} />}
+                    {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} />}
                     {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
                     {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} openCase={openCase} />}
                     {screen === 'insight' && <InsightReport added={added} openCase={openCase} />}
@@ -2180,7 +2194,7 @@ export default function App() {
                 </main>
               )}
               {panelMode !== 'collapsed' && (
-                <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} updateCases={updateCases} selected={selected} setSelected={setSelected} />
+                <AgentPanel screen={screen} caseId={caseId} added={added} notify={notify} updateCases={updateCases} selected={selected} setSelected={setSelected} openCase={openCase} />
               )}
             </div>
           </div>
@@ -2217,6 +2231,18 @@ export default function App() {
       )}
       <Toast msg={toast} onClose={() => setToast('')} />
       <Modal open={modal.open} title={modal.title} body={modal.body} onClose={() => setModal({ open: false, title: '', body: '' })} />
+      {sharedEnabled && showShared && (
+        <div className="modal-overlay" onClick={() => setShowShared(false)}>
+          <div className="modal share-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head"><b>공유 저장소 도구 <span className="muted" style={{ fontWeight: 400 }}>· 공모전 데모용</span></b><button className="modal-x" aria-label="닫기" onClick={() => setShowShared(false)}>✕</button></div>
+            <p className="modal-note">입력·붙여넣은 VOC가 공유 저장소에 적재되어 로그인한 모든 사용자 화면에 수 초 내 누적 표시됩니다. 현재 <b>{added.length.toLocaleString()}</b>건 공유 중.</p>
+            <div className="ip-actions">
+              <button className="btn btn-ghost" onClick={() => { seedShared() }}>공유 데이터에 샘플 시드 넣기</button>
+              <button className="btn btn-ghost danger" onClick={() => { wipeShared() }}>공유 데이터 비우기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
