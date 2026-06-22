@@ -47,41 +47,82 @@ const GROUP_CLS = {
 
 /* ---------- 데모용 경량 분류기 (직접 입력 → 게이트+22) ---------- */
 const norm = (s) => String(s).toLowerCase().replace(/[\s()[\]{}/\\.,;:!?~·・"'`+\-_*=|]/g, '')
-const FAULT_KW = ['오류', '안됨', '안됩', '안돼', '안되', '튕김', '튕겨', '튕기', '튕', '먹통', '접속불가', '접속안', '로그인불가', '로그인풀림', '에러', '깨짐', '실패']
+const FAULT_KW = ['오류', '에러', '튕김', '튕겨', '튕기', '튕', '먹통', '접속불가', '접속안', '로그인불가', '로그인풀림', '깨짐', '강제종료', '강종', '화면이안', '앱이꺼', '앱이안']
 const PERF_KW = ['느림', '느려', '느리', '백화', '버벅', '멈춤', '지연됨', '로딩']
 const IMPROVE_KW = ['개선', '바꿔', '바뀌었으면', '추가했으면', '불편해서', '제안', '했으면좋겠', '좋겠', '었으면', '헷갈려서개선']
 const CAT_KW = [
-  ['네트워크/통신품질/와이파이', ['네트워크', '통화품질', '통신망', '와이파이', '중계기', '기지국', '통화끊김', '끊김', '끊기', '안터짐', '안터', '음영']],
-  ['인터넷·통신속도 불만', ['통신속도', '인터넷속도', '데이터품질', '속도불만', '인터넷느림']],
-  ['앱·웹 이용문의', ['앱이용문의', '앱이용', '위젯', '메뉴위치', '바코드', '사용법', '앱문의']],
-  ['요금제', ['요금제변경', '요금제추천', '요금제진단', '나의요금제', '요금제']],
-  ['해지/약정/위약금', ['위약금', '약정', '재약정', '반환금', '해지', '일시정지']],
-  ['가입/개통/결합', ['가입정보', '결합', '개통', '번호이동', '가입']],
-  ['부가서비스', ['부가서비스', '컬러링', '듀얼넘버', '착신전환', '휴대폰보험']],
-  ['데이터(사용량/선물/충전)', ['데이터사용량', '데이터선물', '데이터충전', '데이터쿠폰', '데이터']],
-  ['로밍', ['로밍요금', '해외문자', '로밍']],
-  ['유심/이심/IMSI', ['유심교체', '이심', '심전환', 'imsi', '유심']],
-  ['단말/기기/액세서리', ['기기변경', '단말기', '액세서리', '모바일신분증', '핸드폰', '휴대폰', '기기']],
+  ['네트워크/통신품질/와이파이', ['네트워크', '통화품질', '통신망', '와이파이', '중계기', '기지국', '통화끊김', '끊김', '끊기', '안터짐', '안터', '음영', '신호']],
+  ['인터넷·통신속도 불만', ['통신속도', '인터넷속도', '데이터품질', '속도불만', '인터넷느림', '속도느']],
+  ['앱·웹 이용문의', ['앱이용문의', '앱이용', '위젯', '메뉴위치', '바코드', '사용법', '앱문의', '앱에서']],
+  ['요금제', ['요금제변경', '요금제추천', '요금제진단', '나의요금제', '최적요금제', '요금제바꿔', '요금제']],
+  ['해지/약정/위약금', ['위약금', '약정', '재약정', '반환금', '해지', '일시정지', '번호이동', '분실파손', '세이브', '해지방어']],
+  ['가입/개통/결합', ['가입정보', '결합', '개통', '단통법', '지원금', '공시지원금', '선택약정', '약정할인', '할부원금', '할부개월', '투게더', '가입']],
+  ['부가서비스', ['부가서비스', '컬러링', '듀얼넘버', '착신전환', '휴대폰보험', '폰안심']],
+  ['데이터(사용량/선물/충전)', ['데이터사용량', '데이터선물', '데이터충전', '데이터쿠폰', '데이터남은', '데이터']],
+  ['로밍', ['로밍요금', '로밍요금제', '해외로밍', '로밍패스', '데이터로밍', '출국전', '로밍신청', '해외문자', '로밍']],
+  ['유심/이심/IMSI', ['유심교체', '유심변경', '이심', '심전환', '심교체', 'imsi', 'esim', 'usim', '유심']],
+  ['단말/기기/액세서리', ['기기변경', '단말설정', '기능설정', '단말기설정', '단말기', '액세서리', '모바일신분증', '핸드폰', '휴대폰', '기기']],
   ['멤버십/쿠폰/혜택/VIP콕', ['멤버십', 'vip콕', 'vip', '쿠폰', '혜택', '이벤트', '제휴', '영화']],
   ['설치/AS(홈상품)', ['이전설치', '인터넷설치', '공유기', '리모컨', '홈상품', '설치']],
   ['IPTV/셋톱박스', ['iptv', '셋톱박스', '셋톱', '셋탑']],
-  ['상담/고객지원', ['상담연결', '상담지연', '미답변', '고객센터', 'ars', '답변지연', '상담']],
+  ['상담/고객지원', ['상담연결', '상담지연', '미답변', '고객센터', 'ars', '답변지연', '업무불가', '상담종료', '상담']],
   ['매장/대리점', ['대리점', '매장', '영업', '오프라인']],
   ['회원/로그인/인증', ['로그인', '본인인증', '인증번호', '회원가입', '회원탈퇴', '아이디', '비밀번호', '명의', '인증']],
-  ['요금/청구/납부/환불', ['청구서', '청구', '요금조회', '납부', '미납', '자동이체', '환불', '과금', '이중청구', '중복결제', '요금']],
-  ['휴대폰결제/소액결제', ['휴대폰결제', '소액결제', '결제한도']],
-  ['유독/모바일TV/익시오/스마트홈', ['유독', '모바일tv', '익시오', 'ixio', '스마트홈', '넷플릭스', '디즈니', '티비', 'tv']],
+  ['요금/청구/납부/환불', ['청구서', '청구', '요금조회', '납부', '미납', '연체', '실시간요금', '자동이체', '선납', '선결제', '수납', '가상계좌', '세금계산서', '납부내역', '납부결과', '환불', '과금', '이중청구', '중복결제', '요금']],
+  ['휴대폰결제/소액결제', ['휴대폰결제', '소액결제', '결제한도', '정기결제']],
+  ['유독/모바일TV/익시오/스마트홈', ['유독', '구독서비스', '모바일tv', '익시오', 'ixio', '스마트홈', '넷플릭스', '디즈니', '티비', 'tv']],
   ['배송', ['배송', '택배', '수령', '배달', '도착']],
   ['검색/챗봇/AI', ['검색', '챗봇', '인공지능', 'ai']],
 ]
-// 강한 우선순위 규칙: 모호한 일반 키워드보다 먼저 적용(예: '데이터' 단어가 있어도 연결 실패면 네트워크)
+// 강한 우선순위 규칙(STT 실데이터 학습): 구어체 '안돼/안되' 등이 장애 게이트를 오발동시키기 전에
+// 도메인 신호(로밍·유심·납부·약정 등)를 먼저 확정한다. norm(공백·기호 제거·소문자) 기준.
 const PRIORITY_RULES = [
-  [/안터|안터짐|안터져|안터지|터지지않|음영|신호.{0,2}약|신호.{0,2}없|신호불량|전파/, '네트워크/통신품질/와이파이'],
+  [/안터|음영|신호.{0,2}약|신호.{0,2}없|신호불량|전파|통화.{0,3}끊/, '네트워크/통신품질/와이파이'],
+  [/로밍|출국전|로밍패스/, '로밍'],
+  [/유심|이심|imsi|esim|usim/, '유심/이심/IMSI'],
+  [/휴대폰결제|소액결제|결제한도|정기결제/, '휴대폰결제/소액결제'],
+  [/연체|실시간요금|자동이체|선납|선결제|가상계좌|미납|세금계산서|납부내역|납부결과/, '요금/청구/납부/환불'],
+  [/단통법|공시지원금|선택약정|약정할인|할부원금|할부개월|투게더|결합할인/, '가입/개통/결합'],
+  [/번호이동|해지방어|위약금|재약정/, '해지/약정/위약금'],
+  [/최적요금제|요금제변경|요금제추천|요금제진단/, '요금제'],
+  [/단말설정|기능설정|단말기설정|폰안심/, '단말/기기/액세서리'],
+  [/유독|구독서비스/, '유독/모바일TV/익시오/스마트홈'],
 ]
+/* ---------- 전사(USER/CUSTOMER 대화) 파서 — 채팅 렌더·고객 발화 추출에 공통 사용 ---------- */
+const TRANSCRIPT_SPEAKERS = [
+  { re: /^(customer|cust|고객|이용자|사용자|손님)$/i, side: 'cust', label: '고객' },
+  { re: /^(user|agent|staff|상담사|상담원|직원|담당)$/i, side: 'staff', label: '상담사' },
+]
+function parseTranscript(text) {
+  const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  const reSpk = /^([A-Za-z가-힣]+)\s*[:：]\s*(.*)$/s
+  const turns = []; let cur = null; let speakerTurns = 0
+  for (const line of lines) {
+    const m = line.match(reSpk)
+    const who = m ? TRANSCRIPT_SPEAKERS.find((s) => s.re.test(m[1])) : null
+    if (m && who) {
+      cur = { side: who.side, label: who.label, text: m[2] }; turns.push(cur); speakerTurns++
+    } else if (cur) {
+      cur.text += (cur.text ? ' ' : '') + line // 화자 표기 없는 줄 → 직전 발화에 이어붙임
+    } else {
+      cur = { side: 'note', label: '', text: line }; turns.push(cur)
+    }
+  }
+  return speakerTurns >= 2 ? turns : null // 화자가 둘 이상 잡힌 진짜 대화만 채팅으로
+}
+// 전사면 고객(CUSTOMER) 발화만 모아 반환 — 상담사 인사말 노이즈를 제거해 분류·요약 정확도를 높인다.
+function customerIssueText(text) {
+  const turns = parseTranscript(text)
+  if (!turns) return String(text || '')
+  const cust = turns.filter((t) => t.side === 'cust').map((t) => t.text).join(' ').trim()
+  return cust || String(text || '')
+}
 function demoClassify(text) {
   const v = norm(text)
   if (!v) return null
-  // 게이트: 정형 그룹 먼저
+  // 0) 도메인 신호 먼저 — 구어체 '안돼/안되'가 장애 게이트를 오발동시키는 것을 방지(STT 학습 반영)
+  for (const [re, cat] of PRIORITY_RULES) if (re.test(v)) return { group: '단순 문의/불만/기타', cat, conf: '높음', review: false, mode: '열림' }
+  // 게이트: 정형 그룹
   if (FAULT_KW.some((k) => v.includes(norm(k)))) return { group: '장애/오류', cat: '앱/웹 기능오류', conf: '보통', review: false, mode: '정형' }
   if (PERF_KW.some((k) => v.includes(norm(k)))) return { group: '성능', cat: v.includes('백화') ? '앱/웹 백화 현상' : '앱/웹 속도 느림', conf: '보통', review: false, mode: '정형' }
   if (IMPROVE_KW.some((k) => v.includes(norm(k)))) return { group: '개선 요청/희망', cat: '앱/웹 기능 개선', conf: '보통', review: false, mode: '정형' }
@@ -294,17 +335,19 @@ function parsePaste(text) {
    구분1/2·대응영역·요약·답변·개발대응·진행상황을 모두 도출(검토용 초안). */
 function enrichRow(r, id) {
   const content = maskPII(r.content || '(내용 없음)')
-  // 1) 채널+내용에서 그룹·분류 도출
-  const cls = demoClassify(content) || { group: '단순 문의/불만/기타', mode: '열림' }
+  const issue = customerIssueText(content)      // 전사면 고객 발화만, 아니면 원문 — 상담사 인사말 노이즈 제거
+  const isTranscript = issue !== content
+  // 1) 고객 발화 기준으로 그룹·분류 도출
+  const cls = demoClassify(issue) || { group: '단순 문의/불만/기타', mode: '열림' }
   const group = cls.group, mode = cls.mode
   let cat, conf, review
-  if (mode === '정형') { cat = pickFixedCat(group, content); conf = '보통'; review = false }
-  else { const p = pick22(content); cat = p.cat; conf = p.conf; review = p.review }
-  const severity = deriveSeverity(group, content)
-  const sentiment = deriveSentiment('', group, content)
+  if (mode === '정형') { cat = pickFixedCat(group, issue); conf = '보통'; review = false }
+  else { const p = pick22(issue); cat = p.cat; conf = p.conf; review = p.review }
+  const severity = deriveSeverity(group, issue)
+  const sentiment = deriveSentiment('', group, issue)
   const { action, org } = deriveAction(group)
-  // 2) 나머지 컬럼 자동 생성(검토용 초안)
-  const summary = aiSummarize(content)
+  // 2) 나머지 컬럼 자동 생성(검토용 초안) — 전사면 고객 핵심문장을 요약으로
+  const summary = isTranscript ? (extractKey(issue) || aiSummarize(issue)) : aiSummarize(content)
   const [area1, area2] = catToArea(group, cat)
   const dev = devNeeded(group)
   const answer = draftAnswer(group, cat, content)
@@ -525,26 +568,50 @@ function AgentPanel({ screen, caseId, added, notify, updateCases, selected, setS
     if (setSelected) setSelected([])
     notify.toast(`${ids.length}건 처리 완료 — 가운데 뷰어에 반영됨`)
   }
-  const send = () => {
-    const el = inputRef.current
-    const text = ((el && el.value) || '').trim()
-    if (!text) return
+  // Copilot 입력 처리 — 조치 실행 + 데이터 질의(현황·검색·Top 유형)에 응답
+  const topCats = (arr, n) => { const m = {}; arr.forEach((v) => { const k = v.cat; if (k) m[k] = (m[k] || 0) + 1 }); return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, n) }
+  const STOP = ['관련', '보여줘', '보여', '알려줘', '알려', '찾아줘', '찾아', '해줘', '좀', '건', '만', '줘', '대해', '대한', '보고싶어', '리스트', '목록', '있어', '뭐', '무슨']
+  const matchCases = (text) => {
     const t = text.replace(/\s+/g, '')
-    const wantsAction = /(처리|조치|완료|반영|해결|끝)/.test(t)
-    const wantsSel = /(선택|고른|체크)/.test(t)
-    const wantsAll = /(전부|모두|모든|일괄|한번에|전체|다)/.test(t)
-    if (wantsAction && wantsSel && sel.length) {
-      actIds(sel); setReply({ q: text, a: `선택한 ${sel.length}건을 처리하고 가운데 뷰어에 반영했어요.` })
-    } else if (wantsAction && todo.length) {
-      const ids = todo.map((v) => v.id); actIds(ids)
-      setReply({ q: text, a: `조치 필요 ${ids.length}건을 ${wantsAll ? '일괄 ' : ''}처리하고 가운데 뷰어에 반영했어요.` })
-    } else if (wantsAction) {
-      setReply({ q: text, a: '지금 조치 필요한 건이 없어요. VOC를 입력·붙여넣으면 여기서 바로 처리할 수 있어요.' })
-    } else {
-      setReply({ q: text, a: '무엇을 반영할지 알려주시면 처리할게요. 예) "조치 필요 건 전부 처리해줘", "선택한 건 처리".' })
-    }
-    if (el) el.value = ''
+    if (/high|하이|긴급|심각|중요/i.test(t)) return data.filter((v) => v.severity === 'High')
+    if (/검토필요|검토/.test(t)) return data.filter((v) => v.review)
+    if (/처리중/.test(t)) return data.filter((v) => v.status === '처리중')
+    if (/완료/.test(t)) return data.filter((v) => v.status === '처리 완료')
+    const toks = text.split(/\s+/).map((s) => s.replace(/[을를이가은는의도와과에서]$/, '')).filter((w) => w.length >= 2 && !STOP.includes(w))
+    if (!toks.length) return []
+    return data.filter((v) => { const hay = `${v.cat} ${v.group} ${v.summary} ${v.content} ${v.area1} ${v.area2}`.toLowerCase(); return toks.some((tk) => hay.includes(tk.toLowerCase())) })
   }
+  const runCommand = (text0) => {
+    const text = (text0 || '').trim(); if (!text) return
+    if (inputRef.current) inputRef.current.value = ''
+    const t = text.replace(/\s+/g, '')
+    // 1) 조치 실행
+    if (/(처리|조치|완료|해결|끝내)/.test(t)) {
+      if (/(선택|고른|체크)/.test(t) && sel.length) { actIds(sel); setReply({ q: text, a: `선택한 ${sel.length}건을 처리하고 가운데 뷰어에 반영했어요.` }); return }
+      if (todo.length) { const ids = todo.map((v) => v.id); actIds(ids); setReply({ q: text, a: `조치 필요 ${ids.length}건을 처리하고 가운데 뷰어에 반영했어요.` }); return }
+      setReply({ q: text, a: '지금 조치 필요한 건이 없어요. VOC를 입력·붙여넣으면 여기서 바로 처리할 수 있어요.' }); return
+    }
+    // 2) 현황·통계
+    if (/(현황|통계|개요|상황|몇건|건수|요약|정리)/.test(t)) {
+      const high = data.filter((v) => v.severity === 'High').length
+      const review = data.filter((v) => v.review).length
+      const top = topCats(data, 3)
+      setReply({ q: text, a: `전체 ${data.length.toLocaleString()}건 · 조치 필요 ${todo.length.toLocaleString()}건 · High ${high.toLocaleString()}건 · 검토필요 ${review.toLocaleString()}건`, list: top.map(([k, n]) => `${k} · ${n.toLocaleString()}건`) }); return
+    }
+    // 3) Top 유형
+    if (/(제일많|가장많|많은유형|많이들어|top|순위|랭킹)/i.test(t)) {
+      const top = topCats(data, 5)
+      setReply({ q: text, a: top.length ? '많이 들어온 유형 Top 5' : '집계할 데이터가 없어요.', list: top.map(([k, n]) => `${k} · ${n.toLocaleString()}건`) }); return
+    }
+    // 4) 키워드/조건 검색 → 매칭 케이스(클릭하면 상세)
+    const hits = matchCases(text)
+    if (hits.length) {
+      setReply({ q: text, a: `'${text}' 관련 ${hits.length.toLocaleString()}건을 찾았어요. 눌러서 상세를 볼 수 있어요.`, items: hits.slice(0, 6).map((v) => ({ id: v.id, label: `${v.cat} · ${(v.summary || v.content || '').slice(0, 36)}` })) }); return
+    }
+    // 5) 안내
+    setReply({ q: text, a: '이렇게 해볼 수 있어요 — "현황 알려줘", "조치 필요 건 전부 처리", "로밍 관련 보여줘", "High만 보여줘".' })
+  }
+  const send = () => runCommand(inputRef.current ? inputRef.current.value : '')
   const ViewerResult = () => !done ? null : (
     <div className="ap-viewer">
       <div className="ap-viewer-h">뷰어 수정 <span className="ap-applied">✓ 반영완료</span></div>
@@ -604,11 +671,24 @@ function AgentPanel({ screen, caseId, added, notify, updateCases, selected, setS
           <div className="ap-reply">
             <div className="ap-reply-q">{reply.q}</div>
             <div className="ap-reply-a">{reply.a}</div>
+            {reply.list && <ul className="ap-reply-list">{reply.list.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+            {reply.items && (
+              <div className="ap-reply-items">
+                {reply.items.map((it) => (
+                  <button key={it.id} className="ap-reply-item" onClick={() => openCase && openCase(it.id)}>{it.label}</button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
+      <div className="ap-chips">
+        {['현황 알려줘', '조치 필요 전부 처리', '로밍 관련 보여줘', 'High만 보여줘', '많은 유형 Top5'].map((c) => (
+          <button key={c} className="ap-chip" onClick={() => runCommand(c)}>{c}</button>
+        ))}
+      </div>
       <div className="ap-input">
-        <input ref={inputRef} placeholder="고칠 내용을 말하면 뷰어에 반영해요" onKeyDown={(e) => { if (e.key === 'Enter') send() }} />
+        <input ref={inputRef} placeholder="현황·검색·조치를 입력하세요 — 예: 로밍 관련 보여줘" onKeyDown={(e) => { if (e.key === 'Enter') send() }} />
         <button className="ap-send" title="전달" onClick={send}>↑</button>
       </div>
     </aside>
@@ -701,7 +781,7 @@ function MultiLine({ labels, series, sel, onSel, perPoint = 0 }) {
     </svg>
   )
 }
-function VOCTrends({ added }) {
+function VOCTrends({ added, openCase }) {
   const data0 = added || []
   const [d1, setD1] = useState(''); const [d2, setD2] = useState('')
   const [q, setQ] = useState(''); const [fw, setFw] = useState('전체'); const [fa, setFa] = useState('전체')
@@ -815,7 +895,7 @@ function VOCTrends({ added }) {
         <div className="table-wrap"><table className="vtable">
           <thead><tr><th>ID</th><th>주차</th><th>채널</th><th>구분</th><th>대응영역</th><th>원문</th></tr></thead>
           <tbody>{results.slice(0, 200).map((d) => (
-            <tr key={d.id}><td className="mono">{d.id}</td><td className="nowrap muted">{d.week || '-'}</td><td><ChannelChip channel={d.channel} /></td><td className="nowrap"><GroupBadge v={d.group} /> <Tag>{d.cat}</Tag></td><td className="nowrap muted">{d.area1} › {d.area2}</td><td className="cell-content" title={d.content}>{d.content}</td></tr>
+            <tr key={d.id} className="row-click" onClick={() => openCase && openCase(d.id)}><td className="mono">{d.id}</td><td className="nowrap muted">{d.week || '-'}</td><td><ChannelChip channel={d.channel} /></td><td className="nowrap"><GroupBadge v={d.group} /> <Tag>{d.cat}</Tag></td><td className="nowrap muted">{d.area1} › {d.area2}</td><td className="cell-content" title={d.content}>{d.summary || d.content}</td></tr>
           ))}</tbody>
         </table></div>
         {results.length > 200 && <p className="micro">상위 200건만 표시 — 검색어/필터로 좁혀주세요.</p>}
@@ -1056,28 +1136,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
   )
 }
 
-/* ---------- 전사(대화) → 채팅 말풍선 렌더 ---------- */
-const TRANSCRIPT_SPEAKERS = [
-  { re: /^(customer|cust|고객|이용자|사용자|손님)$/i, side: 'cust', label: '고객' },
-  { re: /^(user|agent|staff|상담사|상담원|직원|담당)$/i, side: 'staff', label: '상담사' },
-]
-function parseTranscript(text) {
-  const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-  const reSpk = /^([A-Za-z가-힣]+)\s*[:：]\s*(.*)$/s
-  const turns = []; let cur = null; let speakerTurns = 0
-  for (const line of lines) {
-    const m = line.match(reSpk)
-    const who = m ? TRANSCRIPT_SPEAKERS.find((s) => s.re.test(m[1])) : null
-    if (m && who) {
-      cur = { side: who.side, label: who.label, text: m[2] }; turns.push(cur); speakerTurns++
-    } else if (cur) {
-      cur.text += (cur.text ? ' ' : '') + line // 화자 표기 없는 줄 → 직전 발화에 이어붙임
-    } else {
-      cur = { side: 'note', label: '', text: line }; turns.push(cur)
-    }
-  }
-  return speakerTurns >= 2 ? turns : null // 화자가 둘 이상 잡힌 진짜 대화만 채팅으로
-}
+/* ---------- 전사(대화) → 채팅 말풍선 렌더 (파서는 상단 분류기 영역에 정의) ---------- */
 function Transcript({ text }) {
   const turns = parseTranscript(text)
   if (!turns) return <p className="voc-raw">{text}</p>
@@ -2290,7 +2349,7 @@ export default function App() {
               {panelMode !== 'expanded' && (
                 <main className="main-nav">
                   <div className="content">
-                    {screen === 'trends' && <VOCTrends added={added} />}
+                    {screen === 'trends' && <VOCTrends added={added} openCase={openCase} />}
                     {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} />}
                     {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
                     {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} openCase={openCase} />}
