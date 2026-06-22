@@ -881,3 +881,11 @@ h1,h2{margin:0}
 /* 파일 불러오기 버튼 + 공유 패널 */
 .file-btn{position:relative;display:inline-flex;align-items:center;cursor:pointer}
 .file-btn input[type=file]{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+
+/* 공유 저장소 상태 배지 + 위험 버튼 */
+.share-badge{display:inline-flex;align-items:center;font:700 11.5px var(--sans);padding:4px 10px;border-radius:999px;border:1px solid var(--line)}
+.share-badge.sb-on{color:#0a7d34;background:#e8f7ee;border-color:#bce6cc}
+.share-badge.sb-wait{color:#8a6d00;background:#fdf6e3;border-color:#efe2b0}
+.share-badge.sb-err{color:#b3261e;background:#fdecea;border-color:#f3c4c0}
+.btn.danger{color:#b3261e}
+.btn.danger:hover{border-color:#e0857f;background:#fdecea}

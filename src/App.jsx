@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
+import { sharedEnabled, listAll, listSince, insertMany, clearAll } from './shared.js'
 
 /* ============================================================
    U+ VOC Action Copilot — 공모전 MVP (정적 프로토타입 · React)
@@ -418,13 +419,20 @@ function SubLNB({ screen, setScreen }) {
     </aside>
   )
 }
-function Topbar({ title, mode, setMode, agentTitle }) {
+function ShareBadge({ state }) {
+  if (!state || state === 'local') return null
+  const map = { connecting: ['● 공유 연결 중…', 'sb-wait'], online: ['● 공유 저장소 연결됨', 'sb-on'], error: ['● 공유 연결 오류', 'sb-err'] }
+  const [label, cls] = map[state] || map.connecting
+  return <span className={'share-badge ' + cls}>{label}</span>
+}
+function Topbar({ title, mode, setMode, agentTitle, shareState }) {
   return (
     <header className="topbar">
       {mode !== 'expanded' && (
         <div className="tb-main">
           <div className="crumb">U+ Agent<span className="crumb-sep">›</span>VOC Action Copilot<span className="crumb-sep">›</span><b>{title}</b></div>
           <div className="tb-main-right">
+            <ShareBadge state={shareState} />
             <span className="ai-pill">● Copilot 연결됨 (데모)</span>
             {mode === 'collapsed' && <button className="tb-open" onClick={() => setMode('split')} title="Agent 패널 열기"><span className="tb-open-i">‹</span>Agent</button>}
           </div>
@@ -651,7 +659,7 @@ function Donut({ segments, total, centerLabel }) {
 }
 /* ---------- [2] VOC Inbox (채널 수집 + 화면 직접 입력) ---------- */
 const INPUT_CHANNELS = ['고객의소리', 'Call', 'Medallia', 'App Store', '고객센터']
-function VOCInbox({ openCase, notify, added, setAdded }) {
+function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, clearShared }) {
   const [fch, setFch] = useState('전체'); const [fgrp, setFgrp] = useState('전체'); const [fst, setFst] = useState('전체')
   const [channel, setChannel] = useState('고객의소리'); const [customer, setCustomer] = useState(''); const [text, setText] = useState('')
   const [vDate, setVDate] = useState(''); const [vWeek, setVWeek] = useState(''); const [vOccur, setVOccur] = useState('')
@@ -667,17 +675,21 @@ function VOCInbox({ openCase, notify, added, setAdded }) {
   }, [added])
   const Sel = ({ value, set, opts }) => <select className="flt" value={value} onChange={(e) => set(e.target.value)}>{opts.map((o) => <option key={o}>{o}</option>)}</select>
   const nid = (n) => `IN-${String(n).padStart(3, '0')}`
+  // 공유 모드: 사용자 간 충돌 없도록 전역 고유 ID
+  const uid = (k = '') => 'IN-' + Date.now().toString(36) + String(k) + Math.random().toString(36).slice(2, 6)
   const addVoc = () => {
     if (!text.trim()) { notify.toast('VOC 내용을 입력하세요'); return }
-    const v = enrichRow({ channel, content: text.trim(), customer: customer.trim(), date: vDate.trim(), week: vWeek.trim(), occur: vOccur.trim() }, nid(seq))
-    setAdded([v, ...added]); setSeq(seq + 1); setResult(v); setText(''); setCustomer('')
+    const v = enrichRow({ channel, content: text.trim(), customer: customer.trim(), date: vDate.trim(), week: vWeek.trim(), occur: vOccur.trim() }, shared ? uid() : nid(seq))
+    setAdded([v, ...added]); if (!shared) setSeq(seq + 1); setResult(v); setText(''); setCustomer('')
+    if (shared) sharedInsert(toCompact([v]))
     notify.toast(`${v.id} 분류·추가됨 — ${v.group} · ${v.cat}`)
   }
   const addPaste = () => {
     const parsed = parsePaste(paste)
     if (!parsed.length) { notify.toast("붙여넣은 데이터에서 '내용'을 찾지 못했습니다 (헤더 행 포함 권장)"); return }
-    const vs = parsed.map((row, k) => enrichRow(row, nid(seq + k)))
-    setAdded([...vs, ...added]); setSeq(seq + vs.length); setResult(vs[0]); setPaste('')
+    const vs = parsed.map((row, k) => enrichRow(row, shared ? uid(k) : nid(seq + k)))
+    setAdded([...vs, ...added]); if (!shared) setSeq(seq + vs.length); setResult(vs[0]); setPaste('')
+    if (shared) sharedInsert(toCompact(vs))
     notify.toast(`${vs.length}건 분류·추가됨`)
   }
   const exportSeed = () => {
@@ -702,6 +714,19 @@ function VOCInbox({ openCase, notify, added, setAdded }) {
     }
     rd.readAsText(f); e.target.value = ''
   }
+  const seedShared = async () => {
+    try {
+      const r = await fetch(`${import.meta.env.BASE_URL}seed.json`, { cache: 'no-store' })
+      const recs = await r.json()
+      if (!Array.isArray(recs) || !recs.length) { notify.toast('seed.json이 비어 있어요'); return }
+      sharedInsert(recs)
+      notify.toast(`샘플 ${recs.length.toLocaleString()}건을 공유 저장소에 넣었어요 (잠시 후 모두에게 표시)`)
+    } catch { notify.toast('샘플 시드를 넣지 못했어요') }
+  }
+  const wipeShared = async () => {
+    if (!window.confirm('공유 저장소의 모든 VOC를 삭제합니다.\n로그인한 모든 사용자에게 반영됩니다. 계속할까요?')) return
+    try { await clearShared(); setAdded([]); notify.toast('공유 데이터를 비웠어요') } catch { notify.toast('삭제하지 못했어요 — 네트워크를 확인하세요') }
+  }
   return (
     <div className="screen">
       <PageHead title="VOC 수집·입력" sub="채널 수집 + 화면 직접 입력 → Copilot이 4그룹·22분류·대응영역·초안까지 자동 생성 (담당자 검수 후 처리)" />
@@ -718,7 +743,7 @@ function VOCInbox({ openCase, notify, added, setAdded }) {
         <div className="ip-actions">
           <button className="btn btn-primary" onClick={addVoc}>Copilot 분류 후 추가</button>
           <button className="btn btn-ghost" onClick={() => { setText(''); setCustomer(''); setVDate(''); setVWeek(''); setVOccur(''); setResult(null) }}>초기화</button>
-          {added.length > 0 && <button className="btn btn-ghost" onClick={() => { if (window.confirm(`저장된 입력 ${added.length.toLocaleString()}건을 모두 삭제할까요? (되돌릴 수 없습니다)`)) { setAdded([]); setResult(null) } }}>입력 항목 비우기</button>}
+          {!shared && added.length > 0 && <button className="btn btn-ghost" onClick={() => { if (window.confirm(`저장된 입력 ${added.length.toLocaleString()}건을 모두 삭제할까요? (되돌릴 수 없습니다)`)) { setAdded([]); setResult(null) } }}>입력 항목 비우기</button>}
           {added.length > 0 && <span className="up-summary">입력 <b>{added.length}</b>건 · 표 상단에 표시됨</span>}
         </div>
         {result && (
@@ -741,14 +766,25 @@ function VOCInbox({ openCase, notify, added, setAdded }) {
           <button className="btn btn-ghost" onClick={() => setPaste('')}>지우기</button>
         </div>
       </div>
-      <div className="panel input-panel">
-        <div className="ip-head">전체 공유 (배포본에 데이터 싣기) <span className="ip-note">입력 데이터는 이 브라우저에만 저장됩니다. 다른 사람도 같은 데이터를 보게 하려면 ① <b>내보내기</b>로 seed.json을 받아 ② 프로젝트의 <b>public/seed.json</b>에 넣고 배포(git push)하세요. 배포 후에는 로그인한 누구나(저장 데이터가 없는 브라우저) seed.json을 자동으로 불러옵니다.</span></div>
-        <div className="ip-actions">
-          <button className="btn btn-primary" onClick={exportSeed} disabled={!added.length}>현재 데이터 내보내기 (seed.json)</button>
-          <label className="btn btn-ghost file-btn">JSON 불러오기<input type="file" accept="application/json,.json" onChange={importSeed} /></label>
-          <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건</span>
+      {shared ? (
+        <div className="panel input-panel">
+          <div className="ip-head">공유 저장소 (실시간 누적) <span className="ip-note">입력·붙여넣은 VOC가 공유 저장소에 적재되어, 로그인한 모든 사용자 화면에 수 초 내 누적 표시됩니다. 아래는 데모 편의 기능이에요.</span></div>
+          <div className="ip-actions">
+            <button className="btn btn-ghost" onClick={seedShared}>공유 데이터에 샘플 시드 넣기</button>
+            <button className="btn btn-ghost danger" onClick={wipeShared}>공유 데이터 비우기</button>
+            <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건 · 공유</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="panel input-panel">
+          <div className="ip-head">전체 공유 (배포본에 데이터 싣기) <span className="ip-note">입력 데이터는 이 브라우저에만 저장됩니다. 다른 사람도 같은 데이터를 보게 하려면 ① <b>내보내기</b>로 seed.json을 받아 ② 프로젝트의 <b>public/seed.json</b>에 넣고 배포(git push)하세요. 배포 후에는 로그인한 누구나(저장 데이터가 없는 브라우저) seed.json을 자동으로 불러옵니다. (실시간 누적이 필요하면 공유 저장소 모드를 설정하세요)</span></div>
+          <div className="ip-actions">
+            <button className="btn btn-primary" onClick={exportSeed} disabled={!added.length}>현재 데이터 내보내기 (seed.json)</button>
+            <label className="btn btn-ghost file-btn">JSON 불러오기<input type="file" accept="application/json,.json" onChange={importSeed} /></label>
+            <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건</span>
+          </div>
+        </div>
+      )}
       <div className="filters">
         <Sel value={fch} set={setFch} opts={chOpts} />
         <Sel value={fgrp} set={setFgrp} opts={['전체', ...GROUPS]} />
@@ -1778,12 +1814,45 @@ export default function App() {
   const [railView, setRail] = useState('home') // 'home'|'agent'|'mail'|'cal'|'org'|'pay'|'grid'
   const [homeAi, setHomeAi] = useState(false) // 홈 우측: false=홈(컴팩트 패널) / true=AI 펼침 워크스페이스
   const [selected, setSelected] = useState([]) // 체크박스로 선택한 케이스 id (대시보드 ↔ Agent 패널 공유)
-  const [added, setAdded] = useState(loadAdded) // 입력/붙여넣은 VOC — localStorage에 저장되어 재접속 시 복원됨
+  const [added, setAdded] = useState(() => (sharedEnabled ? [] : loadAdded())) // 공유 모드면 서버에서, 아니면 localStorage에서
   const [sentLog, setSentLog] = useState(loadSent)
+  const [shareState, setShareState] = useState(sharedEnabled ? 'connecting' : 'local') // 'connecting'|'online'|'error'|'local'
   const seededRef = useRef(false)
-  // 공유 기본 데이터: 내 localStorage가 비어 있으면 배포본의 seed.json을 로드 → 로그인한 누구나 동일 데이터 확인
+  const lastTsRef = useRef('')
+
+  // 공유 모드: 서버에서 전체 로드 + 주기적 폴링으로 실시간 누적
   useEffect(() => {
-    if (added.length) return
+    if (!sharedEnabled) return
+    let cancelled = false
+    const mergeIn = (recs) => {
+      if (!recs || !recs.length) return
+      const hy = hydrate(recs)
+      setAdded((prev) => {
+        const have = new Set(prev.map((v) => v.id))
+        const fresh = hy.filter((v) => !have.has(v.id))
+        return fresh.length ? [...prev, ...fresh] : prev
+      })
+    }
+    listAll().then(({ recs, lastTs }) => {
+      if (cancelled) return
+      lastTsRef.current = lastTs || ''
+      setAdded(hydrate(recs))
+      setShareState('online')
+    }).catch(() => { if (!cancelled) setShareState('error') })
+    const t = setInterval(() => {
+      listSince(lastTsRef.current).then(({ recs, lastTs }) => {
+        if (cancelled) return
+        if (lastTs && lastTs > lastTsRef.current) lastTsRef.current = lastTs
+        mergeIn(recs)
+        setShareState('online')
+      }).catch(() => { if (!cancelled) setShareState('error') })
+    }, 4000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [])
+
+  // 로컬 모드: 내 localStorage가 비어 있으면 배포본 seed.json을 로드(공유 모드에선 사용 안 함)
+  useEffect(() => {
+    if (sharedEnabled || added.length) return
     let cancelled = false
     fetch(`${import.meta.env.BASE_URL}seed.json`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
@@ -1794,6 +1863,7 @@ export default function App() {
   useEffect(() => { saveSent(sentLog) }, [sentLog])
   const addSent = (e) => setSentLog((l) => [{ id: 'S' + Date.now(), date: new Date().toLocaleString('ko-KR'), ...e }, ...l])
   useEffect(() => {
+    if (sharedEnabled) return // 공유 모드는 서버가 원본 — localStorage 저장 안 함
     if (seededRef.current) { seededRef.current = false; return } // 공유 seed 로드분은 저장하지 않음(개인 입력만 저장)
     const ok = saveAdded(added)
     if (!ok && added.length) setToast('브라우저 저장 한도를 초과해 일부가 저장되지 않았을 수 있습니다')
@@ -1804,7 +1874,13 @@ export default function App() {
   }), [])
   const openCase = (id) => { setRail('agent'); setCaseId(id); setScreen('detail'); setPanelMode((m) => m === 'collapsed' ? 'split' : m) }
   const goAgent = (s) => { setRail('agent'); if (s) setScreen(s) }
-  const updateCases = (ids, patch) => setAdded((prev) => prev.map((v) => ids.includes(v.id) ? { ...v, ...patch } : v))
+  // 공유 모드: 새 VOC를 서버에 적재(누적). 압축 레코드 배열을 받는다.
+  const sharedInsert = (compactRecs) => { if (sharedEnabled) insertMany(compactRecs).catch(() => setToast('공유 저장소 적재 실패 — 네트워크를 확인하세요')) }
+  const updateCases = (ids, patch) => setAdded((prev) => {
+    const next = prev.map((v) => ids.includes(v.id) ? { ...v, ...patch } : v)
+    if (sharedEnabled) { const changed = next.filter((v) => ids.includes(v.id)); insertMany(toCompact(changed), true).catch(() => { }) }
+    return next
+  })
   const [t] = TITLES[screen]
   const agentTitle = new Date().toISOString().slice(0, 10) + ' · 선제조치 Copilot'
   if (!authEmail) return <Login onAuthed={setAuthEmail} />
@@ -1815,13 +1891,13 @@ export default function App() {
         <>
           <SubLNB screen={screen} setScreen={setScreen} />
           <div className={'workspace mode-' + panelMode}>
-            <Topbar title={t} mode={panelMode} setMode={setPanelMode} agentTitle={agentTitle} />
+            <Topbar title={t} mode={panelMode} setMode={setPanelMode} agentTitle={agentTitle} shareState={shareState} />
             <div className="workbody">
               {panelMode !== 'expanded' && (
                 <main className="main-nav">
                   <div className="content">
                     {screen === 'trends' && <VOCTrends added={added} />}
-                    {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} />}
+                    {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} clearShared={clearAll} />}
                     {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
                     {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} />}
                     {screen === 'insight' && <InsightReport added={added} />}
@@ -1847,6 +1923,7 @@ export default function App() {
                   <button className={homeAi ? 'on' : ''} onClick={() => setHomeAi(true)}>✦ AI</button>
                 </div>
               )}
+              <ShareBadge state={shareState} />
               <span className="ai-pill">● 통합 업무 · 데모</span>
             </div>
           </header>
