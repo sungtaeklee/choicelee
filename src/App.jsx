@@ -2592,16 +2592,100 @@ function ApprovalApp({ notify }) {
     </div>
   )
 }
+/* ---------- [확장 로드맵] Phase 2 — U+one 앱 선제조치 임베드 (콘셉트) ---------- */
+function Phase2({ notify }) {
+  const demo = (l) => notify && notify.toast(`${l} (콘셉트 데모 — 실제 동작 안 함)`)
+  const phases = [
+    { tag: 'AS-IS', t: '사후 대응', d: '상담·콜 인입 후 수기 처리' },
+    { tag: 'PHASE 1', t: '내부 VOC Copilot', d: '자동 분류·대응·인사이트 (현재)', on: true },
+    { tag: 'PHASE 2', t: 'U+one 선제조치', d: '고객 앱에서 VOC 발생 전 차단', next: true },
+  ]
+  const steps = [
+    { t: '① 청구 이상 감지', d: '요금 증가·신규 결제를 내부 엔진이 먼저 포착' },
+    { t: '② 선제 버블', d: '청구서 진입 시 "원인 볼까요?" 한 줄 제안' },
+    { t: '③ AI 분석 패널', d: '증가 원인과 항목별 근거를 바로 제시' },
+    { t: '④ 인앱 액션', d: '요금제 변경·로밍 차단·상담 연결을 그 자리에서' },
+    { t: '⑤ VOC 피드백', d: '처리·미처리 결과가 내부 Copilot로 돌아가 학습' },
+  ]
+  const place = [
+    { r: '1순위', t: '요금/청구', d: '청구서 화면 · 데이터와 액션이 명확 (MVP)', best: true },
+    { r: '2순위', t: '앱/웹 오류·로그인', d: '오류 시점 인앱 복구 가이드로 셀프 해결' },
+    { r: '3순위', t: '네트워크/속도', d: '내폰 진단 후 AS 예약 연결' },
+    { r: '4순위', t: '로밍', d: '출국 전·해외 도착 시점 사전 안내' },
+  ]
+  const metrics = [
+    { t: '상담 인입 감소율', d: '해당 영역 콜·상담 인입 감소' },
+    { t: '인앱 셀프해결률', d: '앱 내에서 종결되는 비율' },
+    { t: 'CTA 전환율', d: '요금제 변경·로밍 차단 실행률' },
+  ]
+  return (
+    <div className="screen">
+      <div className="page-head"><div>
+        <h1 className="page-title">확장 로드맵 — U+one 앱 선제조치</h1>
+        <p className="page-sub">내부에서 검증한 분류·대응 엔진을 고객 앱으로 확장해, VOC가 발생하기 전에 막습니다.</p>
+      </div></div>
+
+      <h2 className="sec-title">단계 <span className="sec-note">사후 대응 → 내부 Copilot(현재) → 고객 앱 선제조치</span></h2>
+      <div className="phase-row">{phases.map((p) => (
+        <div key={p.tag} className={'phase-card' + (p.on ? ' on' : '') + (p.next ? ' next' : '')}>
+          <span className="phase-tag">{p.tag}</span><b>{p.t}</b><span className="phase-d">{p.d}</span>
+        </div>
+      ))}</div>
+      <div className="phase-note">같은 분류·대응 엔진을 <b>양쪽 끝</b>에서 씁니다 — 내부 Copilot(사후) ↔ U+one 임베드(사전). 앱에서 처리·미처리된 결과가 내부 엔진으로 돌아가 선제 정확도를 높이는 <b>닫힌 루프</b>가 일반 챗봇과의 차별점입니다.</div>
+
+      <h2 className="sec-title">대표 시나리오 <span className="sec-note">요금/청구 선제조치 · 첨부 콘셉트 화면 기준</span></h2>
+      <div className="p2-scenario">
+        <div className="phone-demo">
+          <div className="pd-frame">
+            <div className="pd-status"><span>9:41</span><span>ixi ▾</span></div>
+            <div className="pd-h">‹ 이번달 청구서</div>
+            <div className="pd-amt-l">3월 총 청구금액</div>
+            <div className="pd-amt">180,000<span>원</span></div>
+            <div className="pd-sub">모바일 (010-65**-84**)</div>
+            <div className="pd-card">
+              <div className="pd-card-h">분석 결과 <span className="pd-ai">AI가 최근 6개월 분석</span></div>
+              <div className="pd-lead">새로운 <b>결제 2건</b>이 발생해 이번달 요금이 <b className="up">12,300원</b> 늘었어요</div>
+              <ul className="pd-items">
+                <li>월 기본 요금<span>77,500원</span></li>
+                <li>OTT 정기 결제<span className="up">↑ 7,900원</span></li>
+                <li>로밍 데이터<span className="up">↑ 4,500원</span></li>
+                <li>기타<span>4,300원</span></li>
+              </ul>
+              <div className="pd-cta"><button onClick={() => demo('요금제 변경')}>요금제 변경</button><button className="pri" onClick={() => demo('로밍 데이터 차단')}>로밍 데이터 차단</button></div>
+            </div>
+          </div>
+        </div>
+        <ol className="p2-steps">{steps.map((s, i) => (
+          <li key={i}><b>{s.t}</b><span>{s.d}</span></li>
+        ))}</ol>
+      </div>
+
+      <h2 className="sec-title">적용 우선순위 <span className="sec-note">VOC 볼륨 × 인앱 액션 가능성 × 데이터 가용성</span></h2>
+      <div className="effect-row">{place.map((p) => (
+        <div key={p.r} className={'effect-card' + (p.best ? ' brand' : '')}><div className="effect-t">{p.r} · {p.t}</div><div className="effect-d">{p.d}</div></div>
+      ))}</div>
+
+      <h2 className="sec-title">측정지표</h2>
+      <div className="effect-row">{metrics.map((m) => (
+        <div key={m.t} className="effect-card"><div className="effect-t">{m.t}</div><div className="effect-d">{m.d}</div></div>
+      ))}</div>
+
+      <p className="micro">실제 적용 시 익시(ixi)의 도메인 스킬 카드로 연동하며, 본 화면·수치는 콘셉트 데모입니다.</p>
+    </div>
+  )
+}
 function AllMenu({ goAgent, setRail, notify }) {
-  const [doc, setDoc] = useState('architecture') // 'architecture' | 'prompts'
+  const [doc, setDoc] = useState('architecture') // 'architecture' | 'prompts' | 'phase2'
   return (
     <div className="screen portal-screen">
       <div className="soldoc-tabs">
         <button className={'soldoc-tab' + (doc === 'architecture' ? ' on' : '')} onClick={() => setDoc('architecture')}>솔루션 구조 (TO-BE)</button>
         <button className={'soldoc-tab' + (doc === 'prompts' ? ' on' : '')} onClick={() => setDoc('prompts')}>Copilot 프롬프트</button>
+        <button className={'soldoc-tab' + (doc === 'phase2' ? ' on' : '')} onClick={() => setDoc('phase2')}>확장 로드맵 (Phase 2)</button>
       </div>
       {doc === 'architecture' && <Architecture />}
       {doc === 'prompts' && <PromptTemplates notify={notify} />}
+      {doc === 'phase2' && <Phase2 notify={notify} />}
     </div>
   )
 }
