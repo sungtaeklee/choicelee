@@ -804,7 +804,7 @@ h1,h2{margin:0}
 .ai-expand .ex-ic{font-size:13px}
 
 .home-ai-work{display:flex;height:100%;min-height:0}
-.aiw-side{width:340px;flex-shrink:0;border-right:1px solid var(--line);background:var(--bg);overflow-y:auto;padding:22px 18px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.aiw-side{width:384px;flex-shrink:0;border-right:1px solid var(--line);background:var(--bg);overflow-y:auto;padding:22px 20px;display:flex;flex-direction:column;gap:16px;min-width:0}
 .aiw-side .hcard{margin:0}
 .aiw-main{flex:1;min-width:0;overflow-y:auto;background:var(--surface)}
 .aiw-band{background:linear-gradient(120deg,#fbe6f2 0%,#ede9fb 52%,#e4f0fb 100%);padding:15px 26px;display:flex;align-items:center;gap:13px}
@@ -841,7 +841,7 @@ h1,h2{margin:0}
 .tc-bcol{width:38px;border-radius:7px 7px 0 0;background:#d9dbe3;min-height:6px}
 .tc-bcol.mag{background:linear-gradient(180deg,var(--magenta),#ff7ab8)}
 .tc-bn{font:700 11px var(--sans);color:var(--ink);margin-top:6px}
-.tc-bl{font-size:10.5px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tc-bl{font-size:10.5px;color:var(--muted);max-width:100%;line-height:1.3;word-break:keep-all;overflow-wrap:anywhere}
 .tc-cap{font-size:12px;color:var(--slate)}
 .tc-quote{font:600 13px/1.55 var(--sans);color:var(--ink);background:var(--bg);border-radius:10px;padding:12px 13px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .tc-stepper{display:flex;align-items:flex-start;gap:4px;padding:4px 0}
@@ -949,3 +949,14 @@ table.sheet td input:focus{background:#fdeef6;box-shadow:inset 0 0 0 2px var(--m
 svg.ltrend{display:block}
 svg.ltrend path{cursor:pointer}
 .lt-axis{font:400 10.5px var(--sans);fill:var(--muted)}
+
+/* ===== AI 워크스페이스 답변 카드 (키워드 응답) ===== */
+.aiw-answer{border:1px solid var(--line);border-radius:16px;padding:16px 18px;background:#fff;box-shadow:var(--shadow-sm);max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.aiw-a-head{display:flex;align-items:center;gap:8px;font:700 14px var(--sans);color:var(--ink)}
+.aiw-a-head .ai-spark{color:var(--magenta)}
+.aiw-a-x{margin-left:auto;border:0;background:none;color:var(--muted);font-size:14px;cursor:pointer;width:26px;height:26px;border-radius:7px}
+.aiw-a-x:hover{background:var(--bg);color:var(--ink)}
+.aiw-a-q{font-size:12.5px;color:var(--muted)}
+.aiw-a-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.aiw-a-list li{font-size:13.5px;line-height:1.6;color:var(--ink)}
+.aiw-answer .ai-pill-btn{align-self:flex-start}

@@ -719,7 +719,7 @@ function VOCTrends({ added }) {
 }
 
 /* ---------- 공통: 도넛 차트 + 색상 (홈 현황 요약에서 사용) ---------- */
-const DONUT_COLORS = ['#e6007e', '#6938ef', '#1570ef', '#12b76a', '#f79009', '#98a2b3']
+const DONUT_COLORS = ['#e6007e', '#9b3fd4', '#4f7cf6', '#1bb59a', '#f5a623', '#9aa3b2']
 function Donut({ segments, total, centerLabel }) {
   const sum = segments.reduce((a, s) => a + s.value, 0) || 1
   const R = 52, C = 2 * Math.PI * R; let off = 0
@@ -1432,6 +1432,7 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
   const pct = (n) => total ? Math.round((n / total) * 100) : 0
   const name = (account || 'U+').split('@')[0]
   const [caseTab, setCaseTab] = useState('high')
+  const [aiAns, setAiAns] = useState(null)
   // 집계
   const grpMap = {}; data.forEach((v) => { grpMap[v.group] = (grpMap[v.group] || 0) + 1 })
   const groupSeg = GROUPS.filter((g) => grpMap[g]).map((g, i) => ({ label: g, value: grpMap[g], color: DONUT_COLORS[i % DONUT_COLORS.length] }))
@@ -1483,8 +1484,44 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
   if (high) brief.push({ t: `High 리스크 ${high.toLocaleString()}건 집중 관리`, imp: 'mid' })
   brief.push({ t: `자동 분류율 ${autoRate}%`, imp: 'mid' })
   if (review) brief.push({ t: `검토 필요 ${review.toLocaleString()}건`, imp: 'mid' })
-  const askDemo = (label) => notify && notify.toast(`Copilot에 요청했어요 — ${label} (데모)`)
-  const sendDemo = (el) => { const v = (el.value || '').trim(); if (!v) return; if (notify) notify.toast('Copilot에 전달했어요 (데모)'); el.value = '' }
+  // 키워드 기반 응답(사내망 정책상 실제 AI 호출 대신, 수집 VOC 집계로 답함)
+  const ask = (raw) => {
+    const q = String(raw || '').trim(); if (!q) return
+    const has = (...ks) => ks.some((k) => q.toLowerCase().includes(k.toLowerCase()))
+    let a
+    if (has('급증', '이상', '추이', '트렌드', '징후', 'spike', 'trend')) {
+      a = { title: '이상 징후 · 추이 요약', lines: a0 ? [
+        `${a0.k}이(가) 직전 주차 대비 ▲${a0.pc}% 급증했어요.`,
+        `최근 주차 ${a0.c.toLocaleString()}건(전주 ${a0.p.toLocaleString()}건) 집중 발생 — 담당 영역 확인이 필요합니다.`,
+      ] : ['최근 주차에서 급증 패턴은 감지되지 않았어요. 추이는 안정적입니다.'], act: { label: '추이 상세 보기', onClick: () => goAgent('trends') } }
+    } else if (has('검토', '분류', '확인')) {
+      a = { title: '검토 필요 케이스', lines: [
+        `검토 필요 ${review.toLocaleString()}건이 분류 확인을 기다리고 있어요.`,
+        `현재 자동 분류율은 ${autoRate}%입니다.`,
+        sampleCase ? `예: “${String(sampleCase.summary || sampleCase.content || '').slice(0, 42)}…”` : null,
+      ].filter(Boolean), act: { label: sampleCase ? '케이스 열기' : '케이스 보기', onClick: () => sampleCase ? (openCase && openCase(sampleCase.id)) : goAgent('detail') } }
+    } else if (has('개선', '우선순위', '백로그', '요청')) {
+      a = { title: '개선 우선순위', lines: [
+        '개선 후보는 대응영역 기준으로 모아 백로그에서 우선순위를 매길 수 있어요.',
+        `상위 유형: ${topGroups.map((s) => `${s.label} ${s.value.toLocaleString()}건`).join(' · ') || '데이터 없음'}`,
+      ], act: { label: '개선 백로그 열기', onClick: () => goAgent('backlog') } }
+    } else if (has('처리', 'high', '하이', '급한', '우선', '리스크')) {
+      a = { title: '처리 필요 정리', lines: [
+        `처리 필요 ${todo.toLocaleString()}건 · High 리스크 ${high.toLocaleString()}건 · 처리 중 ${doing.toLocaleString()}건.`,
+        '분류 보드에서 상태별로 한 번에 처리할 수 있어요.',
+      ], act: { label: '분류 보드 열기', onClick: () => goAgent('board') } }
+    } else {
+      a = { title: 'VOC 현황 요약', lines: [
+        `전체 ${total.toLocaleString()}건 · 처리 필요 ${todo.toLocaleString()} · High ${high.toLocaleString()} · 검토 필요 ${review.toLocaleString()}.`,
+        `자동 분류율 ${autoRate}% · 상위 유형 ${topGroups.map((s) => `${s.label}(${s.value.toLocaleString()})`).join(' · ') || '없음'}.`,
+        a0 ? `이상 징후: ${a0.k} ▲${a0.pc}% 급증.` : '이상 징후: 안정적.',
+        "'급증·추이', '검토', '개선', '처리' 같은 키워드로 더 자세히 물어볼 수 있어요.",
+      ], act: { label: '추이 상세 보기', onClick: () => goAgent('trends') } }
+    }
+    setAiAns({ q, ...a })
+  }
+  const askDemo = (label) => ask(label)
+  const sendDemo = (el) => { const v = (el.value || '').trim(); if (!v) return; ask(v); el.value = '' }
 
   const cardAgent = (
     <div className="hcard">
@@ -1634,10 +1671,19 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
               <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.aiw-inputbox').querySelector('input'))}>↑</button>
             </div>
           </div>
+          {aiAns && (
+            <div className="aiw-answer">
+              <div className="aiw-a-head"><span className="ai-spark">✦</span><b>{aiAns.title}</b><button className="aiw-a-x" aria-label="닫기" onClick={() => setAiAns(null)}>✕</button></div>
+              <div className="aiw-a-q">“{aiAns.q}”</div>
+              <ul className="aiw-a-list">{aiAns.lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
+              {aiAns.act && <button className="ai-pill-btn primary" onClick={aiAns.act.onClick}>{aiAns.act.label}</button>}
+              <p className="micro">사내 네트워크 정책상 실제 AI 호출 대신 수집된 VOC 집계로 응답합니다.</p>
+            </div>
+          )}
           <div className="aiw-chips">
-            <button className="chip-btn" onClick={() => goAgent('trends')}>오늘 급증 VOC 정리해줘</button>
-            <button className="chip-btn" onClick={() => goAgent('detail')}>검토필요 케이스 보여줘</button>
-            <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위 알려줘</button>
+            <button className="chip-btn" onClick={() => ask('오늘 급증 VOC 정리해줘')}>오늘 급증 VOC 정리해줘</button>
+            <button className="chip-btn" onClick={() => ask('검토필요 케이스 보여줘')}>검토필요 케이스 보여줘</button>
+            <button className="chip-btn" onClick={() => ask('개선 우선순위 알려줘')}>개선 우선순위 알려줘</button>
           </div>
           <div className="todo-rec"><span className="tr-l">오늘의 todo 추천</span><button className="refresh" onClick={() => askDemo('todo 새로고침')}>↻ 새로고침</button></div>
           {todoCards}
