@@ -546,6 +546,9 @@ const PageHead = ({ title, sub, children }) => (
 
 /* ---------- [추이·영역] 피벗 + 원문검색 (엑셀 1·2번 시트 대응) ---------- */
 function weekKey(w) { const m = String(w).match(/(\d+)\D+(\d+)/); return m ? (+m[1]) * 10 + (+m[2]) : 9999 }
+// 'YYYY.MM.DD' / 'YYYY.M.D' 등 → 'YYYY-MM-DD' (없으면 '')
+function toDay(s) { if (!s) return ''; const m = String(s).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}` : '' }
+function recDay(d) { return toDay(d.date) || toDay(d.occur) }
 function buildPivot(data, getL1, getL2) {
   const tree = {}
   for (const d of data) {
@@ -583,9 +586,22 @@ function PivotView({ tree, weeks, l1order }) {
   )
 }
 function VOCTrends({ added }) {
-  const data = added || []
+  const data0 = added || []
+  const [d1, setD1] = useState(''); const [d2, setD2] = useState('')
   const [q, setQ] = useState(''); const [fw, setFw] = useState('전체'); const [fa, setFa] = useState('전체')
+  // 기간 필터(시작·종료일) — 전체 화면에 적용
+  const data = useMemo(() => data0.filter((d) => {
+    const dd = recDay(d); if (!d1 && !d2) return true; if (!dd) return false
+    if (d1 && dd < d1) return false; if (d2 && dd > d2) return false; return true
+  }), [data0, d1, d2])
   const weeks = useMemo(() => [...new Set(data.map((d) => d.week).filter(Boolean))].sort((a, b) => weekKey(a) - weekKey(b)), [data])
+  // 일별 추이
+  const byDay = useMemo(() => {
+    const m = {}; for (const d of data) { const k = recDay(d); if (k) m[k] = (m[k] || 0) + 1 }
+    return Object.entries(m).sort((a, b) => a[0] < b[0] ? -1 : 1).map(([day, n]) => ({ day, n }))
+  }, [data])
+  const maxD = Math.max(1, ...byDay.map((x) => x.n))
+  const dayRange = useMemo(() => { const ds = data0.map(recDay).filter(Boolean).sort(); return ds.length ? { min: ds[0], max: ds[ds.length - 1] } : null }, [data0])
   const pv1 = useMemo(() => buildPivot(data, (d) => d.group, (d) => d.cat), [data])
   const pv2 = useMemo(() => buildPivot(data, (d) => d.area1, (d) => d.area2), [data])
   const totalsByWeek = weeks.map((w) => ({ w, n: data.filter((d) => d.week === w).length }))
@@ -598,12 +614,28 @@ function VOCTrends({ added }) {
     return { rows: grid, max }
   }, [data, weeks])
   const results = data.filter((d) => (fw === '전체' || d.week === fw) && (fa === '전체' || d.area1 === fa) && (!q || (d.content || '').includes(q) || (d.summary || '').includes(q)))
-  if (!data.length) return <div className="screen"><PageHead title="기간별·영역별 추이" sub="VOC구분·대응영역 추이와 원문 검색" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 입력하거나 붙여넣으면 추이·영역 피벗이 생성됩니다.</div></div>
+  if (!data0.length) return <div className="screen"><PageHead title="기간별·영역별 추이" sub="VOC구분·대응영역 추이와 원문 검색" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 입력하거나 붙여넣으면 추이·영역 피벗이 생성됩니다.</div></div>
   return (
     <div className="screen">
-      <PageHead title="기간별·영역별 추이" sub="① 기간별 VOC 추이(구분1·2) · ② 영역별(대응영역1·2) · ③ 원문 검색" />
+      <PageHead title="기간별·영역별 추이" sub="① 기간 필터 · 일별/주차별 추이 · ② 영역별(대응영역) · ③ 원문 검색" />
       <div className="panel">
-        <div className="card-title">주차별 VOC 추이 <span className="muted">전체 {data.length.toLocaleString()}건 · {weeks.length}개 주차</span></div>
+        <div className="card-title">기간 필터 <span className="muted">시작·종료일로 전체 집계를 좁혀 봅니다{dayRange ? ` · 데이터 범위 ${dayRange.min} ~ ${dayRange.max}` : ''}</span></div>
+        <div className="date-filter">
+          <label>시작일 <input type="date" value={d1} min={dayRange?.min} max={dayRange?.max} onChange={(e) => setD1(e.target.value)} /></label>
+          <span className="df-sep">~</span>
+          <label>종료일 <input type="date" value={d2} min={dayRange?.min} max={dayRange?.max} onChange={(e) => setD2(e.target.value)} /></label>
+          {(d1 || d2) && <button className="btn btn-ghost sm" onClick={() => { setD1(''); setD2('') }}>기간 초기화</button>}
+          <span className="muted nowrap">표시 {data.length.toLocaleString()}건{(d1 || d2) ? ` / 전체 ${data0.length.toLocaleString()}` : ''}</span>
+        </div>
+      </div>
+      <div className="panel">
+        <div className="card-title">일별 VOC 추이 <span className="muted">{byDay.length}일 · 최대 {maxD.toLocaleString()}건/일</span></div>
+        {byDay.length ? (
+          <div className="trend-bars day-bars">{byDay.map((t) => <div key={t.day} className="tb-col" title={`${t.day} · ${t.n}건`}><div className="tb-v">{t.n}</div><div className="tb-bar" style={{ height: Math.max(4, t.n / maxD * 120) + 'px' }} /><div className="tb-k">{t.day.slice(5).replace('-', '/')}</div></div>)}</div>
+        ) : <p className="micro">일자(인입일자/발생일자) 정보가 있는 데이터가 없어 일별 추이를 표시할 수 없습니다.</p>}
+      </div>
+      <div className="panel">
+        <div className="card-title">주차별 VOC 추이 <span className="muted">{data.length.toLocaleString()}건 · {weeks.length}개 주차</span></div>
         <div className="trend-bars">{totalsByWeek.map((t) => <div key={t.w} className="tb-col"><div className="tb-v">{t.n}</div><div className="tb-bar" style={{ height: Math.max(4, t.n / maxW * 120) + 'px' }} /><div className="tb-k">{t.w}</div></div>)}</div>
       </div>
       <div className="panel"><div className="card-title">① 기간별 VOC 추이 <span className="muted">VOC구분1 · 구분2 × 주차</span></div><PivotView tree={pv1} weeks={weeks} l1order={GROUPS} /></div>
@@ -659,11 +691,68 @@ function Donut({ segments, total, centerLabel }) {
 }
 /* ---------- [2] VOC Inbox (채널 수집 + 화면 직접 입력) ---------- */
 const INPUT_CHANNELS = ['고객의소리', 'Call', 'Medallia', 'App Store', '고객센터']
+const SHEET_COLS = [
+  { k: 'date', label: '인입일자', w: 108 }, { k: 'channel', label: '인입채널', w: 104 },
+  { k: 'customer', label: '고객번호', w: 128 }, { k: 'content', label: '내용', w: 340 },
+  { k: 'week', label: '월내주차', w: 96 }, { k: 'occur', label: '발생일자', w: 104 },
+]
+const emptyRow = () => ({ date: '', channel: '', customer: '', content: '', week: '', occur: '' })
+function PasteSheetModal({ onClose, onSubmit }) {
+  const [rows, setRows] = useState(() => Array.from({ length: 8 }, emptyRow))
+  const setCell = (ri, k, val) => setRows((rs) => rs.map((r, i) => i === ri ? { ...r, [k]: val } : r))
+  const filled = rows.filter((r) => (r.content || '').trim()).length
+  const onPaste = (e, ri, ci) => {
+    const text = (e.clipboardData || window.clipboardData).getData('text')
+    if (!text || (!text.includes('\t') && !text.includes('\n'))) return // 단일 셀 → 기본 붙여넣기
+    e.preventDefault()
+    const grid = text.replace(/\r/g, '').split('\n').filter((l) => l !== '').map((l) => l.split('\t'))
+    const maxCols = Math.max(...grid.map((g) => g.length))
+    const headerNamed = /인입일자|채널|고객번호|내용|주차|발생/.test((grid[0] || []).join(' '))
+    if (maxCols >= 10 || headerNamed) { // 전체 export(16열) 또는 헤더 포함 → 표준 파서로 인식
+      const parsed = parsePaste(text)
+      if (parsed.length) { setRows([...parsed.map((p) => ({ date: p.date || '', channel: p.channel || '', customer: p.customer || '', content: p.content || '', week: p.week || '', occur: p.occur || '' })), emptyRow(), emptyRow()]); return }
+    }
+    setRows((rs) => { // 6열 이하 → 엑셀처럼 현재 셀 기준 위치 채우기
+      const next = rs.map((r) => ({ ...r }))
+      grid.forEach((cells, r) => { const tr = ri + r; while (next.length <= tr) next.push(emptyRow()); cells.forEach((val, c) => { const col = SHEET_COLS[ci + c]; if (col) next[tr][col.k] = (val || '').trim() }) })
+      return next
+    })
+  }
+  return (
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal sheet-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head"><b>엑셀 시트로 입력 · 붙여넣기</b><button className="modal-x" aria-label="닫기" onClick={onClose}>✕</button></div>
+        <p className="modal-note">셀에 직접 입력하거나, Excel에서 범위를 복사해 셀에 <b>붙여넣기(Ctrl+V)</b> 하세요 — 헤더·전체 열도 자동 인식합니다. <b>내용</b>이 있는 행만 추가되며, 전화·이름은 추가 시 자동 마스킹됩니다.</p>
+        <div className="sheet-wrap">
+          <table className="sheet">
+            <thead><tr><th className="sh-rownum"></th>{SHEET_COLS.map((c) => <th key={c.k} style={{ minWidth: c.w }}>{c.label}{c.k === 'content' && <span className="sh-req"> *</span>}</th>)}</tr></thead>
+            <tbody>{rows.map((r, ri) => (
+              <tr key={ri}><td className="sh-rownum">{ri + 1}</td>{SHEET_COLS.map((c, ci) => (
+                <td key={c.k}><input value={r[c.k]} onChange={(e) => setCell(ri, c.k, e.target.value)} onPaste={(e) => onPaste(e, ri, ci)} /></td>
+              ))}</tr>
+            ))}</tbody>
+          </table>
+        </div>
+        <div className="modal-foot">
+          <div className="mf-left">
+            <button className="btn btn-ghost sm" onClick={() => setRows((rs) => [...rs, ...Array.from({ length: 5 }, emptyRow)])}>행 추가</button>
+            <button className="btn btn-ghost sm" onClick={() => setRows(Array.from({ length: 8 }, emptyRow))}>전체 지우기</button>
+            <span className="muted">내용 입력 {filled}행</span>
+          </div>
+          <div className="mf-right">
+            <button className="btn btn-ghost" onClick={onClose}>닫기</button>
+            <button className="btn btn-primary" disabled={!filled} onClick={() => onSubmit(rows)}>분류·추가 ({filled}건)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, clearShared }) {
   const [fch, setFch] = useState('전체'); const [fgrp, setFgrp] = useState('전체'); const [fst, setFst] = useState('전체')
   const [channel, setChannel] = useState('고객의소리'); const [customer, setCustomer] = useState(''); const [text, setText] = useState('')
   const [vDate, setVDate] = useState(''); const [vWeek, setVWeek] = useState(''); const [vOccur, setVOccur] = useState('')
-  const [paste, setPaste] = useState('')
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [result, setResult] = useState(null)
   const [seq, setSeq] = useState(() => added.reduce((m, v) => { const n = parseInt(String(v.id).replace(/\D/g, ''), 10); return n > m ? n : m }, 0) + 1)
   const all = useMemo(() => [...added, ...VOCS], [added])
@@ -684,35 +773,14 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
     if (shared) sharedInsert(toCompact([v]))
     notify.toast(`${v.id} 분류·추가됨 — ${v.group} · ${v.cat}`)
   }
-  const addPaste = () => {
-    const parsed = parsePaste(paste)
-    if (!parsed.length) { notify.toast("붙여넣은 데이터에서 '내용'을 찾지 못했습니다 (헤더 행 포함 권장)"); return }
-    const vs = parsed.map((row, k) => enrichRow(row, shared ? uid(k) : nid(seq + k)))
-    setAdded([...vs, ...added]); if (!shared) setSeq(seq + vs.length); setResult(vs[0]); setPaste('')
+  const addSheet = (sheetRows) => {
+    const valid = (sheetRows || []).filter((r) => (r.content || '').trim())
+    if (!valid.length) { notify.toast('내용이 입력된 행이 없습니다'); return }
+    const vs = valid.map((row, k) => enrichRow({ content: row.content, channel: row.channel || '고객의소리', customer: row.customer, date: row.date, week: row.week, occur: row.occur }, shared ? uid(k) : nid(seq + k)))
+    setAdded([...vs, ...added]); if (!shared) setSeq(seq + vs.length); setResult(vs[0])
     if (shared) sharedInsert(toCompact(vs))
+    setSheetOpen(false)
     notify.toast(`${vs.length}건 분류·추가됨`)
-  }
-  const exportSeed = () => {
-    const data = JSON.stringify(toCompact(added))
-    const blob = new Blob([data], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'seed.json'; document.body.appendChild(a); a.click(); a.remove()
-    URL.revokeObjectURL(url)
-    notify.toast(`${added.length.toLocaleString()}건을 seed.json으로 내보냈어요 — public/seed.json에 넣고 배포하세요`)
-  }
-  const importSeed = (e) => {
-    const f = e.target.files && e.target.files[0]; if (!f) return
-    const rd = new FileReader()
-    rd.onload = () => {
-      try {
-        const recs = JSON.parse(String(rd.result))
-        if (!Array.isArray(recs)) throw new Error('형식 오류')
-        const hy = hydrate(recs); setAdded(hy)
-        setSeq(hy.reduce((m, v) => { const n = parseInt(String(v.id).replace(/\D/g, ''), 10); return n > m ? n : m }, 0) + 1)
-        setResult(null); notify.toast(`${recs.length.toLocaleString()}건을 불러왔어요`)
-      } catch { notify.toast('JSON을 읽지 못했어요 — 내보낸 seed.json 형식이어야 합니다') }
-    }
-    rd.readAsText(f); e.target.value = ''
   }
   const seedShared = async () => {
     try {
@@ -754,34 +822,26 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
             <div className="co-row"><span className="co-k">요약</span><span className="muted">{result.summary}</span></div>
             <div className="co-row"><span className="co-k">진행 / 개발</span><StatBadge v={result.status} /><span className="muted">개발 대응: {result.devNeeded}</span></div>
             <div className="co-row"><span className="co-k">신뢰 / 검토</span><ConfBadge v={result.conf} />{result.review && <span className="rev-y">검토필요 Y</span>}</div>
+            <div className="co-ans"><div className="co-ans-k">예상 답안 (고객 응대 초안)</div><div className="co-ans-v">{result.answer}</div></div>
+            <div className="co-ans"><div className="co-ans-k">예상 처리 방안</div><div className="co-ans-v">{result.action}{result.devNeeded === 'Y' ? ' · 개발 대응 필요' : ''} · 담당 {result.org}</div></div>
             <p className="micro">{result.id} 추가됨 — 표/보드에서 확인하고 행을 클릭하면 답변 초안 등 상세가 열립니다. (담당자 검수 후 처리)</p>
           </div>
         )}
       </div>
       <div className="panel input-panel">
-        <div className="ip-head">엑셀에서 붙여넣기 (일괄) <span className="ip-note">Excel에서 범위를 복사 → 붙여넣기. 헤더 포함이면 열 이름으로, 헤더 없이 전체 16열을 붙여넣으면 표준 컬럼 순서로 인식해 일괄 분류·추가합니다. 전화·이름은 마스킹됩니다.</span></div>
-        <textarea className="input-ta" rows={4} placeholder={'인입일자\t인입 채널\t고객번호orCTNor기기\t...\t내용\t...\t월 내 주차\t발생일자\n2026.03.01\t고객의소리\t010-...\t...\t통화가 자주 끊겨요\t...\t02월4주차\t2026.3.1'} value={paste} onChange={(e) => setPaste(e.target.value)} />
+        <div className="ip-head">엑셀에서 붙여넣기 (일괄) <span className="ip-note">엑셀처럼 시트에 입력하거나, Excel에서 범위를 복사해 시트에 붙여넣으면 표준 컬럼으로 인식해 일괄 분류·추가합니다. 전화·이름은 마스킹됩니다.</span></div>
         <div className="ip-actions">
-          <button className="btn btn-primary" onClick={addPaste}>붙여넣기 분류·추가</button>
-          <button className="btn btn-ghost" onClick={() => setPaste('')}>지우기</button>
+          <button className="btn btn-primary" onClick={() => setSheetOpen(true)}>엑셀 시트로 입력 / 붙여넣기 열기</button>
         </div>
       </div>
-      {shared ? (
+      {sheetOpen && <PasteSheetModal onClose={() => setSheetOpen(false)} onSubmit={addSheet} />}
+      {shared && (
         <div className="panel input-panel">
           <div className="ip-head">공유 저장소 (실시간 누적) <span className="ip-note">입력·붙여넣은 VOC가 공유 저장소에 적재되어, 로그인한 모든 사용자 화면에 수 초 내 누적 표시됩니다. 아래는 데모 편의 기능이에요.</span></div>
           <div className="ip-actions">
             <button className="btn btn-ghost" onClick={seedShared}>공유 데이터에 샘플 시드 넣기</button>
             <button className="btn btn-ghost danger" onClick={wipeShared}>공유 데이터 비우기</button>
             <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건 · 공유</span>
-          </div>
-        </div>
-      ) : (
-        <div className="panel input-panel">
-          <div className="ip-head">전체 공유 (배포본에 데이터 싣기) <span className="ip-note">입력 데이터는 이 브라우저에만 저장됩니다. 다른 사람도 같은 데이터를 보게 하려면 ① <b>내보내기</b>로 seed.json을 받아 ② 프로젝트의 <b>public/seed.json</b>에 넣고 배포(git push)하세요. 배포 후에는 로그인한 누구나(저장 데이터가 없는 브라우저) seed.json을 자동으로 불러옵니다. (실시간 누적이 필요하면 공유 저장소 모드를 설정하세요)</span></div>
-          <div className="ip-actions">
-            <button className="btn btn-primary" onClick={exportSeed} disabled={!added.length}>현재 데이터 내보내기 (seed.json)</button>
-            <label className="btn btn-ghost file-btn">JSON 불러오기<input type="file" accept="application/json,.json" onChange={importSeed} /></label>
-            <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건</span>
           </div>
         </div>
       )}
@@ -916,7 +976,10 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
             {c.summary && <div className="block"><div className="block-label">AI 요약 초안</div><p className="voc-raw">{c.summary}</p></div>}
             <div className="block"><div className="block-label">VOC 원문(내용)</div><p className="voc-raw">{c.content}</p></div>
           </div>
-          <div className="panel ai-panel"><div className="ai-head">Copilot AI 분석 <span className="ai-tag">초안 · 담당자 검수 필요</span></div><ul className="ai-list">{c.analysis.map((a, i) => <li key={i}>{a}</li>)}</ul></div>
+          <div className="panel ai-panel"><div className="ai-head">Copilot AI 분석 <span className="ai-tag">초안 · 담당자 검수 필요</span></div><ul className="ai-list">{c.analysis.map((a, i) => <li key={i}>{a}</li>)}</ul>
+            <div className="ai-ans"><div className="ai-ans-k">예상 답안 (고객 응대 초안)</div><div className="ai-ans-v">{c.answer}</div></div>
+            <div className="ai-ans"><div className="ai-ans-k">예상 처리 방안</div><div className="ai-ans-v">{c.action}{c.devNeeded === 'Y' ? ' · 개발 대응 필요' : ''} · 담당 {c.org}</div></div>
+          </div>
           {c.sms && <div className="panel"><div className="block-label">고객 문자/푸시 초안</div><div className="draft">{c.sms}</div><button className="btn btn-ghost sm" onClick={() => copy(c.sms, '문자 초안')}>문자 초안 복사</button></div>}
           {c.mail && <div className="panel"><div className="block-label">담당자 메일 초안</div><div className="draft"><div className="mail-line"><b>수신</b> {c.mail.to}</div><div className="mail-line"><b>제목</b> {c.mail.subject}</div><div className="mail-body">{c.mail.body}</div></div><button className="btn btn-ghost sm" onClick={() => copy(`수신: ${c.mail.to}\n제목: ${c.mail.subject}\n\n${c.mail.body}`, '메일 초안')}>메일 초안 복사</button></div>}
           <div className="panel"><div className="block-label">UX/개발 개선 요청</div><div className="impv"><div><span className="impv-k">문제</span>{c.improvement.problem}</div><div><span className="impv-k">제안</span>{c.improvement.suggestion}</div><div><span className="impv-k">기대효과</span>{c.improvement.effect}</div></div></div>
