@@ -801,6 +801,8 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
   const [channel, setChannel] = useState('고객의소리'); const [customer, setCustomer] = useState(''); const [text, setText] = useState('')
   const [vDate, setVDate] = useState(''); const [vWeek, setVWeek] = useState(''); const [vOccur, setVOccur] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [mode, setMode] = useState('text') // 'text' | 'call'(STT)
+  const [showShared, setShowShared] = useState(false)
   const [result, setResult] = useState(null)
   const [seq, setSeq] = useState(() => added.reduce((m, v) => { const n = parseInt(String(v.id).replace(/\D/g, ''), 10); return n > m ? n : m }, 0) + 1)
   const all = useMemo(() => [...added, ...VOCS], [added])
@@ -846,19 +848,41 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
   return (
     <div className="screen">
       <PageHead title="VOC 수집·입력" sub="채널 수집 + 화면 직접 입력 → Copilot이 4그룹·22분류·대응영역·초안까지 자동 생성 (담당자 검수 후 처리)" />
+      {shared && (
+        <div className="inbox-top">
+          <button className="btn btn-ghost sm" onClick={() => setShowShared((s) => !s)}>{showShared ? '▲ 공유 저장소 도구 닫기' : '⚙ 공유 저장소 도구 (데모)'}</button>
+        </div>
+      )}
+      {shared && showShared && (
+        <div className="panel input-panel">
+          <div className="ip-head">공유 저장소 (실시간 누적) <span className="ip-note">입력·붙여넣은 VOC가 공유 저장소에 적재되어, 로그인한 모든 사용자 화면에 수 초 내 누적 표시됩니다. 공모전 데모 편의 기능이에요.</span></div>
+          <div className="ip-actions">
+            <button className="btn btn-ghost" onClick={seedShared}>공유 데이터에 샘플 시드 넣기</button>
+            <button className="btn btn-ghost danger" onClick={wipeShared}>공유 데이터 비우기</button>
+            <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건 · 공유</span>
+          </div>
+        </div>
+      )}
       <div className="panel input-panel">
-        <div className="ip-head">VOC 직접 입력 → Copilot 분류·추가 <span className="ip-note">인입일자·채널·고객번호·내용·주차·발생일자를 넣으면 VOC구분1/2·대응영역·요약·답변·개발대응·진행상황을 채워 목록에 추가 (데모: 키워드 기반 · 담당자 검수 후 처리)</span></div>
+        <div className="ip-head">VOC 직접 입력 → Copilot 분류·추가 <span className="ip-note">직접 입력하거나 엑셀을 붙여넣으면 VOC구분1/2·대응영역·요약·답변·개발대응·진행상황을 채워 목록에 추가 (데모: 키워드 기반 · 담당자 검수 후 처리)</span></div>
+        <div className="seg-toggle">
+          <button className={'seg' + (mode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>텍스트 VOC</button>
+          <button className={'seg' + (mode === 'call' ? ' on' : '')} onClick={() => { setMode('call'); setChannel('Call') }}>상담콜 · STT</button>
+        </div>
         <div className="input-grid">
-          <label className="in-field"><span>인입일자</span><input className="in-text" placeholder="2026.03.01" value={vDate} onChange={(e) => setVDate(e.target.value)} /></label>
+          <label className="in-field"><span>{mode === 'call' ? '콜 인입일자' : '인입일자'}</span><input className="in-text" placeholder="2026.03.01" value={vDate} onChange={(e) => setVDate(e.target.value)} /></label>
           <label className="in-field"><span>인입 채널</span><select className="flt" value={channel} onChange={(e) => setChannel(e.target.value)}>{INPUT_CHANNELS.map((c) => <option key={c}>{c}</option>)}</select></label>
           <label className="in-field"><span>고객번호 (선택)</span><input className="in-text" placeholder="010-1234-5678" value={customer} onChange={(e) => setCustomer(e.target.value)} /></label>
           <label className="in-field"><span>월 내 주차</span><input className="in-text" placeholder="02월4주차" value={vWeek} onChange={(e) => setVWeek(e.target.value)} /></label>
           <label className="in-field"><span>발생일자</span><input className="in-text" placeholder="2026.3.1" value={vOccur} onChange={(e) => setVOccur(e.target.value)} /></label>
         </div>
-        <textarea className="input-ta" rows={3} placeholder="내용 — 예) 통화가 자주 끊기고 특정 지역에서 잘 안 터져요" value={text} onChange={(e) => setText(e.target.value)} />
+        <label className="ta-label">{mode === 'call' ? 'STT 스크립트 (상담콜 전사)' : '내용'}{mode === 'call' && <span className="ta-req"> · 통화 전사 전체를 붙여넣으세요</span>}</label>
+        <textarea className="input-ta" rows={mode === 'call' ? 5 : 3} placeholder={mode === 'call' ? '상담콜 전사(STT)를 붙여넣으세요 — 예) 상담사: 무엇을 도와드릴까요? / 고객: 통화가 자주 끊기고 특정 지역에서 잘 안 터져요…' : '내용 — 예) 통화가 자주 끊기고 특정 지역에서 잘 안 터져요'} value={text} onChange={(e) => setText(e.target.value)} />
+        {mode === 'call' && <p className="micro">통화 전사 전체에서 핵심 VOC를 분류·요약합니다. 전화·이름 등 개인정보는 추가 시 자동 마스킹됩니다.</p>}
         <div className="ip-actions">
           <button className="btn btn-primary" onClick={addVoc}>Copilot 분류 후 추가</button>
           <button className="btn btn-ghost" onClick={() => { setText(''); setCustomer(''); setVDate(''); setVWeek(''); setVOccur(''); setResult(null) }}>초기화</button>
+          <button className="btn btn-ghost" onClick={() => setSheetOpen(true)}>＋ 엑셀 시트로 입력 / 붙여넣기</button>
           {!shared && added.length > 0 && <button className="btn btn-ghost" onClick={() => { if (window.confirm(`저장된 입력 ${added.length.toLocaleString()}건을 모두 삭제할까요? (되돌릴 수 없습니다)`)) { setAdded([]); setResult(null) } }}>입력 항목 비우기</button>}
           {added.length > 0 && <span className="up-summary">입력 <b>{added.length}</b>건 · 표 상단에 표시됨</span>}
         </div>
@@ -876,23 +900,7 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
           </div>
         )}
       </div>
-      <div className="panel input-panel">
-        <div className="ip-head">엑셀에서 붙여넣기 (일괄) <span className="ip-note">엑셀처럼 시트에 입력하거나, Excel에서 범위를 복사해 시트에 붙여넣으면 표준 컬럼으로 인식해 일괄 분류·추가합니다. 전화·이름은 마스킹됩니다.</span></div>
-        <div className="ip-actions">
-          <button className="btn btn-primary" onClick={() => setSheetOpen(true)}>엑셀 시트로 입력 / 붙여넣기 열기</button>
-        </div>
-      </div>
       {sheetOpen && <PasteSheetModal onClose={() => setSheetOpen(false)} onSubmit={addSheet} />}
-      {shared && (
-        <div className="panel input-panel">
-          <div className="ip-head">공유 저장소 (실시간 누적) <span className="ip-note">입력·붙여넣은 VOC가 공유 저장소에 적재되어, 로그인한 모든 사용자 화면에 수 초 내 누적 표시됩니다. 아래는 데모 편의 기능이에요.</span></div>
-          <div className="ip-actions">
-            <button className="btn btn-ghost" onClick={seedShared}>공유 데이터에 샘플 시드 넣기</button>
-            <button className="btn btn-ghost danger" onClick={wipeShared}>공유 데이터 비우기</button>
-            <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건 · 공유</span>
-          </div>
-        </div>
-      )}
       <div className="filters">
         <Sel value={fch} set={setFch} opts={chOpts} />
         <Sel value={fgrp} set={setFgrp} opts={['전체', ...GROUPS]} />
@@ -1123,18 +1131,64 @@ function InsightReport({ added }) {
 
 /* ---------- [6] Prompt Templates ---------- */
 function PromptTemplates({ notify }) {
-  const prompts = [
-    { t: 'VOC 분류 프롬프트 (4그룹·22개)', p: '목적: VOC 자동 분류', body: '아래 VOC를 분류해줘.\n먼저 VOC구분1을 [장애/오류 · 성능 · 개선 요청/희망 · 단순 문의/불만/기타] 중 하나로 정하고,\n장애/오류·성능·개선 요청/희망이면 각 그룹의 닫힌 분류값으로,\n단순 문의/불만/기타이면 표준분류 22개 중 하나로 분류해줘.\n목록 밖 새 분류명은 만들지 말고, 모호하면 "기타 + 검토필요"로 표시해줘.' },
-    { t: '고객 문자/푸시 생성 프롬프트', p: '목적: 고객 안내 초안', body: '아래 VOC에 대해 고객에게 보낼 문자/푸시 안내 초안을 작성해줘.\n사실 확인된 내용만, 오해를 푸는 데 집중해 정중·간결하게. 개인정보는 포함하지 마.' },
-    { t: '담당자 메일 생성 프롬프트', p: '목적: 담당 조직 공유', body: '아래 High 심각도 VOC를 담당 조직에 공유할 메일 초안을 작성해줘.\n수신 조직·제목·VOC 요약·고객 혼선 포인트·개선 필요 화면·요청 액션 포함.' },
-    { t: 'UX/개발 개선 요청 생성 프롬프트', p: '목적: 개선 과제화', body: '아래 VOC를 UX/개발 개선 요청으로 정리해줘.\n문제·제안·기대효과 형식, 반복 발생 가능성과 영향 범위 표기.' },
-    { t: '인사이트 리포트 생성 프롬프트', p: '목적: 경영 보고용 요약', body: '분류된 VOC 전체로 표준분류 분포·High 리스크·개선 우선순위·기대효과를 요약해줘. 수치는 표/비율로.' },
+  const [shown, setShown] = useState({})
+  const steps = [
+    {
+      key: 'cls', n: 1, role: '분석', title: 'VOC 분류', purpose: '유형 · 세부 · 심각도 자동 분류', core: true, cta: 'Copilot으로 분석하기',
+      body: '아래 VOC를 분석해라.\n\n1. VOC 유형을 4개 중 하나로 분류\n   - 장애/오류 / 성능 / 개선 요청 / 문의·기타\n2. 세부 카테고리(22개 기준)로 분류\n3. 모호하면 "기타 + 검토필요"로 표시\n\n[출력 형식]\n- 유형:\n- 세부:\n- 심각도:',
+      preview: ['유형: 장애/오류', '세부: 앱/웹 기능오류', '심각도: High'],
+    },
+    {
+      key: 'msg', n: 2, role: '대응', title: '고객 메시지 생성', purpose: '고객 안내 메시지 초안', cta: '메시지 생성',
+      body: '아래 VOC를 기반으로 고객 안내 메시지를 작성해라.\n\n- 사실 기반\n- 오해 방지 중심\n- 간결하게 작성\n- 개인정보 포함 금지\n\n[출력]\n- 고객 안내 메시지:',
+      preview: ['고객 안내 메시지: 불편을 드려 죄송합니다. 해당 오류는 확인되어 순차 정상화 중이며, 앱 최신 버전 업데이트 후 재시도를 부탁드립니다.'],
+    },
+    {
+      key: 'imp', n: 3, role: '개선', title: '개선 요청 생성', purpose: 'UX/개발 개선 과제화', cta: '개선 요청 정리',
+      body: '아래 VOC를 기반으로 UX/개선 요청으로 정리해라.\n\n[포함 항목]\n- 문제 정의\n- 영향 범위\n- 개선 제안\n- 우선순위',
+      preview: ['문제 정의: 특정 단계에서 기능 오류 반복', '영향 범위: 동일 유형 VOC 다수', '개선 제안: 예외 처리 · 안내 보강', '우선순위: High'],
+    },
+    {
+      key: 'mail', n: 4, role: '공유', title: '담당자 메일', purpose: '담당 조직 공유 메일', cta: '메일 작성',
+      body: 'High VOC를 담당 조직에 공유할 메일을 작성해라.\n\n[포함]\n- VOC 요약\n- 고객 영향\n- 개선 필요 사항\n- 요청 액션',
+      preview: ['수신: 담당 조직', '제목: [High] 앱 기능오류 공유', '본문: VOC 요약 · 고객 영향 · 개선 필요 · 요청 액션 포함'],
+    },
+    {
+      key: 'rpt', n: 5, role: '요약', title: '인사이트 리포트', purpose: '경영 보고용 요약', cta: '리포트 생성',
+      body: 'VOC 데이터를 기반으로 리포트를 생성해라.\n\n[포함]\n- 유형 분포\n- 주요 문제\n- 개선 우선순위\n- 기대 효과',
+      preview: ['유형 분포 · 주요 문제 · 개선 우선순위 · 기대 효과를 표/비율로 요약'],
+    },
   ]
   const copy = (t) => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => notify.toast('프롬프트 복사됨')).catch(() => notify.toast('복사 실패')); else notify.toast('복사 불가') }
+  const run = (st) => { setShown((s) => ({ ...s, [st.key]: true })); notify.toast(`Copilot이 ${st.title} 결과를 생성했어요 (데모)`) }
   return (
     <div className="screen">
-      <PageHead title="Copilot 프롬프트" sub="현업자가 Copilot AI로 VOC 분류·액션 생성을 재현할 수 있는 프롬프트입니다." />
-      <div className="prompt-grid">{prompts.map((pr) => <div key={pr.t} className="prompt-card"><div className="pc-title">{pr.t}</div><div className="pc-purpose">{pr.p}</div><pre className="pc-body">{pr.body}</pre><div className="pc-actions"><button className="btn btn-ghost sm" onClick={() => copy(pr.body)}>복사</button><button className="btn btn-primary sm" onClick={() => notify.modal('Copilot에서 실행', '실제 적용 시 사내 Copilot 또는 Copilot Studio Agent로 연결됩니다.')}>Copilot에서 실행</button></div></div>)}</div>
+      <PageHead title="Copilot 프롬프트" sub="5개 프롬프트는 따로 도는 게 아니라, 하나의 Copilot 워크플로우로 이어집니다." />
+      <div className="pipe-strip">{steps.map((st, i, a) => (
+        <React.Fragment key={st.key}><span className={'pipe-step' + (i === 0 ? ' on' : '')}>{st.n} {st.role}</span>{i < a.length - 1 && <span className="pipe-ar">→</span>}</React.Fragment>
+      ))}</div>
+      <div className="prompt-grid">{steps.map((st) => (
+        <div key={st.key} className={'prompt-card' + (st.core ? ' pc-core' : '')}>
+          <div className="pc-head">
+            <span className="pc-num">{st.n}</span>
+            <span className="pc-title">{st.title}{st.core && <span className="pc-core-badge">핵심</span>}</span>
+            <span className="pc-role">{st.role}</span>
+          </div>
+          <div className="pc-purpose">{st.purpose}</div>
+          <pre className="pc-body">{st.body}</pre>
+          {shown[st.key] && (
+            <div className="pc-preview">
+              <div className="pc-pv-l"><span className="ai-spark">✦</span> 결과 미리보기 <span className="muted" style={{ fontWeight: 400 }}>· 데모</span></div>
+              <ul className="pc-pv-list">{st.preview.map((l, i) => <li key={i}>{l}</li>)}</ul>
+            </div>
+          )}
+          <div className="pc-actions">
+            <button className="btn btn-ghost sm" onClick={() => copy(st.body)}>복사</button>
+            <button className="btn btn-primary sm" onClick={() => run(st)}>{st.cta}</button>
+          </div>
+        </div>
+      ))}</div>
+      <p className="micro">사내 네트워크 정책상 데모에서는 실제 Copilot 호출 대신 예시 결과를 보여줍니다. 실제 적용 시 사내 Copilot / Copilot Studio Agent로 연결됩니다.</p>
     </div>
   )
 }
