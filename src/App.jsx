@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 
 /* ============================================================
    U+ VOC Action Copilot — 공모전 MVP (정적 프로토타입 · React)
@@ -285,24 +285,30 @@ function enrichRow(r, id) {
    파생 결과 전체가 아니라 입력 원본(채널·내용·실번호·일자·주차)만 저장하고,
    불러올 때 enrichRow로 다시 분류·생성한다. 용량을 줄이고, 분류기 개선 시 자동 반영. */
 const LS_KEY = 'voc-action-copilot:added:v1'
+// 압축 레코드 → 보강 레코드 (localStorage·seed.json 공통)
+function hydrate(recs) {
+  if (!Array.isArray(recs)) return []
+  return recs.map((r) => {
+    const e = enrichRow({ channel: r.c, content: r.t, customer: r.n, date: r.d, week: r.w, occur: r.o }, r.id)
+    return { ...e, status: r.s || e.status, owner: r.ow || e.owner, jiraUrl: r.j || '', ownerNote: r.on || '' }
+  })
+}
+// 보강 레코드 → 압축 레코드 (저장·내보내기 공통)
+function toCompact(arr) {
+  return (arr || []).map((v) => ({ id: v.id, c: v.channel, t: v.content, n: v.customerRaw || '', d: v.date || '', w: v.week || '', o: v.occur || '', s: v.status, ow: v.owner, j: v.jiraUrl || '', on: v.ownerNote || '' }))
+}
 function loadAdded() {
   try {
     const raw = typeof localStorage !== 'undefined' && localStorage.getItem(LS_KEY)
     if (!raw) return []
-    const recs = JSON.parse(raw)
-    if (!Array.isArray(recs)) return []
-    return recs.map((r) => {
-      const e = enrichRow({ channel: r.c, content: r.t, customer: r.n, date: r.d, week: r.w, occur: r.o }, r.id)
-      return { ...e, status: r.s || e.status, owner: r.ow || e.owner, jiraUrl: r.j || '', ownerNote: r.on || '' }
-    })
+    return hydrate(JSON.parse(raw))
   } catch { return [] }
 }
 function saveAdded(arr) {
   try {
     if (typeof localStorage === 'undefined') return true
     if (!arr.length) { localStorage.removeItem(LS_KEY); return true }
-    const recs = arr.map((v) => ({ id: v.id, c: v.channel, t: v.content, n: v.customerRaw || '', d: v.date || '', w: v.week || '', o: v.occur || '', s: v.status, ow: v.owner, j: v.jiraUrl || '', on: v.ownerNote || '' }))
-    localStorage.setItem(LS_KEY, JSON.stringify(recs))
+    localStorage.setItem(LS_KEY, JSON.stringify(toCompact(arr)))
     return true
   } catch { return false } // 저장 한도 초과 등
 }
@@ -674,6 +680,28 @@ function VOCInbox({ openCase, notify, added, setAdded }) {
     setAdded([...vs, ...added]); setSeq(seq + vs.length); setResult(vs[0]); setPaste('')
     notify.toast(`${vs.length}건 분류·추가됨`)
   }
+  const exportSeed = () => {
+    const data = JSON.stringify(toCompact(added))
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'seed.json'; document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+    notify.toast(`${added.length.toLocaleString()}건을 seed.json으로 내보냈어요 — public/seed.json에 넣고 배포하세요`)
+  }
+  const importSeed = (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return
+    const rd = new FileReader()
+    rd.onload = () => {
+      try {
+        const recs = JSON.parse(String(rd.result))
+        if (!Array.isArray(recs)) throw new Error('형식 오류')
+        const hy = hydrate(recs); setAdded(hy)
+        setSeq(hy.reduce((m, v) => { const n = parseInt(String(v.id).replace(/\D/g, ''), 10); return n > m ? n : m }, 0) + 1)
+        setResult(null); notify.toast(`${recs.length.toLocaleString()}건을 불러왔어요`)
+      } catch { notify.toast('JSON을 읽지 못했어요 — 내보낸 seed.json 형식이어야 합니다') }
+    }
+    rd.readAsText(f); e.target.value = ''
+  }
   return (
     <div className="screen">
       <PageHead title="VOC 수집·입력" sub="채널 수집 + 화면 직접 입력 → Copilot이 4그룹·22분류·대응영역·초안까지 자동 생성 (담당자 검수 후 처리)" />
@@ -711,6 +739,14 @@ function VOCInbox({ openCase, notify, added, setAdded }) {
         <div className="ip-actions">
           <button className="btn btn-primary" onClick={addPaste}>붙여넣기 분류·추가</button>
           <button className="btn btn-ghost" onClick={() => setPaste('')}>지우기</button>
+        </div>
+      </div>
+      <div className="panel input-panel">
+        <div className="ip-head">전체 공유 (배포본에 데이터 싣기) <span className="ip-note">입력 데이터는 이 브라우저에만 저장됩니다. 다른 사람도 같은 데이터를 보게 하려면 ① <b>내보내기</b>로 seed.json을 받아 ② 프로젝트의 <b>public/seed.json</b>에 넣고 배포(git push)하세요. 배포 후에는 로그인한 누구나(저장 데이터가 없는 브라우저) seed.json을 자동으로 불러옵니다.</span></div>
+        <div className="ip-actions">
+          <button className="btn btn-primary" onClick={exportSeed} disabled={!added.length}>현재 데이터 내보내기 (seed.json)</button>
+          <label className="btn btn-ghost file-btn">JSON 불러오기<input type="file" accept="application/json,.json" onChange={importSeed} /></label>
+          <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건</span>
         </div>
       </div>
       <div className="filters">
@@ -1744,9 +1780,21 @@ export default function App() {
   const [selected, setSelected] = useState([]) // 체크박스로 선택한 케이스 id (대시보드 ↔ Agent 패널 공유)
   const [added, setAdded] = useState(loadAdded) // 입력/붙여넣은 VOC — localStorage에 저장되어 재접속 시 복원됨
   const [sentLog, setSentLog] = useState(loadSent)
+  const seededRef = useRef(false)
+  // 공유 기본 데이터: 내 localStorage가 비어 있으면 배포본의 seed.json을 로드 → 로그인한 누구나 동일 데이터 확인
+  useEffect(() => {
+    if (added.length) return
+    let cancelled = false
+    fetch(`${import.meta.env.BASE_URL}seed.json`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((recs) => { if (!cancelled && Array.isArray(recs) && recs.length) { seededRef.current = true; setAdded(hydrate(recs)) } })
+      .catch(() => { })
+    return () => { cancelled = true }
+  }, []) // 최초 1회
   useEffect(() => { saveSent(sentLog) }, [sentLog])
   const addSent = (e) => setSentLog((l) => [{ id: 'S' + Date.now(), date: new Date().toLocaleString('ko-KR'), ...e }, ...l])
   useEffect(() => {
+    if (seededRef.current) { seededRef.current = false; return } // 공유 seed 로드분은 저장하지 않음(개인 입력만 저장)
     const ok = saveAdded(added)
     if (!ok && added.length) setToast('브라우저 저장 한도를 초과해 일부가 저장되지 않았을 수 있습니다')
   }, [added])

@@ -877,3 +877,7 @@ h1,h2{margin:0}
 .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .menu-cell{background:#fff;border:1px solid var(--line);border-radius:11px;padding:14px 16px;text-align:left;font:600 13px var(--sans);color:var(--ink);cursor:pointer;transition:.15s}
 .menu-cell:hover{border-color:var(--magenta);color:var(--magenta-d);box-shadow:var(--shadow-sm)}
+
+/* 파일 불러오기 버튼 + 공유 패널 */
+.file-btn{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.file-btn input[type=file]{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
