@@ -613,6 +613,29 @@ h1,h2{margin:0}
 .portal-top{height:56px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff}
 .pt-right{display:flex;align-items:center;gap:12px}
 .portal-body{flex:1;overflow:auto}
+/* 홈: 풀하이트 셸 (메인 스크롤 + 우측 AI 독) — AI peak 레퍼런스 */
+.portal-body.home-body{overflow:hidden;padding:0}
+.home-shell{display:flex;height:100%;min-height:0}
+.home-scroll{flex:1;min-width:0;overflow-y:auto;padding:24px}
+.home-inner{max-width:1080px;margin:0 auto}
+.home-dock{width:386px;flex-shrink:0;border-left:1px solid var(--line);background:#fff;display:flex;flex-direction:column;min-height:0}
+.dock-head{height:56px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 18px;border-bottom:1px solid var(--line)}
+.dock-head b{font:700 14px var(--sans);color:var(--ink)}
+.dock-spark{color:var(--magenta);font-size:13px}
+.dock-date{margin-left:auto;font-size:11.5px;color:var(--faint)}
+.dock-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:13px}
+.dock-body h3{font:800 18px var(--sans);letter-spacing:-.02em;margin:0;color:var(--ink)}
+.dock-body::-webkit-scrollbar,.home-scroll::-webkit-scrollbar,.aiw-main::-webkit-scrollbar,.aiw-side::-webkit-scrollbar{width:8px}
+.dock-body::-webkit-scrollbar-thumb,.home-scroll::-webkit-scrollbar-thumb,.aiw-main::-webkit-scrollbar-thumb,.aiw-side::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+@media(max-width:980px){
+  .portal-body.home-body{overflow:auto}
+  .home-shell,.home-ai-work{flex-direction:column;height:auto;min-height:0}
+  .home-scroll{overflow:visible;padding:16px}
+  .home-dock{width:auto;border-left:0;border-top:1px solid var(--line)}
+  .dock-body{overflow:visible}
+  .aiw-side{width:auto;border-right:0;border-bottom:1px solid var(--line);overflow:visible}
+  .aiw-main{overflow:visible}
+}
 .portal-screen{max-width:1180px}
 .demo-banner{background:var(--magenta-soft);color:var(--magenta-d);border-radius:10px;padding:9px 14px;font-size:12.5px;margin-bottom:14px}
 
@@ -780,18 +803,23 @@ h1,h2{margin:0}
 .ai-expand:hover{border-color:var(--magenta);color:var(--magenta-d)}
 .ai-expand .ex-ic{font-size:13px}
 
-.home-ai-work{display:grid;grid-template-columns:336px minmax(0,1fr);gap:20px;align-items:start}
-@media(max-width:1000px){.home-ai-work{grid-template-columns:minmax(0,1fr)}}
-.aiw-side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.home-ai-work{display:flex;height:100%;min-height:0}
+.aiw-side{width:340px;flex-shrink:0;border-right:1px solid var(--line);background:var(--bg);overflow-y:auto;padding:22px 18px;display:flex;flex-direction:column;gap:16px;min-width:0}
 .aiw-side .hcard{margin:0}
-.aiw-main{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;min-width:0}
-.aiw-band{background:linear-gradient(120deg,#fbe6f2 0%,#ede9fb 52%,#e4f0fb 100%);padding:15px 22px;display:flex;align-items:center;gap:13px}
+.aiw-main{flex:1;min-width:0;overflow-y:auto;background:var(--surface)}
+.aiw-band{background:linear-gradient(120deg,#fbe6f2 0%,#ede9fb 52%,#e4f0fb 100%);padding:15px 26px;display:flex;align-items:center;gap:13px}
 .ai-toggle{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:3px}
 .ai-toggle button{border:0;background:none;padding:6px 15px;border-radius:8px;font:700 12.5px var(--sans);color:var(--muted);transition:.12s;display:inline-flex;align-items:center;gap:4px}
 .ai-toggle button.on{background:var(--ink);color:#fff}
 .ai-toggle button:not(.on):hover{color:var(--ink)}
 .aiw-sub{font-size:12.5px;color:var(--slate);font-weight:600}
-.aiw-body{padding:24px 26px 26px;display:flex;flex-direction:column;gap:18px}
+.aiw-body{padding:24px 26px 30px;display:flex;flex-direction:column;gap:18px;max-width:1040px;margin:0 auto;width:100%}
+@media(max-width:980px){
+  .home-ai-work{flex-direction:column;height:auto}
+  .aiw-side{width:auto;border-right:0;border-bottom:1px solid var(--line);overflow:visible}
+  .aiw-main{overflow:visible}
+  .aiw-body{padding:16px}
+}
 .aiw-hero{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0 2px}
 .aiw-spark{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--magenta-soft);color:var(--magenta-d);font-size:19px}
 .aiw-hero h2{font:800 25px var(--sans);letter-spacing:-.03em;color:var(--ink);margin:0}

@@ -1398,30 +1398,32 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
     </div>
   )
 
-  // 홈(컴팩트) 우측 패널 — 이미지1
+  // 홈: 우측 풀하이트 AI 독 — 이미지1
   const aiPanel = (
-    <aside className="home-ai compact">
-      <div className="ai-badge">✦ VOC Copilot</div>
-      <h3>무엇을 도와드릴까요?</h3>
-      <div className="brief-l">todo 브리핑</div>
-      <div className="brief-box">{(brief.slice(0, 4)).map((b, i) => (
-        <div key={i} className="brief-item"><span className="b-t">{b.t}</span><span className={'imp ' + b.imp}>{b.imp === 'hi' ? '중요도 높음' : '중요도 보통'}</span></div>
-      ))}</div>
-      <div className="chips">
-        <button className="chip-btn" onClick={() => goAgent('trends')}>이상 징후 요약</button>
-        <button className="chip-btn" onClick={() => goAgent('detail')}>처리 필요 정리</button>
-        <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위</button>
-      </div>
-      <div className="ai-input">
-        <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
-        <input placeholder="VOC 관련 무엇이든 물어보세요" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
-        <div className="ai-i-bot">
-          <div className="ai-i-tools"><span onClick={() => askDemo('리서치')}>⌕ 리서치</span><span onClick={() => askDemo('툴')}>✎ 툴</span></div>
-          <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.ai-input').querySelector('input'))}>↑</button>
+    <aside className="home-dock">
+      <div className="dock-head"><span className="dock-spark">✦</span><b>VOC Copilot</b><span className="dock-date">오늘의 브리핑</span></div>
+      <div className="dock-body">
+        <h3>무엇을 도와드릴까요?</h3>
+        <div className="brief-l">todo 브리핑</div>
+        <div className="brief-box">{(brief.slice(0, 4)).map((b, i) => (
+          <div key={i} className="brief-item"><span className="b-t">{b.t}</span><span className={'imp ' + b.imp}>{b.imp === 'hi' ? '중요도 높음' : '중요도 보통'}</span></div>
+        ))}</div>
+        <div className="chips">
+          <button className="chip-btn" onClick={() => goAgent('trends')}>이상 징후 요약</button>
+          <button className="chip-btn" onClick={() => goAgent('detail')}>처리 필요 정리</button>
+          <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위</button>
         </div>
+        <div className="ai-input">
+          <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
+          <input placeholder="VOC 관련 무엇이든 물어보세요" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
+          <div className="ai-i-bot">
+            <div className="ai-i-tools"><span onClick={() => askDemo('리서치')}>⌕ 리서치</span><span onClick={() => askDemo('툴')}>✎ 툴</span></div>
+            <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.ai-input').querySelector('input'))}>↑</button>
+          </div>
+        </div>
+        <button className="ai-expand-link" onClick={() => setAiMode && setAiMode(true)}>AI 워크스페이스 펼치기 <span className="ex-ic">⤢</span></button>
+        <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다.</p>
       </div>
-      <button className="ai-expand-link" onClick={() => setAiMode && setAiMode(true)}>AI 워크스페이스 펼치기 <span className="ex-ic">⤢</span></button>
-      <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다.</p>
     </aside>
   )
 
@@ -1461,33 +1463,25 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
     </div>
   )
 
-  if (aiMode) return (
-    <div className="portal-screen home-wide">
-      {aiWorkspace}
-    </div>
-  )
+  if (aiMode) return aiWorkspace
 
   return (
-    <div className="portal-screen home-wide">
-      <div className="home-head">
-        <h1>안녕하세요, <b>{name}</b> 님<span className="dot">.</span></h1>
-        <p>Simply U+로 더 나은 VOC 운영을 만들어요 · 오늘의 현황과 처리할 일을 한 곳에서.</p>
-      </div>
+    <div className="home-shell">
+      <section className="home-scroll">
+        <div className="home-inner">
+          <div className="home-head">
+            <h1>안녕하세요, <b>{name}</b> 님<span className="dot">.</span></h1>
+            <p>Simply U+로 더 나은 VOC 운영을 만들어요 · 오늘의 현황과 처리할 일을 한 곳에서.</p>
+          </div>
 
-      {total === 0 ? (
-        <div className="home2">
-          <div className="home-cols">
-            <div className="hcard">
+          {total === 0 ? (
+            <div className="hcard empty-home">
               <CardHead title="VOC 현황" sub="아직 데이터 없음" />
               <div className="empty-mini">수집된 VOC가 아직 없어요. <b>VOC 수집·입력</b>에서 직접 입력하거나 엑셀을 붙여넣으면 이상 감지·증상 유형·처리 현황이 자동으로 집계됩니다.</div>
               <div className="ai-acts"><button className="ai-pill-btn primary" onClick={() => goAgent('inbox')}>VOC 입력하러 가기</button><button className="ai-pill-btn" onClick={() => setRail('grid')}>전체메뉴</button></div>
             </div>
-          </div>
-          {aiPanel}
-        </div>
-      ) : (
-        <div className="home2">
-          <div className="home-cols">
+          ) : (
+            <div className="home-cols">
 
             {/* 핵심 카드 — 펼침 사이드와 공유 */}
             {cardAgent}
@@ -1587,9 +1581,10 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
             </div>
 
           </div>
-          {aiPanel}
+          )}
         </div>
-      )}
+      </section>
+      {aiPanel}
     </div>
   )
 }
@@ -1807,15 +1802,18 @@ export default function App() {
               <span className="ai-pill">● 통합 업무 · 데모</span>
             </div>
           </header>
-          <main className="portal-body">
-            <div className="content">
-              {railView === 'home' && <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} openCase={openCase} notify={notify} aiMode={homeAi} setAiMode={setHomeAi} />}
-              {railView === 'mail' && <MailApp sentLog={sentLog} />}
-              {railView === 'cal' && <CalendarApp />}
-              {railView === 'org' && <OrgApp />}
-              {railView === 'pay' && <ApprovalApp notify={notify} />}
-              {railView === 'grid' && <AllMenu goAgent={goAgent} setRail={setRail} notify={notify} />}
-            </div>
+          <main className={'portal-body' + (railView === 'home' ? ' home-body' : '')}>
+            {railView === 'home' ? (
+              <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} openCase={openCase} notify={notify} aiMode={homeAi} setAiMode={setHomeAi} />
+            ) : (
+              <div className="content">
+                {railView === 'mail' && <MailApp sentLog={sentLog} />}
+                {railView === 'cal' && <CalendarApp />}
+                {railView === 'org' && <OrgApp />}
+                {railView === 'pay' && <ApprovalApp notify={notify} />}
+                {railView === 'grid' && <AllMenu goAgent={goAgent} setRail={setRail} notify={notify} />}
+              </div>
+            )}
           </main>
         </div>
       )}
