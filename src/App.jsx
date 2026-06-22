@@ -1179,118 +1179,65 @@ function FlowMap() {
   )
 }
 function Architecture() {
-  const Box = ({ t, d }) => <div className="fc-box"><b>{t}</b>{d && <span>{d}</span>}</div>
-  const Arrow = () => <span className="fc-arrow" aria-hidden="true" />
-  const intake = [
-    { t: '채널 수집', d: '상담콜 · 메달리아 · U+one 앱 · 홈페이지' },
-    { t: '데이터 전처리', d: 'STT · 개인정보 마스킹' },
-    { t: '자동 분류 · 분석', d: '4그룹·22개 표준분류 라벨링 · 우선순위화' },
-    { t: '피드백 · 처리결과 학습', d: '분류 정확도 개선에 반영' },
+  const [open, setOpen] = useState(null)
+  const flow = ['VOC 발생', 'Copilot 분석', '고객 대응 생성', '개선 과제 도출', '리포트 생성']
+  const roles = [
+    { t: '분석', d: '유형 · 심각도 자동 분류' },
+    { t: '대응', d: '문자 · 메일 초안 생성' },
+    { t: '개선', d: '개선 과제 도출' },
+    { t: '리포트', d: '현황 · 인사이트 요약' },
   ]
-  const operate = [
-    { t: 'VOC 관리 대시보드', d: '유형·영역별 발생 추이 · 처리현황 · 담당자' },
-    { t: '분석 · 개선 인사이트 도출', d: '개선과제 → 서비스 반영' },
-    { t: '담당자 알림 + 예상 해결안 안내', d: '케이스별 처리 가이드' },
-    { t: '고객 안내', d: '문자 · 푸시 · 메일 초안' },
-    { t: '서비스 반영', d: '근본 원인 개선' },
+  const steps = [
+    { t: 'Step 1 · 고객 접점', items: ['VOC 발생 (상담콜 · 앱 · 홈페이지)', '셀프 가이드로 사전 해결 시도', '미해결 건만 상담 연결'] },
+    { t: 'Step 2 · 수집 · 분류', items: ['채널 수집 · 전처리 (STT · 마스킹)', 'Copilot 자동 분류 (4그룹 · 22개)', '감성 · 긴급도 우선순위화'] },
+    { t: 'Step 3 · 운영 · 개선', items: ['대시보드로 추이 · 처리현황 확인', '담당자 알림 + 예상 답안 안내', '개선 과제 → 서비스 반영'] },
+  ]
+  const effects = [
+    { t: '상담 Call 감소', d: '셀프 해결로 인입 감소' },
+    { t: 'VOC 감소', d: '근본 원인 개선' },
+    { t: '분류 자동화', d: '수기 태깅 제거' },
+    { t: '대응 속도 향상', d: '실시간 처리' },
   ]
   return (
     <div className="screen">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">솔루션 구조 (TO-BE)</h1>
-          <p className="page-sub">Copilot 데이터 파이프라인 + 두 개의 엔진으로 수집·분류부터 셀프 해결·예방까지 자동화.</p>
-        </div>
-      </div>
+      <div className="page-head"><div>
+        <h1 className="page-title">솔루션 구조 (TO-BE)</h1>
+        <p className="page-sub">VOC 자동 분류 → 개선안 도출까지, Copilot이 전체 흐름을 자동 수행합니다.</p>
+      </div></div>
 
-      <div className="pipe-strip">{['데이터 수집', '정제 · 비식별화', '임베딩 · 자동 분류', '개선 인사이트', '셀프 가이드'].map((s, i, a) => (
-        <React.Fragment key={s}><span className={'pipe-step' + (i >= 2 ? ' on' : '')}>{s}</span>{i < a.length - 1 && <span className="pipe-ar">→</span>}</React.Fragment>
+      <h2 className="sec-title">핵심 Flow</h2>
+      <div className="pipe-strip">{flow.map((s, i, a) => (
+        <React.Fragment key={s}><span className={'pipe-step' + (i >= 1 && i <= 3 ? ' on' : '')}>{s}</span>{i < a.length - 1 && <span className="pipe-ar">→</span>}</React.Fragment>
       ))}</div>
-      <div className="eng-grid">
-        <div className="panel eng-card">
-          <div className="eng-h">엔진 ① <b>VOC 분류 · 분석 에이전트</b></div>
-          <ul className="eng-list">{['유형·발생영역 다중 라벨 자동 분류', '감성·긴급도 스코어링으로 우선순위화', '영역별 개선 과제를 원인·액션과 함께 자동 제안', '실시간 트렌드·발생영역 히트맵 대시보드 제공'].map((t) => <li key={t}>{t}</li>)}</ul>
-        </div>
-        <div className="panel eng-card eng-2">
-          <div className="eng-h">엔진 ② <b>고객 셀프 해결 가이드 에이전트</b></div>
-          <ul className="eng-list">{['상담 인입콜 STT(정답 데이터) 학습', '자주 묻는 VOC를 셀프 해결 시나리오로 변환', '접수 전 단계에서 고객 맞춤 가이드 노출', '미해결 건만 정제해 상담사 연결'].map((t) => <li key={t}>{t}</li>)}</ul>
-        </div>
-      </div>
 
-      <h2 className="sec-title">처리 흐름 (Flow Chart)</h2>
-      <FlowMap />
+      <h2 className="sec-title">Copilot 역할</h2>
+      <div className="effect-row">{roles.map((r) => <div key={r.t} className="effect-card"><div className="effect-t">{r.t}</div><div className="effect-d">{r.d}</div></div>)}</div>
 
-      <h2 className="sec-title">단계별 상세 <span className="sec-note">3개 레인 · 수집부터 반영까지</span></h2>
-      <div className="flowchart">
-        <div className="fc-lane">
-          <div className="fc-lane-h"><span className="n">1</span>고객 접점 · 셀프 해결</div>
-          <Box t="VOC 발생" />
-          <Arrow />
-          <div className="fc-decision"><span className="fc-dtag">분기</span><span className="fc-dia">◆</span>셀프 가이드로 해결 가능?</div>
-          <div className="fc-branch">
-            <div className="fc-leg">
-              <span className="fc-yes">예</span>
-              <Box t="고객 셀프 해결 · 사전 예방" d="접수 전 맞춤 가이드 제공" />
-              <Arrow />
-              <div className="fc-pill end">END · 인입콜 · VOC 감소</div>
-            </div>
-            <div className="fc-leg">
-              <span className="fc-no">아니오</span>
-              <Box t="상담 연결 · VOC 접수" d="미해결 건만 상담사에 전달" />
-              <Arrow />
-              <div className="fc-next">↳ 레인 2 수집으로 유입</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="fc-lane">
-          <div className="fc-lane-h"><span className="n">2</span>수집 · 자동 분류</div>
-          {intake.map((s, i) => <React.Fragment key={s.t}><Box t={s.t} d={s.d} />{i < intake.length - 1 && <Arrow />}</React.Fragment>)}
-          <div className="fc-loop">⟲ 학습 결과는 자동 분류 모델로 되먹임 (피드백 루프)</div>
-        </div>
-
-        <div className="fc-lane">
-          <div className="fc-lane-h"><span className="n">3</span>운영 · 서비스 반영</div>
-          {operate.map((s, i) => <React.Fragment key={s.t}><Box t={s.t} d={s.d} />{i < operate.length - 1 && <Arrow />}</React.Fragment>)}
-          <Arrow />
-          <div className="fc-pill end">END · 처리율 · 속도 향상</div>
-        </div>
-      </div>
-
-      <div className="note-box"><b>흐름 요약</b> — 고객 VOC는 먼저 <b>셀프 가이드</b>로 해결을 시도해 인입콜·VOC 자체를 줄이고(레인 1), 미해결 건만 상담 연결로 접수됩니다. 접수된 VOC는 <b>수집·전처리·자동 분류</b>(레인 2)를 거쳐 <b>대시보드·인사이트·담당자 알림·고객 안내·서비스 반영</b>(레인 3)으로 처리되며, 처리결과는 다시 분류 모델 학습으로 되먹임됩니다.</div>
-
-      <h2 className="sec-title">활용 배경 · 문제 인식 (AS-IS)</h2>
-      <div className="two-col">
-        <div className="panel">
-          <div className="card-title">현재 처리 프로세스</div>
-          <ol className="asis-steps">{[['인입 · 수집', '채널별 VOC를 개별 채널에서 수집'], ['전처리', '중복·오탈자 정리 · 개인정보 비식별화'], ['수기 분석 · 분류', '유형·발생영역을 담당자가 판단·태깅'], ['집계 · 리포팅', '엑셀 취합 후 정기 리포트 수작성'], ['개선', '①~④ 텀으로 개선 반영 지연']].map(([t, d], i) => <li key={t}><b>{t}</b> — {d}</li>)}</ol>
-        </div>
-        <div className="panel">
-          <div className="card-title">페인포인트 · 근본 원인</div>
-          <div className="pain-chips">{['일일 150~200건', '분류·태깅 수작업', 'Edge case 지식 단절'].map((p) => <span key={p} className="pain-chip">{p}</span>)}</div>
-          <ul className="asis-pain">{['수기 처리로 분류 기준 불명확', '전처리·태깅에 리소스 집중 → 개선 액션 후순위', '동일 유형 VOC·인입콜 반복으로 업무 가중', '분류·분석을 사람에 의존 + 사후 처리 중심 + 셀프 채널 부재'].map((t) => <li key={t}>{t}</li>)}</ul>
-        </div>
-      </div>
-
-      <h2 className="sec-title">Before / After</h2>
+      <h2 className="sec-title">문제 → 해결</h2>
       <div className="ba-grid">
-        <div className="panel ba-before"><div className="ba-tag">Before</div><ul className="ba-list">{['협력업체·사람이 VOC를 수작업 분류', '채널별로 흩어진 VOC를 수작업 취합', '상담사가 고객에게 다시 연락', '중요 이슈는 담당자가 별도로 판단', 'UX/개발 개선 과제 연결이 늦음', '상담 Call과 1:1 문의가 반복 발생'].map((b, i) => <li key={i}>{b}</li>)}</ul></div>
-        <div className="panel ba-after"><div className="ba-tag after">After</div><ul className="ba-list">{['수집된 VOC를 Copilot AI가 4그룹·22개 표준분류로 자동 분류', '대시보드에서 유형·심각도·담당조직·처리방식 확인', '셀프 가이드로 사전 해결 → 인입콜·VOC 감소', '중요 이슈는 담당자 메일·문자 초안 자동 생성', 'UX/개발 개선 필요 케이스는 개선 요청으로 정리', '분류–처리–결과까지 한 화면에서 관리'].map((a, i) => <li key={i}>{a}</li>)}</ul></div>
+        <div className="panel ba-before"><div className="ba-tag">AS-IS</div><ul className="ba-list"><li>수기 분류</li><li>중복 처리</li><li>대응 지연</li></ul></div>
+        <div className="panel ba-after"><div className="ba-tag after">TO-BE</div><ul className="ba-list"><li>Copilot 자동 분류</li><li>자동 메시지 생성</li><li>실시간 대응</li></ul></div>
       </div>
+
+      <h2 className="sec-title">상세 구조 <span className="sec-note">제목을 클릭하면 펼쳐집니다</span></h2>
+      <div className="sol-acc">{steps.map((st, i) => (
+        <div key={st.t} className={'sol-acc-item' + (open === i ? ' open' : '')}>
+          <button className="sol-acc-h" onClick={() => setOpen(open === i ? null : i)}><span>{st.t}</span><span className="sol-acc-x">{open === i ? '▲' : '▼'}</span></button>
+          {open === i && <ul className="sol-acc-b">{st.items.map((t) => <li key={t}>{t}</li>)}</ul>}
+        </div>
+      ))}</div>
 
       <h2 className="sec-title">기대 효과</h2>
-      <div className="effect-row">{[...EFFECTS, { t: '디지털 채널 고객불편 감소', d: '근본 원인 개선으로 재발 방지' }].map((e) => <div key={e.t} className="effect-card"><div className="effect-t">{e.t}</div><div className="effect-d">{e.d}</div></div>)}</div>
+      <div className="effect-row">{effects.map((e) => <div key={e.t} className="effect-card"><div className="effect-t">{e.t}</div><div className="effect-d">{e.d}</div></div>)}</div>
 
       <h2 className="sec-title">구현 로드맵</h2>
       <div className="roadmap">
-        <div className="rm-step rm-now"><div className="rm-t">PoC <span className="rm-badge">현재</span></div><div className="rm-d">핵심 분류·대시보드 프로토타입 동작</div></div>
+        <div className="rm-step rm-now"><div className="rm-t">PoC <span className="rm-badge">현재</span></div></div>
         <span className="rm-ar">→</span>
-        <div className="rm-step"><div className="rm-t">파일럿</div><div className="rm-d">실 VOC·STT 데이터로 정확도 고도화</div></div>
+        <div className="rm-step"><div className="rm-t">파일럿</div></div>
         <span className="rm-ar">→</span>
-        <div className="rm-step"><div className="rm-t">전사 확산</div><div className="rm-d">CX 전 영역·타 채널로 확대 적용</div></div>
+        <div className="rm-step"><div className="rm-t">전사 확산</div></div>
       </div>
-
-      <div className="note-box"><b>설계 메모</b> — 게이트(전문가 풀)로 정형/열림을 나눠 AI는 꼭 필요한 곳에만 쓰고, 생성–검증으로 사람이 마지막을 책임집니다. 현재 MVP는 입력·붙여넣은 데이터 기반이며, 향후 상담어드바이스·메달리아·앱스토어·고객센터 연동, 문자/메일 발송(담당자 검수 후), 개선 티켓 생성(고도화 단계 선택 적용)이 가능합니다.</div>
     </div>
   )
 }

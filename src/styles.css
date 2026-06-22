@@ -961,3 +961,13 @@ svg.ltrend path{cursor:pointer}
 .aiw-a-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
 .aiw-a-list li{font-size:13.5px;line-height:1.6;color:var(--ink)}
 .aiw-answer .ai-pill-btn{align-self:flex-start}
+
+/* ===== 솔루션 구조(TO-BE) 상세 토글 ===== */
+.sol-acc{display:flex;flex-direction:column;gap:10px}
+.sol-acc-item{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.sol-acc-item.open{border-color:var(--magenta)}
+.sol-acc-h{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border:0;background:none;cursor:pointer;font:700 14px var(--sans);color:var(--ink);text-align:left}
+.sol-acc-h:hover{background:var(--bg)}
+.sol-acc-x{color:var(--magenta-d);font-size:11px}
+.sol-acc-b{margin:0;padding:2px 18px 16px 34px;display:flex;flex-direction:column;gap:7px}
+.sol-acc-b li{font-size:13px;line-height:1.55;color:var(--slate);list-style:disc}
