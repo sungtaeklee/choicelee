@@ -132,10 +132,32 @@ function deriveSentiment(rawGroup, group, text) {
   if (/불만|짜증|항의|최악|화남|불편|왜/.test(v)) return 'Negative'
   return 'Neutral'
 }
+/* STT/전사 등 본문에서 고객 핵심문장 추출 → 예상답안 근거로 사용 */
+function extractKey(text) {
+  const raw = String(text || '').trim()
+  if (!raw) return ''
+  // 1) 전사에 '고객:'/'상담사:' 화자 표기가 있으면 고객 발화만 추림
+  const lines = raw.split(/\r?\n+/).map((l) => l.trim()).filter(Boolean)
+  let cust = lines.filter((l) => /^(고객|이용자|사용자|손님)\s*[:：]/.test(l)).map((l) => l.replace(/^[^:：]+[:：]\s*/, '').trim())
+  let cands = cust.length ? cust : lines.map((l) => l.replace(/^(상담사|상담원|고객|이용자|사용자)\s*[:：]\s*/, '').trim())
+  // 화자 표기가 없으면 문장 단위로 분해
+  if (cands.length <= 1) cands = raw.split(/(?<=[.!?。…])\s+|[\n·]/).map((s) => s.replace(/^(상담사|상담원|고객)\s*[:：]\s*/, '').trim())
+  cands = cands.filter((s) => s.length >= 4)
+  if (!cands.length) return raw.slice(0, 70)
+  const KW = ['안 돼', '안돼', '안되', '안 되', '안 됨', '오류', '에러', '끊', '느', '불가', '먹통', '튕', '풀림', '풀려', '로그인', '결제', '환불', '요금', '위약', '청구', '가입', '해지', '안 터', '터지', '지연', '중복', '백화', '버벅', '문의', '불편', '문제', '故', '안 나', '안나와']
+  const score = (s) => KW.reduce((n, k) => n + (s.includes(k) ? 1 : 0), 0)
+  cands.sort((a, b) => score(b) - score(a) || b.length - a.length)
+  return cands[0].replace(/\s+/g, ' ').slice(0, 90)
+}
 function deriveAction(group) {
   if (group === '장애/오류' || group === '성능') return { action: '개발 개선 검토', org: '개발' }
   if (group === '개선 요청/희망') return { action: 'UX 개선 검토', org: 'UX디자인' }
   return { action: '담당자 메일 전달', org: 'CX/운영' }
+}
+/* 조치 필요 = 처리 전 단계(신규·분류완료·처리필요)이면서, 분류 미확정(검토필요) 또는 우선순위 High */
+const PRE_DONE = ['신규', '분류 완료', '처리 필요']
+function actionNeeded(v) {
+  return PRE_DONE.includes(v.status) && (v.review || v.severity === 'High')
 }
 
 /* ---------- 빈 컬럼 자동 생성(채널+내용 → 검토용 초안) ----------
@@ -169,10 +191,12 @@ function catToArea(group, cat) {
 }
 function ownerForArea(area1) { return OWNER_BY_AREA[area1] || '미지정' }
 function devNeeded(group) { return (group === '장애/오류' || group === '성능' || group === '개선 요청/희망') ? 'Y' : 'N' }
-function draftAnswer(group, cat) {
-  if (group === '장애/오류' || group === '성능') return `불편을 드려 죄송합니다. 말씀하신 '${cat}' 증상은 담당 부서에서 원인을 확인하고 있으며, 확인되는 대로 신속히 안내드리겠습니다.`
-  if (group === '개선 요청/희망') return `소중한 의견 감사합니다. '${cat}' 관련 개선 의견을 담당 부서에 전달했으며 검토 후 반영을 추진하겠습니다.`
-  return `문의 주신 '${cat}' 관련 내용을 확인하여 정확한 사항을 안내드리겠습니다. 추가로 궁금한 점이 있으시면 언제든 말씀해 주세요.`
+function draftAnswer(group, cat, content) {
+  const key = extractKey(content)
+  const lead = key ? `말씀해주신 "${key}" 내용을 확인했습니다. ` : ''
+  if (group === '장애/오류' || group === '성능') return `${lead}불편을 드려 죄송합니다. 해당 '${cat}' 증상은 담당 부서에서 원인을 확인하고 있으며, 확인되는 대로 신속히 안내드리겠습니다.`
+  if (group === '개선 요청/희망') return `${lead}소중한 의견 감사합니다. '${cat}' 관련 개선 의견을 담당 부서에 전달했으며 검토 후 반영을 추진하겠습니다.`
+  return `${lead}문의 주신 '${cat}' 관련 사항을 확인하여 정확히 안내드리겠습니다. 추가로 궁금한 점이 있으시면 언제든 말씀해 주세요.`
 }
 
 /* ---------- PII 마스킹 (입력/붙여넣기 시점 · 전화·이메일·이름) ---------- */
@@ -257,7 +281,7 @@ function enrichRow(r, id) {
   const summary = aiSummarize(content)
   const [area1, area2] = catToArea(group, cat)
   const dev = devNeeded(group)
-  const answer = draftAnswer(group, cat)
+  const answer = draftAnswer(group, cat, content)
   const status = severity === 'High' ? '처리 필요' : '분류 완료'
   // 3) 액션 초안 라우팅: 고객 응대 채널이면 문자 초안, 정형/High면 담당 메일 초안
   const toCustomer = /call|고객센터|고객의소리/i.test(r.channel || '')
@@ -385,7 +409,7 @@ const RAIL_ICONS = {
 }
 const RailIcon = ({ d }) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 function IconRail({ account, onLogout, notify, railView, setRail }) {
-  const items = [['home', '홈'], ['grid', '전체메뉴'], ['mail', '메일'], ['cal', '일정'], ['org', '조직도'], ['pay', '결재']]
+  const items = [['home', '홈'], ['grid', '솔루션 설명'], ['mail', '메일'], ['org', '조직도']]
   return (
     <nav className="rail">
       <div className="rail-top">
@@ -404,7 +428,7 @@ function SubLNB({ screen, setScreen }) {
   const SECTIONS = [
     { label: '현황 · 분석', items: [['trends', '기간별·영역별 추이']] },
     { label: '수집 · 자동분류', items: [['inbox', 'VOC 수집·입력'], ['board', '분류 보드']] },
-    { label: '처리 · 개선', items: [['detail', '케이스 처리'], ['backlog', '개선 백로그'], ['insight', '인사이트 리포트']] },
+    { label: '처리 · 개선', items: [['detail', 'VOC 처리'], ['insight', '인사이트 리포트']] },
     { label: '셀프 해결 · 엔진②', items: [['selfguide', '셀프 해결 가이드']] },
   ]
   return (
@@ -613,6 +637,7 @@ function VOCTrends({ added }) {
   const data0 = added || []
   const [d1, setD1] = useState(''); const [d2, setD2] = useState('')
   const [q, setQ] = useState(''); const [fw, setFw] = useState('전체'); const [fa, setFa] = useState('전체')
+  const [sd1, setSd1] = useState(''); const [sd2, setSd2] = useState('')
   // 기간 필터(시작·종료일) — 전체 화면에 적용
   const data = useMemo(() => data0.filter((d) => {
     const dd = recDay(d); if (!d1 && !d2) return true; if (!dd) return false
@@ -650,7 +675,13 @@ function VOCTrends({ added }) {
     const max = Math.max(1, ...grid.flatMap((r) => r.cells))
     return { rows: grid, max }
   }, [data, weeks])
-  const results = data.filter((d) => (fw === '전체' || d.week === fw) && (fa === '전체' || d.area1 === fa) && (!q || (d.content || '').includes(q) || (d.summary || '').includes(q)))
+  const results = data.filter((d) => {
+    if (fw !== '전체' && d.week !== fw) return false
+    if (fa !== '전체' && d.area1 !== fa) return false
+    if (q && !((d.content || '').includes(q) || (d.summary || '').includes(q))) return false
+    if (sd1 || sd2) { const dd = recDay(d); if (!dd) return false; if (sd1 && dd < sd1) return false; if (sd2 && dd > sd2) return false }
+    return true
+  })
   if (!data0.length) return <div className="screen"><PageHead title="기간별·영역별 추이" sub="VOC구분·대응영역 추이와 원문 검색" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 입력하거나 붙여넣으면 추이·영역 피벗이 생성됩니다.</div></div>
   return (
     <div className="screen">
@@ -702,11 +733,15 @@ function VOCTrends({ added }) {
         <p className="micro">색이 진할수록 해당 주차·영역에 VOC가 집중됨을 의미합니다 (가장 진한 칸 = {heat.max}건).</p>
       </div>
       <div className="panel">
-        <div className="card-title">③ 기간·영역별 VOC 원문 검색</div>
+        <div className="card-title">③ 기간·영역별 VOC 원문 검색 <span className="muted">일자(시작~종료) · 주차 · 영역 · 키워드로 검색</span></div>
         <div className="search-row">
+          <label className="sr-date">일자 <input type="date" value={sd1} min={dayRange?.min} max={dayRange?.max} onChange={(e) => setSd1(e.target.value)} /></label>
+          <span className="df-sep">~</span>
+          <label className="sr-date"><input type="date" value={sd2} min={dayRange?.min} max={dayRange?.max} onChange={(e) => setSd2(e.target.value)} /></label>
           <select value={fw} onChange={(e) => setFw(e.target.value)}><option>전체</option>{weeks.map((w) => <option key={w}>{w}</option>)}</select>
           <select value={fa} onChange={(e) => setFa(e.target.value)}><option>전체</option>{AREA1_LIST.map((a) => <option key={a}>{a}</option>)}</select>
           <input placeholder="원문 키워드 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+          {(sd1 || sd2 || q || fw !== '전체' || fa !== '전체') && <button className="btn btn-ghost sm" onClick={() => { setSd1(''); setSd2(''); setQ(''); setFw('전체'); setFa('전체') }}>초기화</button>}
           <span className="muted nowrap">{results.length.toLocaleString()}건</span>
         </div>
         <div className="table-wrap"><table className="vtable">
@@ -801,7 +836,6 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
   const [channel, setChannel] = useState('고객의소리'); const [customer, setCustomer] = useState(''); const [text, setText] = useState('')
   const [vDate, setVDate] = useState(''); const [vWeek, setVWeek] = useState(''); const [vOccur, setVOccur] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [mode, setMode] = useState('text') // 'text' | 'call'(STT)
   const [showShared, setShowShared] = useState(false)
   const [result, setResult] = useState(null)
   const [seq, setSeq] = useState(() => added.reduce((m, v) => { const n = parseInt(String(v.id).replace(/\D/g, ''), 10); return n > m ? n : m }, 0) + 1)
@@ -850,35 +884,32 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
       <PageHead title="VOC 수집·입력" sub="채널 수집 + 화면 직접 입력 → Copilot이 4그룹·22분류·대응영역·초안까지 자동 생성 (담당자 검수 후 처리)" />
       {shared && (
         <div className="inbox-top">
-          <button className="btn btn-ghost sm" onClick={() => setShowShared((s) => !s)}>{showShared ? '▲ 공유 저장소 도구 닫기' : '⚙ 공유 저장소 도구 (데모)'}</button>
+          <button className="btn btn-ghost sm" onClick={() => setShowShared(true)}>⚙ 공유 저장소 도구 (데모)</button>
         </div>
       )}
       {shared && showShared && (
-        <div className="panel input-panel">
-          <div className="ip-head">공유 저장소 (실시간 누적) <span className="ip-note">입력·붙여넣은 VOC가 공유 저장소에 적재되어, 로그인한 모든 사용자 화면에 수 초 내 누적 표시됩니다. 공모전 데모 편의 기능이에요.</span></div>
-          <div className="ip-actions">
-            <button className="btn btn-ghost" onClick={seedShared}>공유 데이터에 샘플 시드 넣기</button>
-            <button className="btn btn-ghost danger" onClick={wipeShared}>공유 데이터 비우기</button>
-            <span className="up-summary">현재 <b>{added.length.toLocaleString()}</b>건 · 공유</span>
+        <div className="modal-overlay" onClick={() => setShowShared(false)}>
+          <div className="modal share-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head"><b>공유 저장소 도구 <span className="muted" style={{ fontWeight: 400 }}>· 공모전 데모용</span></b><button className="modal-x" aria-label="닫기" onClick={() => setShowShared(false)}>✕</button></div>
+            <p className="modal-note">입력·붙여넣은 VOC가 공유 저장소에 적재되어 로그인한 모든 사용자 화면에 수 초 내 누적 표시됩니다. 현재 <b>{added.length.toLocaleString()}</b>건 공유 중.</p>
+            <div className="ip-actions">
+              <button className="btn btn-ghost" onClick={() => { seedShared() }}>공유 데이터에 샘플 시드 넣기</button>
+              <button className="btn btn-ghost danger" onClick={() => { wipeShared() }}>공유 데이터 비우기</button>
+            </div>
           </div>
         </div>
       )}
       <div className="panel input-panel">
-        <div className="ip-head">VOC 직접 입력 → Copilot 분류·추가 <span className="ip-note">직접 입력하거나 엑셀을 붙여넣으면 VOC구분1/2·대응영역·요약·답변·개발대응·진행상황을 채워 목록에 추가 (데모: 키워드 기반 · 담당자 검수 후 처리)</span></div>
-        <div className="seg-toggle">
-          <button className={'seg' + (mode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>텍스트 VOC</button>
-          <button className={'seg' + (mode === 'call' ? ' on' : '')} onClick={() => { setMode('call'); setChannel('Call') }}>상담콜 · STT</button>
-        </div>
+        <div className="ip-head">VOC 직접 입력 → Copilot 분류·추가 <span className="ip-note">내용(또는 상담콜 STT 전사)을 붙여넣으면 VOC구분1/2·대응영역·요약·예상답안·개발대응·진행상황을 채워 목록에 추가 (데모: 키워드 기반 · 담당자 검수 후 처리)</span></div>
         <div className="input-grid">
-          <label className="in-field"><span>{mode === 'call' ? '콜 인입일자' : '인입일자'}</span><input className="in-text" placeholder="2026.03.01" value={vDate} onChange={(e) => setVDate(e.target.value)} /></label>
+          <label className="in-field"><span>인입일자</span><input className="in-text" placeholder="2026.03.01" value={vDate} onChange={(e) => setVDate(e.target.value)} /></label>
           <label className="in-field"><span>인입 채널</span><select className="flt" value={channel} onChange={(e) => setChannel(e.target.value)}>{INPUT_CHANNELS.map((c) => <option key={c}>{c}</option>)}</select></label>
           <label className="in-field"><span>고객번호 (선택)</span><input className="in-text" placeholder="010-1234-5678" value={customer} onChange={(e) => setCustomer(e.target.value)} /></label>
           <label className="in-field"><span>월 내 주차</span><input className="in-text" placeholder="02월4주차" value={vWeek} onChange={(e) => setVWeek(e.target.value)} /></label>
           <label className="in-field"><span>발생일자</span><input className="in-text" placeholder="2026.3.1" value={vOccur} onChange={(e) => setVOccur(e.target.value)} /></label>
         </div>
-        <label className="ta-label">{mode === 'call' ? 'STT 스크립트 (상담콜 전사)' : '내용'}{mode === 'call' && <span className="ta-req"> · 통화 전사 전체를 붙여넣으세요</span>}</label>
-        <textarea className="input-ta" rows={mode === 'call' ? 5 : 3} placeholder={mode === 'call' ? '상담콜 전사(STT)를 붙여넣으세요 — 예) 상담사: 무엇을 도와드릴까요? / 고객: 통화가 자주 끊기고 특정 지역에서 잘 안 터져요…' : '내용 — 예) 통화가 자주 끊기고 특정 지역에서 잘 안 터져요'} value={text} onChange={(e) => setText(e.target.value)} />
-        {mode === 'call' && <p className="micro">통화 전사 전체에서 핵심 VOC를 분류·요약합니다. 전화·이름 등 개인정보는 추가 시 자동 마스킹됩니다.</p>}
+        <label className="ta-label">내용 / 상담콜 STT 전사 <span className="ta-req">· 통화 전사를 붙여넣으면 핵심문장을 추출해 예상답안에 반영합니다</span></label>
+        <textarea className="input-ta" rows={4} placeholder="내용 또는 상담콜 전사(STT)를 붙여넣으세요 — 예) 고객: 로그인이 자꾸 풀리고 앱이 자꾸 튕겨요. 재설치해도 똑같아요." value={text} onChange={(e) => setText(e.target.value)} />
         <div className="ip-actions">
           <button className="btn btn-primary" onClick={addVoc}>Copilot 분류 후 추가</button>
           <button className="btn btn-ghost" onClick={() => { setText(''); setCustomer(''); setVDate(''); setVWeek(''); setVOccur(''); setResult(null) }}>초기화</button>
@@ -894,7 +925,7 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert, cle
             <div className="co-row"><span className="co-k">요약</span><span className="muted">{result.summary}</span></div>
             <div className="co-row"><span className="co-k">진행 / 개발</span><StatBadge v={result.status} /><span className="muted">개발 대응: {result.devNeeded}</span></div>
             <div className="co-row"><span className="co-k">신뢰 / 검토</span><ConfBadge v={result.conf} />{result.review && <span className="rev-y">검토필요 Y</span>}</div>
-            <div className="co-ans"><div className="co-ans-k">예상 답안 (고객 응대 초안)</div><div className="co-ans-v">{result.answer}</div></div>
+            <div className="co-ans"><div className="co-ans-k">예상 답안 (STT 핵심문장 반영 · 고객 응대 초안)</div><div className="co-ans-v">{result.answer}</div></div>
             <div className="co-ans"><div className="co-ans-k">예상 처리 방안</div><div className="co-ans-v">{result.action}{result.devNeeded === 'Y' ? ' · 개발 대응 필요' : ''} · 담당 {result.org}</div></div>
             <p className="micro">{result.id} 추가됨 — 표/보드에서 확인하고 행을 클릭하면 답변 초안 등 상세가 열립니다. (담당자 검수 후 처리)</p>
           </div>
@@ -982,7 +1013,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
 }
 
 /* ---------- [4] Case Detail ---------- */
-function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
+function CaseDetail({ caseId, notify, added, updateCases, addSent, openCase }) {
   const [showNum, setShowNum] = useState(false)
   const [own, setOwn] = useState(''); const [jira, setJira] = useState(''); const [note, setNote] = useState('')
   const [snd, setSnd] = useState({ kind: '문자', to: '', body: '' })
@@ -1004,9 +1035,23 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
   const catOpts = (g) => g === '단순 문의/불만/기타' ? CAT22 : (FIXED_DEPTH2[g] || CAT22)
   const withCur = (opts, cur) => (cur && !opts.includes(cur)) ? [cur, ...opts] : opts
   const setField = (patch) => updateCases && updateCases([c.id], patch)
+  const actList = (added || []).filter(actionNeeded)
   return (
     <div className="screen">
-      <PageHead title="케이스 처리" sub="분류 결과 확인 · 문자/메일 초안 · 처리 상태 관리" />
+      <PageHead title="VOC 처리" sub="분류 결과 확인 · 문자/메일 초안 · 처리 상태 관리" />
+      <div className="panel act-need">
+        <div className="ip-head">조치 필요 VOC <span className="ip-note">분류 미확정(검토필요) 또는 우선순위 High인데 아직 처리 전 단계 — 선택하면 아래에서 바로 처리합니다.</span></div>
+        {actList.length ? (
+          <div className="act-chips">{actList.slice(0, 12).map((v) => (
+            <button key={v.id} className={'act-chip' + (v.id === c.id ? ' on' : '')} onClick={() => openCase && openCase(v.id)} title={v.content}>
+              <span className="ac-id">{v.id}</span>
+              {v.severity === 'High' && <span className="ac-sev">High</span>}
+              {v.review && <span className="ac-rev">검토</span>}
+              <span className="ac-cat">{v.cat}</span>
+            </button>
+          ))}{actList.length > 12 && <span className="muted">외 {actList.length - 12}건</span>}</div>
+        ) : <p className="micro">현재 조치 필요 VOC가 없습니다. (검토필요 또는 High + 처리 전 단계)</p>}
+      </div>
       <div className="case-grid">
         <div className="case-main">
           <div className="panel">
@@ -1074,7 +1119,7 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent }) {
 }
 
 /* ---------- [5] Insight Report (실데이터 집계) ---------- */
-function InsightReport({ added }) {
+function InsightReport({ added, openCase }) {
   const data = added || []
   const dist = useMemo(() => {
     const m = {}; data.forEach((v) => { m[v.cat] = (m[v.cat] || 0) + 1 })
@@ -1084,20 +1129,61 @@ function InsightReport({ added }) {
   const groupSplit = useMemo(() => GROUPS.map((g) => ({ g, n: data.filter((v) => v.group === g).length })), [data])
   const maxPct = dist[0] ? dist[0].pct : 100
   const highList = data.filter((v) => v.severity === 'High')
-  // 데이터 기반 자동 인사이트: 빈도 상위 분류 + 개발 대응 필요 건
+  // 처리 완료 전 단계 VOC를 영역·유형으로 묶어 유사 VOC 그룹화 + 우선순위 (개선 백로그 통합)
+  const groups = useMemo(() => {
+    const pre = data.filter((v) => v.status !== '처리 완료')
+    const m = {}
+    pre.forEach((v) => {
+      const key = v.area1 + '||' + v.cat
+      const g = m[key] || (m[key] = { area1: v.area1, area2: v.area2, cat: v.cat, group: v.group, n: 0, high: 0, dev: 0, action: v.action, sampleId: '', sample: '' })
+      g.n++; if (v.severity === 'High') g.high++; if (v.devNeeded === 'Y') g.dev++
+      if (!g.sampleId) { g.sampleId = v.id; g.sample = v.summary || v.content }
+    })
+    return Object.values(m).map((g) => ({ ...g, score: g.high * 3 + g.n + (g.dev ? 2 : 0) })).sort((a, b) => b.score - a.score).slice(0, 12)
+  }, [data])
+  const pr = (i) => i < 3 ? 'P1' : i < 7 ? 'P2' : 'P3'
   const devCnt = data.filter((v) => v.devNeeded === 'Y').length
-  const insights = []
-  if (dist[0]) insights.push(`가장 많은 유형은 '${dist[0].k}' (${dist[0].n}건, ${dist[0].pct}%) — 우선 대응 검토`)
-  if (highList.length) insights.push(`High 리스크 ${highList.length}건 — 즉시 처리 우선순위`)
-  if (devCnt) insights.push(`개발 대응 필요 ${devCnt}건 — 개발/UX 개선 과제로 연계`)
   const reviewN = data.filter((v) => v.review).length
+  const insights = []
+  if (highList.length) insights.push(`High 리스크 ${highList.length}건 — 즉시 처리 우선순위`)
+  if (dist[0]) insights.push(`가장 많은 유형은 '${dist[0].k}' (${dist[0].n}건, ${dist[0].pct}%) — 우선 대응 검토`)
+  if (devCnt) insights.push(`개발 대응 필요 ${devCnt}건 — 개발/UX 개선 과제로 연계`)
   if (reviewN) insights.push(`검토필요 ${reviewN}건 — 담당자 분류 확인 필요`)
   if (data.length === 0) {
-    return <div className="screen"><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC Inbox</b>에서 VOC를 입력하거나 엑셀을 붙여넣으면 분포·인사이트가 생성됩니다.</div></div>
+    return <div className="screen"><PageHead title="인사이트 리포트" sub="High 리스크 · 유사 VOC 개선 우선순위 · 분포" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 입력하거나 엑셀을 붙여넣으면 리스크·개선 우선순위·분포가 생성됩니다.</div></div>
   }
   return (
     <div className="screen">
-      <PageHead title="인사이트 리포트" sub="표준분류·그룹 분포와 개선 인사이트" />
+      <PageHead title="인사이트 리포트" sub="High 리스크 이슈 · 유사 VOC 개선 우선순위 · 분포와 자동 인사이트를 한 곳에서" />
+      <div className="panel">
+        <div className="card-title">High 리스크 이슈 <span className="muted">즉시 처리 우선 · {highList.length.toLocaleString()}건 · 행 클릭 시 VOC 처리로 이동</span></div>
+        {highList.length ? (
+          <ul className="risk-list">{highList.slice(0, 15).map((v) => (
+            <li key={v.id} className="row-click" onClick={() => openCase && openCase(v.id)}><SevBadge v={v.severity} /> <span className="mono">{v.id}</span> <Tag>{v.cat}</Tag> {v.summary || v.content}</li>
+          ))}{highList.length > 15 && <li className="muted">외 {(highList.length - 15).toLocaleString()}건</li>}</ul>
+        ) : <p className="micro">현재 High 리스크 건이 없습니다.</p>}
+      </div>
+      <div className="panel">
+        <div className="card-title">유사 VOC 그룹 · 개선 우선순위 <span className="muted">처리 전 단계 VOC를 영역·유형으로 묶어 우선순위화 · 행 클릭 시 대표 케이스</span></div>
+        {groups.length ? (
+          <div className="table-wrap"><table className="vtable backlog">
+            <thead><tr><th>우선순위</th><th>대응영역</th><th>유형</th><th>건수</th><th>High</th><th>개발</th><th>제안 액션</th><th>대표 원문</th></tr></thead>
+            <tbody>{groups.map((m, i) => (
+              <tr key={m.area1 + m.cat} className="row-click" onClick={() => m.sampleId && openCase && openCase(m.sampleId)}>
+                <td><span className={'pr-badge pr-' + pr(i).toLowerCase()}>{pr(i)}</span></td>
+                <td className="nowrap muted">{m.area1} › {m.area2}</td>
+                <td className="nowrap"><GroupBadge v={m.group} /> <Tag>{m.cat}</Tag></td>
+                <td className="pv-num">{m.n.toLocaleString()}</td>
+                <td className="pv-num">{m.high || ''}</td>
+                <td className="pv-num">{m.dev ? 'Y' : ''}</td>
+                <td className="nowrap">{m.action}</td>
+                <td className="cell-content" title={m.sample}>{m.sample}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        ) : <p className="micro">처리 전 단계의 VOC가 없습니다.</p>}
+        <p className="micro">우선순위 = High 건수×3 + 건수 + 개발 가중치. 처리 완료 건은 제외됩니다. (실제 적용 시 Jira 백로그로 연계)</p>
+      </div>
       <div className="two-col">
         <div className="panel">
           <div className="card-title">표준분류 분포 <span className="muted">전체 {data.length.toLocaleString()}건</span></div>
@@ -1120,7 +1206,6 @@ function InsightReport({ added }) {
           ))}</div>
         </div>
       </div>
-      <div className="panel"><h2 className="sec-title">High 리스크 이슈</h2><ul className="risk-list">{highList.length ? highList.map((v) => <li key={v.id}><SevBadge v={v.severity} /> <span className="mono">{v.id}</span> {v.content}</li>) : <li className="muted">High 리스크 건이 없습니다.</li>}</ul></div>
       <h2 className="sec-title">자동 제안 인사이트</h2>
       <div className="card-row">{insights.map((t, i) => <div key={i} className="insight-card"><span className="insight-num">{i + 1}</span>{t}</div>)}</div>
       <h2 className="sec-title">기대효과</h2>
@@ -1355,33 +1440,40 @@ const SELF_GUIDE = {
 }
 const GUIDE_FALLBACK = ['앱을 최신 버전으로 업데이트', '캐시 삭제 후 재실행', '도움말 · FAQ에서 동일 증상 확인', '미해결 시 상담 연결']
 function SelfGuide({ added, notify }) {
-  const data = added || []
+  const data = (added || []).filter((v) => v.status !== '처리 완료') // 처리 전 단계 유사 VOC
   const total = data.length
-  const catMap = {}; data.forEach((v) => { catMap[v.cat] = (catMap[v.cat] || 0) + 1 })
-  const top = Object.entries(catMap).map(([cat, n]) => ({ cat, n })).sort((a, b) => b.n - a.n).slice(0, 8)
+  // 비슷한 VOC를 표준분류(cat)로 그룹화 + 대표 예상답안 매칭
+  const map = {}
+  data.forEach((v) => {
+    const m = map[v.cat] || (map[v.cat] = { cat: v.cat, group: v.group, n: 0, high: 0, answer: '', sampleId: '' })
+    m.n++; if (v.severity === 'High') m.high++
+    if (!m.answer) { m.answer = v.answer; m.sampleId = v.id }
+  })
+  const top = Object.values(map).sort((a, b) => b.n - a.n).slice(0, 8)
   const covered = top.filter((t) => SELF_GUIDE[t.cat]).reduce((s, t) => s + t.n, 0)
   const selfRate = total ? Math.round(covered / total * 100) : 0
   if (!total) return <div className="screen"><PageHead title="고객 셀프 해결 가이드" sub="엔진② · 접수 전 셀프 해결 시나리오" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 추가하면 자주 묻는 유형이 셀프 해결 가이드로 변환됩니다.</div></div>
   return (
     <div className="screen">
-      <PageHead title="고객 셀프 해결 가이드" sub="엔진② · 상담 인입콜 STT(정답 데이터) 학습 → 자주 묻는 VOC를 접수 전 셀프 해결 시나리오로 제공" />
+      <PageHead title="고객 셀프 해결 가이드" sub="엔진② · 처리 전 단계의 비슷한 VOC를 그룹화 → 자주 묻는 유형을 접수 전 셀프 해결 시나리오 + 예상답안으로 제공" />
       <div className="kpi-row">
-        <div className="kpi-card"><div className="kpi-l">자주 묻는 유형</div><div className="kpi-main"><span className="kpi-v">{top.length}</span><span className="kpi-chip">셀프 가이드화</span></div></div>
+        <div className="kpi-card"><div className="kpi-l">자주 묻는 유형(그룹)</div><div className="kpi-main"><span className="kpi-v">{top.length}</span><span className="kpi-chip">셀프 가이드화</span></div></div>
         <div className="kpi-card accent brand"><div className="kpi-l">셀프 가이드 커버율</div><div className="kpi-main"><span className="kpi-v">{selfRate}%</span><span className="kpi-chip brand">상위 유형 기준</span></div></div>
         <div className="kpi-card"><div className="kpi-l">예상 인입콜 감소</div><div className="kpi-main"><span className="kpi-v">{covered.toLocaleString()}</span><span className="kpi-chip">접수 전 자가 해결(데모)</span></div></div>
       </div>
-      <h2 className="sec-title">자주 묻는 VOC → 셀프 해결 시나리오 <span className="sec-note">빈도 상위 {top.length}개 유형</span></h2>
+      <h2 className="sec-title">자주 묻는 VOC → 셀프 해결 시나리오 <span className="sec-note">비슷한 VOC 그룹 상위 {top.length}개 · 예상답안 매칭</span></h2>
       <div className="guide-grid">{top.map((t) => {
         const steps = SELF_GUIDE[t.cat] || GUIDE_FALLBACK
         return (
           <div key={t.cat} className="guide-card">
-            <div className="guide-head"><span className="guide-cat">{t.cat}</span><span className="guide-freq">{t.n.toLocaleString()}건</span></div>
+            <div className="guide-head"><span className="guide-cat">{t.cat}</span><span className="guide-freq">{t.n.toLocaleString()}건{t.high ? ` · High ${t.high}` : ''}</span></div>
             <ol className="guide-steps">{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+            {t.answer && <div className="guide-ans"><div className="guide-ans-k">매칭 예상답안 (고객 응대 초안)</div><div className="guide-ans-v">{t.answer}</div></div>}
             <div className="guide-foot"><button className="btn btn-ghost sm" onClick={() => notify.toast('셀프 해결 완료 (데모) — 인입콜 1건 예방')}>해결됐어요</button><button className="btn btn-ghost sm" onClick={() => notify.toast('미해결 — 상담사 연결 (데모)')}>상담 연결</button></div>
           </div>
         )
       })}</div>
-      <div className="note-box"><b>엔진② 동작</b> — 상담 인입콜 STT(정답 데이터)를 학습해 자주 묻는 VOC를 셀프 해결 시나리오로 변환하고, 접수 전 단계에서 고객 맞춤 가이드를 노출합니다. <b>미해결 건만</b> 정제해 상담사에 연결하고, 처리결과는 분류 모델 학습으로 되먹임됩니다(피드백 루프).</div>
+      <div className="note-box"><b>엔진② 동작</b> — 처리 전 단계의 비슷한 VOC를 표준분류로 그룹화해 자주 묻는 유형을 셀프 해결 시나리오로 변환하고, 각 유형의 <b>예상답안</b>(VOC 처리의 응대 초안)과 매칭해 접수 전 단계에서 고객 맞춤 가이드를 노출합니다. <b>미해결 건만</b> 정제해 상담사에 연결하고, 처리결과는 분류 모델 학습으로 되먹임됩니다(피드백 루프).</div>
     </div>
   )
 }
@@ -1426,7 +1518,7 @@ function Backlog({ added, openCase }) {
 /* ---------- [발송 이력] 메일·문자 발송 이력 — 메일 앱에 임베드 ---------- */
 function SentLogTable({ sentLog }) {
   const log = sentLog || []
-  if (!log.length) return <div className="panel empty-panel">아직 발송 이력이 없습니다. <b>VOC Agent › 케이스 처리</b>에서 메일/문자를 발송(데모)하면 담당자·수신·내용·발송일이 여기에 기록됩니다.</div>
+  if (!log.length) return <div className="panel empty-panel">아직 발송 이력이 없습니다. <b>VOC Agent › VOC 처리</b>에서 메일/문자를 발송(데모)하면 담당자·수신·내용·발송일이 여기에 기록됩니다.</div>
   return (
     <div className="table-wrap"><table className="vtable">
       <thead><tr><th>발송일시</th><th>유형</th><th>담당자</th><th>수신</th><th>케이스</th><th>내용</th></tr></thead>
@@ -1438,7 +1530,7 @@ function SentLogTable({ sentLog }) {
 }
 
 /* ---------- 통합 홈(포털) + 업무 앱 (데모) ---------- */
-const PORTAL_TITLES = { home: '통합 홈', mail: '메일', cal: '일정', org: '조직도', pay: '결재', grid: '전체메뉴' }
+const PORTAL_TITLES = { home: '통합 홈', mail: '메일', cal: '일정', org: '조직도', pay: '결재', grid: '솔루션 설명' }
 const DemoBanner = ({ children }) => <div className="demo-banner">데모 화면 — {children} 실제 적용 시 사내 시스템과 연동됩니다.</div>
 /* ---------- 홈 공통: 섹션 헤더 · 시그니처 AI 제안 박스 ---------- */
 const Chev = () => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
@@ -1549,7 +1641,7 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
       a = { title: '개선 우선순위', lines: [
         '개선 후보는 대응영역 기준으로 모아 백로그에서 우선순위를 매길 수 있어요.',
         `상위 유형: ${topGroups.map((s) => `${s.label} ${s.value.toLocaleString()}건`).join(' · ') || '데이터 없음'}`,
-      ], act: { label: '개선 백로그 열기', onClick: () => goAgent('backlog') } }
+      ], act: { label: '인사이트 리포트 열기', onClick: () => goAgent('insight') } }
     } else if (has('처리', 'high', '하이', '급한', '우선', '리스크')) {
       a = { title: '처리 필요 정리', lines: [
         `처리 필요 ${todo.toLocaleString()}건 · High 리스크 ${high.toLocaleString()}건 · 처리 중 ${doing.toLocaleString()}건.`,
@@ -1678,7 +1770,7 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
         <div className="chips">
           <button className="chip-btn" onClick={() => goAgent('trends')}>이상 징후 요약</button>
           <button className="chip-btn" onClick={() => goAgent('detail')}>처리 필요 정리</button>
-          <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위</button>
+          <button className="chip-btn" onClick={() => goAgent('insight')}>개선 우선순위</button>
         </div>
         <div className="ai-input as-launch" role="button" tabIndex={0} onClick={() => setAiMode && setAiMode(true)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAiMode && setAiMode(true) } }}>
           <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
@@ -1753,7 +1845,7 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
             <div className="hcard empty-home">
               <CardHead title="VOC 현황" sub="아직 데이터 없음" />
               <div className="empty-mini">수집된 VOC가 아직 없어요. <b>VOC 수집·입력</b>에서 직접 입력하거나 엑셀을 붙여넣으면 이상 감지·증상 유형·처리 현황이 자동으로 집계됩니다.</div>
-              <div className="ai-acts"><button className="ai-pill-btn primary" onClick={() => goAgent('inbox')}>VOC 입력하러 가기</button><button className="ai-pill-btn" onClick={() => setRail('grid')}>전체메뉴</button></div>
+              <div className="ai-acts"><button className="ai-pill-btn primary" onClick={() => goAgent('inbox')}>VOC 입력하러 가기</button><button className="ai-pill-btn" onClick={() => setRail('grid')}>솔루션 설명</button></div>
             </div>
           ) : (
             <div className="home-cols">
@@ -1822,19 +1914,19 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
                 ))}</ul>
               </div>
               <div className="sub-block">
-                <div className="sub-l">개선 백로그 후보 (대응영역)</div>
+                <div className="sub-l">개선 우선순위 후보 (대응영역)</div>
                 <ul className="mini-list">{topArea.map((it) => (
                   <li key={it.t}><span className="mini-t">{it.t}</span><span className="mini-n">{it.n.toLocaleString()}건</span></li>
                 ))}</ul>
               </div>
-              <div className="ai-acts"><button className="ai-pill-btn" onClick={() => goAgent('selfguide')}>셀프 가이드</button><button className="ai-pill-btn" onClick={() => goAgent('backlog')}>개선 백로그</button></div>
+              <div className="ai-acts"><button className="ai-pill-btn" onClick={() => goAgent('selfguide')}>셀프 가이드</button><button className="ai-pill-btn" onClick={() => goAgent('insight')}>인사이트 리포트</button></div>
             </div>
 
             {/* 즐겨찾는 메뉴 */}
             <div className="hcard">
               <CardHead title="즐겨찾는 메뉴" onMore={() => setRail('grid')} />
               <div className="fav-grid">
-                {[['inbox', 'VOC 입력'], ['board', '분류 보드'], ['trends', '추이'], ['detail', '케이스 처리'], ['insight', '인사이트'], ['selfguide', '셀프 가이드']].map(([k, l]) => (
+                {[['inbox', 'VOC 입력'], ['board', '분류 보드'], ['trends', '추이'], ['detail', 'VOC 처리'], ['insight', '인사이트'], ['selfguide', '셀프 가이드']].map(([k, l]) => (
                   <button key={k} className="fav-cell" onClick={() => goAgent(k)}>{l}</button>
                 ))}
               </div>
@@ -1843,16 +1935,12 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
 
             {/* 오늘의 업무 (포털 데모) */}
             <div className="hcard">
-              <CardHead title="오늘의 업무" sub="메일 · 일정 · 결재" />
+              <CardHead title="오늘의 업무" sub="메일 · 알림" />
               <div className="sub-block">
                 <div className="sub-l">메일</div>
                 <ul className="home-list">{[['VOC 주간 리포트 공유', 'CX기획팀 · 10:24'], ['앱스토어 평점 모니터링 알림', '운영봇 · 어제']].map(([t, m], i) => <li key={i}><span className="hl-t">{t}</span><span className="hl-m">{m}</span></li>)}</ul>
               </div>
-              <div className="sub-block">
-                <div className="sub-l">오늘 일정</div>
-                <ul className="home-list">{[['10:00', 'VOC 분류 기준 리뷰'], ['14:00', '개선 백로그 우선순위 회의']].map(([tm, t], i) => <li key={i}><span className="hl-time">{tm}</span><span className="hl-t">{t}</span></li>)}</ul>
-              </div>
-              <div className="ai-acts"><button className="ai-pill-btn" onClick={() => setRail('mail')}>메일</button><button className="ai-pill-btn" onClick={() => setRail('cal')}>일정</button><button className="ai-pill-btn" onClick={() => setRail('pay')}>결재</button></div>
+              <div className="ai-acts"><button className="ai-pill-btn" onClick={() => setRail('mail')}>메일</button><button className="ai-pill-btn" onClick={() => goAgent('insight')}>인사이트 리포트</button></div>
             </div>
 
           </div>
@@ -1916,32 +2004,15 @@ function ApprovalApp({ notify }) {
   )
 }
 function AllMenu({ goAgent, setRail, notify }) {
-  const [doc, setDoc] = useState(null) // null | 'architecture' | 'prompts'
-  const apps = [['home', '통합 홈'], ['mail', '메일'], ['cal', '일정'], ['org', '조직도'], ['pay', '결재']]
-  const agentScreens = [['trends', '기간별·영역별 추이'], ['inbox', 'VOC 수집·입력'], ['board', '분류 보드'], ['detail', '케이스 처리'], ['backlog', '개선 백로그'], ['insight', '인사이트 리포트'], ['selfguide', '셀프 해결 가이드']]
-  const docs = [['architecture', '솔루션 구조', 'AS-IS / TO-BE · 처리 흐름 · 로드맵'], ['prompts', 'Copilot 프롬프트', 'VOC 분류·액션 재현 프롬프트']]
-  if (doc) {
-    return (
-      <div className="screen portal-screen">
-        <button className="btn btn-ghost sm back-btn" onClick={() => setDoc(null)}>← 전체메뉴</button>
-        {doc === 'architecture' && <Architecture />}
-        {doc === 'prompts' && <PromptTemplates notify={notify} />}
-      </div>
-    )
-  }
+  const [doc, setDoc] = useState('architecture') // 'architecture' | 'prompts'
   return (
     <div className="screen portal-screen">
-      <PageHead title="전체메뉴" sub="업무 앱과 VOC Agent 메뉴 바로가기" />
-      <h2 className="sec-title">업무 앱</h2>
-      <div className="tile-row">{apps.map(([k, l]) => <button key={k} className="home-tile" onClick={() => setRail(k)}><span className="tile-ic"><RailIcon d={RAIL_ICONS[k]} /></span><span className="tile-l">{l}</span></button>)}</div>
-      <h2 className="sec-title">VOC Agent</h2>
-      <div className="menu-grid">{agentScreens.map(([k, l]) => <button key={k} className="menu-cell" onClick={() => goAgent(k)}>{l}</button>)}</div>
-      <h2 className="sec-title">설계 · 도구 <span className="sec-note">솔루션 구조와 Copilot 프롬프트는 여기에서 확인합니다</span></h2>
-      <div className="tile-row">{docs.map(([k, l, d]) => (
-        <button key={k} className="home-tile" onClick={() => setDoc(k)}>
-          <span className="tile-l">{l}</span><span className="tile-s">{d}</span>
-        </button>
-      ))}</div>
+      <div className="soldoc-tabs">
+        <button className={'soldoc-tab' + (doc === 'architecture' ? ' on' : '')} onClick={() => setDoc('architecture')}>솔루션 구조 (TO-BE)</button>
+        <button className={'soldoc-tab' + (doc === 'prompts' ? ' on' : '')} onClick={() => setDoc('prompts')}>Copilot 프롬프트</button>
+      </div>
+      {doc === 'architecture' && <Architecture />}
+      {doc === 'prompts' && <PromptTemplates notify={notify} />}
     </div>
   )
 }
@@ -2003,7 +2074,7 @@ const TITLES = {
   selfguide: ['셀프 해결 가이드', '엔진② · 접수 전 셀프 해결 시나리오'],
   inbox: ['VOC 수집·입력', '수집 VOC 목록 · 직접 입력 분류'],
   board: ['분류 보드', '4그룹 게이트 + 22개 표준분류'],
-  detail: ['케이스 처리', '케이스 분석 및 액션'],
+  detail: ['VOC 처리', '케이스 분석 및 액션'],
   insight: ['인사이트 리포트', '개선 인사이트와 기대효과'],
 }
 
@@ -2102,9 +2173,8 @@ export default function App() {
                     {screen === 'trends' && <VOCTrends added={added} />}
                     {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} clearShared={clearAll} />}
                     {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
-                    {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} />}
-                    {screen === 'insight' && <InsightReport added={added} />}
-                    {screen === 'backlog' && <Backlog added={added} openCase={openCase} />}
+                    {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} openCase={openCase} />}
+                    {screen === 'insight' && <InsightReport added={added} openCase={openCase} />}
                     {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
                   </div>
                 </main>

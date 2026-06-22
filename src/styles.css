@@ -998,3 +998,30 @@ svg.ltrend path{cursor:pointer}
 .ta-label{display:block;font:700 12.5px var(--sans);color:var(--ink);margin:2px 0 7px}
 .ta-label .ta-req{font-weight:400;color:var(--muted)}
 .inbox-top{display:flex;justify-content:flex-end;margin-bottom:10px}
+
+/* 조치 필요 VOC 선택 칩 (VOC 처리 상단) */
+.act-need{border-left:3px solid var(--magenta)}
+.act-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.act-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:#fff;cursor:pointer;font:600 12px var(--sans);color:var(--slate);transition:.12s;max-width:280px}
+.act-chip:hover{border-color:var(--magenta)}
+.act-chip.on{border-color:var(--ink);background:var(--bg);color:var(--ink)}
+.act-chip .ac-id{font-family:var(--mono,monospace);color:var(--muted);font-weight:700}
+.act-chip .ac-sev{background:#fde7ef;color:var(--magenta-d);border-radius:5px;padding:1px 6px;font-size:10.5px;font-weight:800}
+.act-chip .ac-rev{background:#fff3d6;color:#9a6a00;border-radius:5px;padding:1px 6px;font-size:10.5px;font-weight:800}
+.act-chip .ac-cat{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+/* 공유 저장소 도구 모달 */
+.share-modal{max-width:520px;width:92%}
+.share-modal .ip-actions{margin-top:6px}
+
+/* 셀프 가이드 — 매칭 예상답안 */
+.guide-ans{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+.guide-ans-k{font:700 11px var(--sans);color:var(--magenta-d);margin-bottom:4px}
+.guide-ans-v{font-size:12px;line-height:1.55;color:var(--slate)}
+/* 솔루션 설명 탭 */
+.soldoc-tabs{display:flex;gap:8px;margin-bottom:8px}
+.soldoc-tab{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 16px;font:700 13px var(--sans);color:var(--slate);cursor:pointer;transition:.12s}
+.soldoc-tab:hover{border-color:var(--magenta);color:var(--magenta-d)}
+.soldoc-tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+/* 원문 검색 일자 입력 */
+.sr-date{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--sans);color:var(--slate)}
+.sr-date input{font:inherit}
