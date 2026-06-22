@@ -203,10 +203,11 @@ function deriveAction(group) {
   if (group === '개선 요청/희망') return { action: 'UX 개선 검토', org: 'UX디자인' }
   return { action: '담당자 메일 전달', org: 'CX/운영' }
 }
-/* 조치 필요 = 처리 전 단계(신규·분류완료·처리필요)이면서, 분류 미확정(검토필요) 또는 우선순위 High */
+/* 조치 필요 = 처리 전 단계(신규·분류완료·처리필요)이면서, 분류 미확정(검토필요) 또는 우선순위 High.
+   단, '단순 문의/불만/기타'(열림 그룹)는 일상 문의라 조치 필요 리스트에서 제외 — 장애/성능/개선만 큐에 노출. */
 const PRE_DONE = ['신규', '분류 완료', '처리 필요']
 function actionNeeded(v) {
-  return PRE_DONE.includes(v.status) && (v.review || v.severity === 'High')
+  return v.group !== '단순 문의/불만/기타' && PRE_DONE.includes(v.status) && (v.review || v.severity === 'High')
 }
 
 /* ---------- 빈 컬럼 자동 생성(채널+내용 → 검토용 초안) ----------
@@ -1322,7 +1323,7 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent, openCase }) {
     <div className="screen">
       <PageHead title="VOC 처리" sub="분류 결과 확인 · 문자/메일 초안 · 처리 상태 관리" />
       <div className="panel act-need">
-        <div className="ip-head">조치 필요 VOC <span className="ip-note">분류 미확정(검토필요) 또는 우선순위 High인데 아직 처리 전 단계 — 선택하면 아래에서 바로 처리합니다.</span></div>
+        <div className="ip-head">조치 필요 VOC <span className="ip-note">장애/성능/개선 중 분류 미확정(검토필요) 또는 우선순위 High이면서 처리 전 단계 — 단순 문의/불만/기타는 제외됩니다. 선택하면 아래에서 바로 처리합니다.</span></div>
         {actList.length ? (
           <div className="act-chips">{actList.slice(0, 12).map((v) => (
             <button key={v.id} className={'act-chip' + (v.id === c.id ? ' on' : '')} onClick={() => openCase && openCase(v.id)} title={v.content}>
@@ -1332,7 +1333,7 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent, openCase }) {
               <span className="ac-cat">{v.cat}</span>
             </button>
           ))}{actList.length > 12 && <span className="muted">외 {actList.length - 12}건</span>}</div>
-        ) : <p className="micro">현재 조치 필요 VOC가 없습니다. (검토필요 또는 High + 처리 전 단계)</p>}
+        ) : <p className="micro">현재 조치 필요 VOC가 없습니다. (장애/성능/개선 중 검토필요 또는 High + 처리 전 단계 · 단순 문의/불만/기타 제외)</p>}
       </div>
       <div className="case-grid">
         <div className="case-main">
