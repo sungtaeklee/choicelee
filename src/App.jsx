@@ -1557,7 +1557,7 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
           <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
           <input readOnly placeholder="VOC 관련 무엇이든 물어보세요" onFocus={() => setAiMode && setAiMode(true)} />
           <div className="ai-i-bot">
-            <div className="ai-i-tools"><span>⌕ 리서치</span><span>✎ 툴</span></div>
+            <div className="ai-i-tools"><span /></div>
             <button className="ai-send" aria-label="AI 워크스페이스 열기">↑</button>
           </div>
         </div>
@@ -1585,7 +1585,7 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
             <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
             <input autoFocus placeholder="어떤 일이든 시작해보세요 — VOC 분류 · 추이 · 개선" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
             <div className="ai-i-bot">
-              <div className="ai-i-tools"><span onClick={() => askDemo('리서치')}>⌕ 리서치</span><span onClick={() => askDemo('툴')}>✎ 툴</span></div>
+              <div className="ai-i-tools"><span /></div>
               <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.aiw-inputbox').querySelector('input'))}>↑</button>
             </div>
           </div>
