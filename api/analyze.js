@@ -57,16 +57,32 @@ function buildUserPrompt({ content, channel, hintGroup, hintCat }) {
   return `인입 채널: ${channel || '미상'}\nVOC 원문:\n"""\n${content}\n"""${hint}`
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+/* 일시 오류(429/5xx·네트워크) 시 잠깐 쉬었다 재시도 — 무료 등급의 순간 과부하(503) 흡수 */
+async function fetchWithRetry(url, opts, label, retries = 1) {
+  let last
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let res
+    try { res = await fetch(url, opts) }
+    catch (e) { last = new Error(label + ' 네트워크 오류 ' + (e && e.message || e)); if (attempt < retries) { await sleep(1200 * (attempt + 1)); continue } throw last }
+    if (res.ok) return res
+    const status = res.status, text = (await res.text()).slice(0, 200)
+    last = new Error(label + ' ' + status + ' ' + text)
+    if ((status === 429 || status >= 500) && attempt < retries) { await sleep(1200 * (attempt + 1)); continue }
+    throw last
+  }
+  throw last
+}
+
 async function callAnthropic({ system, user, signal }) {
   const key = process.env.ANTHROPIC_API_KEY
   if (!key) throw new Error('ANTHROPIC_API_KEY 미설정')
   const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
     method: 'POST', signal,
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model, max_tokens: 1536, system, messages: [{ role: 'user', content: user }] }),
-  })
-  if (!res.ok) throw new Error('anthropic ' + res.status + ' ' + (await res.text()).slice(0, 200))
+  }, 'anthropic')
   const data = await res.json()
   return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n')
 }
@@ -76,15 +92,14 @@ async function callAzure({ system, user, signal }) {
   const dep = process.env.AZURE_OPENAI_DEPLOYMENT, ver = process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview'
   if (!ep || !key || !dep) throw new Error('Azure OpenAI 환경변수 미설정')
   const url = `${String(ep).replace(/\/$/, '')}/openai/deployments/${dep}/chat/completions?api-version=${ver}`
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST', signal,
     headers: { 'content-type': 'application/json', 'api-key': key },
     body: JSON.stringify({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       max_tokens: 1536, temperature: 0.2, response_format: { type: 'json_object' },
     }),
-  })
-  if (!res.ok) throw new Error('azure ' + res.status + ' ' + (await res.text()).slice(0, 200))
+  }, 'azure')
   const data = await res.json()
   return data.choices?.[0]?.message?.content || ''
 }
@@ -98,7 +113,7 @@ async function callOpenAICompat({ system, user, signal }) {
   const base = process.env.OPENAI_BASE_URL, key = process.env.OPENAI_API_KEY, model = process.env.OPENAI_MODEL
   if (!base || !key || !model) throw new Error('OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL 미설정')
   const url = `${String(base).replace(/\/$/, '')}/chat/completions`
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST', signal,
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
     body: JSON.stringify({
@@ -106,8 +121,7 @@ async function callOpenAICompat({ system, user, signal }) {
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     }),
-  })
-  if (!res.ok) throw new Error('openai-compat ' + res.status + ' ' + (await res.text()).slice(0, 200))
+  }, 'openai-compat')
   const data = await res.json()
   return data.choices?.[0]?.message?.content || ''
 }

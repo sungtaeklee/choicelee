@@ -519,6 +519,7 @@ function saveSent(l) { try { localStorage.setItem(LS_SENT, JSON.stringify((l || 
    브라우저 → 같은 도메인 함수 → 서버에서 LLM 호출(사내망 직접호출 차단 우회).
    결과는 케이스 id 기준 localStorage 캐시. 실패 시 호출부에서 휴리스틱으로 폴백. */
 const AI_URL = '/api/analyze'
+const AI_AUTO = true   // 케이스 상세를 열면 AI 분석을 자동 1회 실행(캐시). 끄려면 false.
 const AI_CACHE_KEY = 'voc-action-copilot:ai:v1'
 function aiCacheGet(id) { try { return (JSON.parse(localStorage.getItem(AI_CACHE_KEY) || '{}'))[id] || null } catch { return null } }
 function aiCacheSet(id, result) { try { const m = JSON.parse(localStorage.getItem(AI_CACHE_KEY) || '{}'); m[id] = result; localStorage.setItem(AI_CACHE_KEY, JSON.stringify(m)) } catch { } }
@@ -1283,13 +1284,15 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent, openCase }) {
     if (!c) return
     setOwn(c.owner || ''); setJira(c.jiraUrl || ''); setNote(c.ownerNote || '')
     setSnd({ kind: '문자', to: c.customerRaw || c.customer || '', body: c.sms || '' })
-    setAi(aiCacheGet(c.id)); setAiErr(''); setAiLoading(false)
+    const cached = aiCacheGet(c.id)
+    setAi(cached); setAiErr(''); setAiLoading(false)
+    if (!cached && AI_AUTO) runAI({ auto: true })   // 열면 자동 1회 — 기본 칸을 AI 결과로 채움
   }, [c && c.id])
-  const runAI = async () => {
+  const runAI = async (opts = {}) => {
     if (!c || aiLoading) return
     setAiLoading(true); setAiErr('')
-    try { const r = await analyzeCaseAI(c); setAi(r); aiCacheSet(c.id, r); notify.toast('AI 심층 분석 완료') }
-    catch (e) { setAiErr(String(e && e.message || e)); notify.toast('AI 분석 불가 — 휴리스틱 유지') }
+    try { const r = await analyzeCaseAI(c); setAi(r); aiCacheSet(c.id, r); if (!opts.auto) notify.toast('AI 분석 완료') }
+    catch (e) { if (!opts.auto) { setAiErr(String(e && e.message || e)); notify.toast('AI 분석 불가 — 휴리스틱 유지') } }  // 자동 실행 실패는 조용히 휴리스틱 유지
     finally { setAiLoading(false) }
   }
   const copy = (t, l) => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => notify.toast(l + ' 복사됨')).catch(() => notify.toast('복사 실패')); else notify.toast('복사 불가') }
@@ -1304,6 +1307,17 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent, openCase }) {
   const withCur = (opts, cur) => (cur && !opts.includes(cur)) ? [cur, ...opts] : opts
   const setField = (patch) => updateCases && updateCases([c.id], patch)
   const actList = (added || []).filter(actionNeeded)
+  // 표시값: AI 결과가 있으면 AI를, 없으면(또는 생성 중) 휴리스틱을 보여줌
+  const summaryShown = (ai && ai.summary) || c.summary
+  const answerShown = (ai && ai.customerReply) || c.answer
+  const analysisLines = ai ? [
+    `핵심 의도: ${ai.summary || summaryShown}`,
+    ai.rootCause ? `근본 원인: ${ai.rootCause}` : null,
+    `분류 제안: ${ai.group} › ${ai.cat}${ai.reason ? ` — ${ai.reason}` : ''}`,
+    `심각도/긴급도: ${ai.urgency} · 고객 감성 ${ai.sentiment}`,
+    `대응영역 ${c.area1} › ${c.area2} · 담당 ${c.org} · 개발대응 ${c.devNeeded} · 진행 ${c.status}`,
+  ].filter(Boolean) : c.analysis
+  const aiPill = aiLoading ? 'AI 분석 생성 중…' : (ai ? 'AI 생성 · 검수 필요' : '키워드 기반 · 검수 필요')
   return (
     <div className="screen">
       <PageHead title="VOC 처리" sub="분류 결과 확인 · 문자/메일 초안 · 처리 상태 관리" />
@@ -1346,30 +1360,18 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent, openCase }) {
               <div className="kv-i"><span className="kv-k">담당</span><span className="kv-v">{c.org}</span></div>
               <div className="kv-i"><span className="kv-k">개발 대응</span><span className="kv-v">{c.devNeeded || '-'}</span></div>
             </div>
-            {c.summary && <div className="block"><div className="block-label">AI 요약 초안</div><p className="voc-raw">{c.summary}</p></div>}
+            {summaryShown && <div className="block"><div className="block-label">AI 요약 초안 <span className="ai-tag soft">{aiLoading ? '생성 중…' : (ai && ai.summary ? 'AI' : '키워드')}</span></div><p className="voc-raw">{summaryShown}</p></div>}
             <div className="block"><div className="block-label">VOC 원문(내용)</div><Transcript text={c.content} /></div>
           </div>
-          <div className="panel ai-panel"><div className="ai-head">Copilot AI 분석 <span className="ai-tag">초안 · 담당자 검수 필요</span><button className="btn btn-ghost sm ai-run" onClick={runAI} disabled={aiLoading}>{aiLoading ? '분석 중…' : (ai ? 'AI 재분석' : 'AI 심층 분석')}</button></div>
-            <ul className="ai-list">{c.analysis.map((a, i) => <li key={i}>{a}</li>)}</ul>
-            <div className="ai-ans"><div className="ai-ans-k">예상 답안 (고객 응대 초안)</div><div className="ai-ans-v">{c.answer}</div></div>
+          <div className="panel ai-panel"><div className="ai-head">Copilot AI 분석 <span className="ai-tag">{aiPill}</span><button className="btn btn-ghost sm ai-run" onClick={() => runAI()} disabled={aiLoading}>{aiLoading ? '분석 중…' : (ai ? 'AI 재분석' : 'AI 분석 실행')}</button></div>
+            <ul className="ai-list">{analysisLines.map((a, i) => <li key={i}>{a}</li>)}</ul>
+            {ai && GROUPS.includes(ai.group) && (ai.group !== c.group || ai.cat !== c.cat) &&
+              <button className="btn btn-ghost sm" onClick={() => setField({ group: ai.group, cat: ai.cat })}>AI 제안 분류로 반영 ({ai.group} › {ai.cat})</button>}
+            <div className="ai-ans"><div className="ai-ans-k">예상 답안 (고객 응대 초안){ai && ai.customerReply ? ' · AI' : ''}</div><div className="ai-ans-v">{answerShown}</div>{ai && ai.customerReply && <button className="btn btn-ghost sm" onClick={() => copy(ai.customerReply, '응대 초안')}>복사</button>}</div>
+            {ai && ai.smsDraft && <div className="ai-ans"><div className="ai-ans-k">문자/푸시 초안 · AI</div><div className="ai-ans-v">{ai.smsDraft}</div><button className="btn btn-ghost sm" onClick={() => copy(ai.smsDraft, '문자 초안')}>복사</button></div>}
+            {ai && ai.nextActions && ai.nextActions.length > 0 && <div className="ai-ans"><div className="ai-ans-k">다음 액션 · AI</div><ul className="ai-list">{ai.nextActions.map((a, i) => <li key={i}>{a}</li>)}</ul></div>}
             <div className="ai-ans"><div className="ai-ans-k">예상 처리 방안</div><div className="ai-ans-v">{c.action}{c.devNeeded === 'Y' ? ' · 개발 대응 필요' : ''} · 담당 {c.org}</div></div>
-            {aiErr && <div className="ai-err">AI 심층 분석을 사용할 수 없습니다 ({aiErr}). 키워드 기반 분석을 유지합니다.</div>}
-            {ai && (
-              <div className="ai-deep">
-                <div className="ai-deep-h">AI 심층 분석 결과 <span className="ai-tag soft">LLM 생성 · 검수 필요</span></div>
-                <div className="ai-deep-grid">
-                  <div className="adk">핵심 의도</div><div className="adv">{ai.summary}</div>
-                  <div className="adk">근본 원인</div><div className="adv">{ai.rootCause}</div>
-                  <div className="adk">분류 제안</div><div className="adv">{ai.group} › {ai.cat} {ai.reason && <span className="muted">— {ai.reason}</span>}</div>
-                  <div className="adk">감성 · 긴급도</div><div className="adv">{ai.sentiment} · {ai.urgency}</div>
-                </div>
-                {(GROUPS.includes(ai.group) && (ai.group !== c.group || ai.cat !== c.cat)) &&
-                  <button className="btn btn-ghost sm" onClick={() => setField({ group: ai.group, cat: ai.cat })}>이 분류로 반영</button>}
-                {ai.customerReply && <div className="ai-ans"><div className="ai-ans-k">AI 응대 초안</div><div className="ai-ans-v">{ai.customerReply}</div><button className="btn btn-ghost sm" onClick={() => copy(ai.customerReply, 'AI 응대 초안')}>복사</button></div>}
-                {ai.smsDraft && <div className="ai-ans"><div className="ai-ans-k">AI 문자/푸시 초안</div><div className="ai-ans-v">{ai.smsDraft}</div><button className="btn btn-ghost sm" onClick={() => copy(ai.smsDraft, 'AI 문자 초안')}>복사</button></div>}
-                {ai.nextActions && ai.nextActions.length > 0 && <div className="ai-ans"><div className="ai-ans-k">다음 액션</div><ul className="ai-list">{ai.nextActions.map((a, i) => <li key={i}>{a}</li>)}</ul></div>}
-              </div>
-            )}
+            {aiErr && <div className="ai-err">AI 분석을 사용할 수 없습니다 ({aiErr}). 키워드 기반 분석을 유지합니다.</div>}
           </div>
           {c.sms && <div className="panel"><div className="block-label">고객 문자/푸시 초안</div><div className="draft">{c.sms}</div><button className="btn btn-ghost sm" onClick={() => copy(c.sms, '문자 초안')}>문자 초안 복사</button></div>}
           {c.mail && <div className="panel"><div className="block-label">담당자 메일 초안</div><div className="draft"><div className="mail-line"><b>수신</b> {c.mail.to}</div><div className="mail-line"><b>제목</b> {c.mail.subject}</div><div className="mail-body">{c.mail.body}</div></div><button className="btn btn-ghost sm" onClick={() => copy(`수신: ${c.mail.to}\n제목: ${c.mail.subject}\n\n${c.mail.body}`, '메일 초안')}>메일 초안 복사</button></div>}
