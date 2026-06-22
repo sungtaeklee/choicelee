@@ -1485,15 +1485,14 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
           <button className="chip-btn" onClick={() => goAgent('detail')}>처리 필요 정리</button>
           <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위</button>
         </div>
-        <div className="ai-input">
+        <div className="ai-input as-launch" role="button" tabIndex={0} onClick={() => setAiMode && setAiMode(true)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAiMode && setAiMode(true) } }}>
           <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
-          <input placeholder="VOC 관련 무엇이든 물어보세요" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
+          <input readOnly placeholder="VOC 관련 무엇이든 물어보세요" onFocus={() => setAiMode && setAiMode(true)} />
           <div className="ai-i-bot">
-            <div className="ai-i-tools"><span onClick={() => askDemo('리서치')}>⌕ 리서치</span><span onClick={() => askDemo('툴')}>✎ 툴</span></div>
-            <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.ai-input').querySelector('input'))}>↑</button>
+            <div className="ai-i-tools"><span>⌕ 리서치</span><span>✎ 툴</span></div>
+            <button className="ai-send" aria-label="AI 워크스페이스 열기">↑</button>
           </div>
         </div>
-        <button className="ai-expand-link" onClick={() => setAiMode && setAiMode(true)}>AI 워크스페이스 펼치기 <span className="ex-ic">⤢</span></button>
         <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다.</p>
       </div>
     </aside>
@@ -1516,7 +1515,7 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode
           </div>
           <div className="aiw-inputbox">
             <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
-            <input placeholder="어떤 일이든 시작해보세요 — VOC 분류 · 추이 · 개선" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
+            <input autoFocus placeholder="어떤 일이든 시작해보세요 — VOC 분류 · 추이 · 개선" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
             <div className="ai-i-bot">
               <div className="ai-i-tools"><span onClick={() => askDemo('리서치')}>⌕ 리서치</span><span onClick={() => askDemo('툴')}>✎ 툴</span></div>
               <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.aiw-inputbox').querySelector('input'))}>↑</button>

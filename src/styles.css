@@ -889,3 +889,9 @@ h1,h2{margin:0}
 .share-badge.sb-err{color:#b3261e;background:#fdecea;border-color:#f3c4c0}
 .btn.danger{color:#b3261e}
 .btn.danger:hover{border-color:#e0857f;background:#fdecea}
+
+/* 컴팩트 독 입력창 = AI 워크스페이스 진입 버튼 */
+.ai-input.as-launch{cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.ai-input.as-launch:hover{border-color:var(--magenta)}
+.ai-input.as-launch input{cursor:pointer;background:transparent;pointer-events:none}
+.ai-input.as-launch .ai-i-tools span{cursor:pointer}
