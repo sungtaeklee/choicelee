@@ -111,17 +111,23 @@ h1,h2{margin:0}
 .page-actions{display:flex;gap:9px;flex-shrink:0;padding-top:4px}
 
 /* ---------- KPI 카드 (레퍼런스: 큰 숫자 + 보조 칩) ---------- */
-.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:14px}
-.kpi-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
-.kpi-l{font-size:12.5px;color:var(--muted);font-weight:500}
-.kpi-main{display:flex;align-items:baseline;gap:10px;margin-top:12px;flex-wrap:wrap}
-.kpi-v{font:800 30px/1 var(--sans);letter-spacing:-.03em;color:var(--ink)}
-.kpi-card.accent .kpi-v{color:var(--magenta)}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.kpi-card{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm);overflow:hidden;transition:border-color .14s,box-shadow .14s,transform .14s}
+.kpi-card::before{content:"";position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--line-2)}
+.kpi-card:hover{box-shadow:var(--shadow);transform:translateY(-2px);border-color:#dde0e8}
+.kpi-l{font-size:12px;color:var(--muted);font-weight:600;line-height:1.4}
+.kpi-v{font:800 33px/1 var(--sans);letter-spacing:-.035em;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:13px;display:flex;align-items:baseline}
+.kpi-unit{font-size:15px;font-weight:700;letter-spacing:-.01em;margin-left:3px;opacity:.6}
+.kpi-chip{margin-top:auto;padding-top:14px;align-self:flex-start;font-size:11px;font-weight:600;line-height:1.5;white-space:nowrap;color:var(--muted)}
+.kpi-chip::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--faint);margin-right:6px;vertical-align:middle}
+.kpi-card.brand{background:linear-gradient(180deg,#fdf2f7,var(--surface) 72%);border-color:#f2d2e4}
+.kpi-card.accent::before,.kpi-card.brand::before{background:var(--magenta)}
+.kpi-card.accent .kpi-v,.kpi-card.brand .kpi-v{color:var(--magenta)}
+.kpi-card.warn::before{background:var(--high)}
 .kpi-card.warn .kpi-v{color:var(--high)}
-.kpi-chip{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:7px;background:var(--line-2);color:var(--muted);white-space:nowrap}
-.kpi-chip.up{background:var(--high-soft);color:var(--high)}
-.kpi-chip.down{background:var(--low-soft);color:var(--low)}
-.kpi-chip.brand{background:var(--magenta-soft);color:var(--magenta-d)}
+.kpi-chip.up{color:var(--high)}.kpi-chip.up::before{background:var(--high)}
+.kpi-chip.down{color:var(--low)}.kpi-chip.down::before{background:var(--low)}
+.kpi-chip.brand{color:var(--magenta-d)}.kpi-chip.brand::before{background:var(--magenta)}
 
 /* ---------- 가로 막대 (채널별 분포) ---------- */
 .hbars{display:flex;flex-direction:column;gap:11px}
@@ -957,9 +963,10 @@ table.sheet td input:focus{background:#fdeef6;box-shadow:inset 0 0 0 2px var(--m
 .lt-leg.clear{color:var(--magenta-d);border-color:var(--magenta)}
 .lt-dot{width:10px;height:10px;border-radius:50%;flex:none}
 .lt-scroll{overflow-x:auto;padding-bottom:6px}
-svg.ltrend{display:block}
-svg.ltrend path{cursor:pointer}
-.lt-axis{font:400 10.5px var(--sans);fill:var(--muted)}
+svg.ltrend{display:block;overflow:visible}
+svg.ltrend .lt-line{cursor:pointer;transition:opacity .15s,stroke-width .15s}
+svg.ltrend .lt-line:hover{opacity:1}
+.lt-axis{font:500 10.5px var(--sans);fill:var(--faint);font-variant-numeric:tabular-nums}
 
 /* ===== AI 워크스페이스 답변 카드 (키워드 응답) ===== */
 .aiw-answer{border:1px solid var(--line);border-radius:16px;padding:16px 18px;background:#fff;box-shadow:var(--shadow-sm);max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:10px}

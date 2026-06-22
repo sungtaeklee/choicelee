@@ -653,13 +653,25 @@ function MultiLine({ labels, series, sel, onSel, perPoint = 0 }) {
   const x = (i) => padL + (labels.length === 1 ? innerW / 2 : i / (labels.length - 1) * innerW)
   const y = (v) => padT + plotH - (v / maxV) * plotH
   const path = (vals) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+  const areaPath = (vals) => `${path(vals)} L${x(vals.length - 1).toFixed(1)} ${(padT + plotH).toFixed(1)} L${x(0).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`
+  const selSeries = sel ? series.find((s) => s.key === sel) : null
   const lblStep = Math.max(1, Math.ceil(labels.length / 12))
   return (
     <svg className="ltrend" viewBox={`0 0 ${W} ${H}`} width={perPoint ? W : '100%'} height={H} preserveAspectRatio="xMinYMin meet">
-      {[0, 0.5, 1].map((f, i) => { const yy = padT + plotH - f * plotH; return <g key={i}><line x1={padL} y1={yy} x2={W - padR} y2={yy} stroke="var(--line-2)" strokeWidth="1" /><text x={padL - 6} y={yy + 3} textAnchor="end" className="lt-axis">{Math.round(maxV * f)}</text></g> })}
+      {selSeries && (
+        <defs>
+          <linearGradient id="ltFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={selSeries.color} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={selSeries.color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+      )}
+      {[0, 0.25, 0.5, 0.75, 1].map((f, i) => { const yy = padT + plotH - f * plotH; return <line key={'g' + i} x1={padL} y1={yy} x2={W - padR} y2={yy} stroke="var(--line-2)" strokeWidth="1" strokeDasharray={f === 0 ? '0' : '3 4'} /> })}
+      {[0, 0.5, 1].map((f, i) => { const yy = padT + plotH - f * plotH; return <text key={'a' + i} x={padL - 8} y={yy + 3.5} textAnchor="end" className="lt-axis">{Math.round(maxV * f)}</text> })}
       {labels.map((l, i) => (i % lblStep === 0 || i === labels.length - 1) ? <text key={i} x={x(i)} y={H - 12} textAnchor="middle" className="lt-axis">{l}</text> : null)}
-      {series.map((s) => { const on = !sel || sel === s.key; return <path key={s.key} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={sel === s.key ? 3 : 1.8} opacity={on ? 1 : 0.1} strokeLinejoin="round" strokeLinecap="round" onClick={() => onSel && onSel(sel === s.key ? null : s.key)}><title>{s.label}</title></path> })}
-      {sel && series.filter((s) => s.key === sel).map((s) => s.values.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r="2.6" fill={s.color} />))}
+      {selSeries && <path d={areaPath(selSeries.values)} fill="url(#ltFill)" stroke="none" />}
+      {series.map((s) => { const on = !sel || sel === s.key; return <path key={s.key} className="lt-line" d={path(s.values)} fill="none" stroke={s.color} strokeWidth={sel === s.key ? 2.6 : 1.8} opacity={on ? 1 : 0.12} strokeLinejoin="round" strokeLinecap="round" onClick={() => onSel && onSel(sel === s.key ? null : s.key)}><title>{s.label}</title></path> })}
+      {selSeries && selSeries.values.map((v, i) => (i === selSeries.values.length - 1 || labels.length <= 16) ? <circle key={i} cx={x(i)} cy={y(v)} r={i === selSeries.values.length - 1 ? 3.4 : 2.3} fill="#fff" stroke={selSeries.color} strokeWidth="1.8" /> : null)}
     </svg>
   )
 }
@@ -790,15 +802,20 @@ function VOCTrends({ added }) {
 const DONUT_COLORS = ['#e6007e', '#9b3fd4', '#4f7cf6', '#1bb59a', '#f5a623', '#9aa3b2']
 function Donut({ segments, total, centerLabel }) {
   const sum = segments.reduce((a, s) => a + s.value, 0) || 1
-  const R = 52, C = 2 * Math.PI * R; let off = 0
+  const R = 52, C = 2 * Math.PI * R, GAP = 3; let off = 0
   return (
     <svg viewBox="0 0 140 140" className="donut" role="img">
       <g transform="translate(70,70) rotate(-90)">
-        <circle r={R} fill="none" stroke="var(--line-2)" strokeWidth="17" />
-        {segments.map((s, i) => { const len = s.value / sum * C; const seg = <circle key={i} r={R} fill="none" stroke={s.color} strokeWidth="17" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-off} />; off += len; return seg })}
+        <circle r={R} fill="none" stroke="var(--line-2)" strokeWidth="15" />
+        {segments.map((s, i) => {
+          const share = s.value / sum * C
+          const len = Math.max(0.5, share - (segments.length > 1 ? GAP : 0))
+          const seg = <circle key={i} r={R} fill="none" stroke={s.color} strokeWidth="15" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-off} />
+          off += share; return seg
+        })}
       </g>
-      <text x="70" y="66" textAnchor="middle" className="donut-num">{total.toLocaleString()}</text>
-      <text x="70" y="84" textAnchor="middle" className="donut-lbl">{centerLabel}</text>
+      <text x="70" y="65" textAnchor="middle" className="donut-num">{total.toLocaleString()}</text>
+      <text x="70" y="83" textAnchor="middle" className="donut-lbl">{centerLabel}</text>
     </svg>
   )
 }
@@ -1456,9 +1473,21 @@ function SelfGuide({ added, notify }) {
     <div className="screen">
       <PageHead title="고객 셀프 해결 가이드" sub="엔진② · 처리 전 단계의 비슷한 VOC를 그룹화 → 자주 묻는 유형을 접수 전 셀프 해결 시나리오 + 예상답안으로 제공" />
       <div className="kpi-row">
-        <div className="kpi-card"><div className="kpi-l">자주 묻는 유형(그룹)</div><div className="kpi-main"><span className="kpi-v">{top.length}</span><span className="kpi-chip">셀프 가이드화</span></div></div>
-        <div className="kpi-card accent brand"><div className="kpi-l">셀프 가이드 커버율</div><div className="kpi-main"><span className="kpi-v">{selfRate}%</span><span className="kpi-chip brand">상위 유형 기준</span></div></div>
-        <div className="kpi-card"><div className="kpi-l">예상 인입콜 감소</div><div className="kpi-main"><span className="kpi-v">{covered.toLocaleString()}</span><span className="kpi-chip">접수 전 자가 해결(데모)</span></div></div>
+        <div className="kpi-card">
+          <div className="kpi-l">자주 묻는 유형(그룹)</div>
+          <div className="kpi-v">{top.length}<span className="kpi-unit">개</span></div>
+          <span className="kpi-chip">셀프 가이드화</span>
+        </div>
+        <div className="kpi-card accent brand">
+          <div className="kpi-l">셀프 가이드 커버율</div>
+          <div className="kpi-v">{selfRate}<span className="kpi-unit">%</span></div>
+          <span className="kpi-chip brand">상위 유형 기준</span>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-l">예상 인입콜 감소</div>
+          <div className="kpi-v">{covered.toLocaleString()}<span className="kpi-unit">건</span></div>
+          <span className="kpi-chip">접수 전 자가 해결(데모)</span>
+        </div>
       </div>
       <h2 className="sec-title">자주 묻는 VOC → 셀프 해결 시나리오 <span className="sec-note">비슷한 VOC 그룹 상위 {top.length}개 · 예상답안 매칭</span></h2>
       <div className="guide-grid">{top.map((t) => {
