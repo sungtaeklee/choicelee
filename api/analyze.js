@@ -89,6 +89,28 @@ async function callAzure({ system, user, signal }) {
   return data.choices?.[0]?.message?.content || ''
 }
 
+/* 범용 OpenAI 호환 — 무료 제공자 다수 지원(코드 수정 없이 환경변수만):
+   Google Gemini  OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai  OPENAI_MODEL=gemini-2.5-flash
+   Groq           OPENAI_BASE_URL=https://api.groq.com/openai/v1                            OPENAI_MODEL=llama-3.3-70b-versatile
+   OpenRouter     OPENAI_BASE_URL=https://openrouter.ai/api/v1                              OPENAI_MODEL=google/gemini-flash-1.5:free
+   Cerebras       OPENAI_BASE_URL=https://api.cerebras.ai/v1                                OPENAI_MODEL=llama-3.3-70b */
+async function callOpenAICompat({ system, user, signal }) {
+  const base = process.env.OPENAI_BASE_URL, key = process.env.OPENAI_API_KEY, model = process.env.OPENAI_MODEL
+  if (!base || !key || !model) throw new Error('OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL 미설정')
+  const url = `${String(base).replace(/\/$/, '')}/chat/completions`
+  const res = await fetch(url, {
+    method: 'POST', signal,
+    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
+    body: JSON.stringify({
+      model, max_tokens: 1024, temperature: 0.2,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+    }),
+  })
+  if (!res.ok) throw new Error('openai-compat ' + res.status + ' ' + (await res.text()).slice(0, 200))
+  const data = await res.json()
+  return data.choices?.[0]?.message?.content || ''
+}
+
 function parseModelJson(text) {
   let t = String(text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
   const i = t.indexOf('{'), j = t.lastIndexOf('}')
@@ -126,7 +148,9 @@ export default async function handler(req, res) {
     try {
       raw = provider === 'azure'
         ? await callAzure({ system, user, signal: ctrl.signal })
-        : await callAnthropic({ system, user, signal: ctrl.signal })
+        : provider === 'openai'
+          ? await callOpenAICompat({ system, user, signal: ctrl.signal })
+          : await callAnthropic({ system, user, signal: ctrl.signal })
     } finally { clearTimeout(timer) }
 
     const result = parseModelJson(raw)
