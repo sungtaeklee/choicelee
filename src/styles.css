@@ -23,6 +23,11 @@ h1,h2{margin:0}
 .brand-mark{font-weight:800;font-size:16px;background:var(--magenta);color:#fff;border-radius:8px;padding:5px 8px;letter-spacing:-.02em}
 .brand-name{font-size:14px;line-height:1.25;color:#d7d7e0}
 .brand-name b{color:#fff;font-weight:700}
+.brand-mark.lg{font-size:18px;padding:7px 10px;border-radius:10px}
+.brand-lock{display:flex;flex-direction:column;line-height:1.12;min-width:0}
+.brand-svc{font-size:15px;font-weight:800;letter-spacing:.01em;color:var(--ink)}
+.brand-svc.lg{font-size:19px}
+.brand-desc{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px;letter-spacing:.01em}
 
 /* LNB (아이콘 레일) */
 .rail{width:62px;flex-shrink:0;background:#17151e;color:#9b99a8;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 0;height:100vh;z-index:20}
@@ -46,6 +51,7 @@ h1,h2{margin:0}
 .slnb-item.on{background:var(--magenta-soft);color:var(--magenta-d);font-weight:600}
 .slnb-pin{font-size:11.5px;color:var(--muted);padding:9px 10px;background:var(--bg);border-radius:9px;line-height:1.55}
 .slnb-foot{margin-top:auto;font-size:10.5px;color:var(--faint);line-height:1.6;padding:14px 8px 0;border-top:1px solid var(--line-2)}
+.slnb-foot b{color:var(--magenta-d);font-weight:700}
 
 /* workspace = Header + workbody (LNB(sub) 오른쪽 전체) */
 .workspace{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh}
@@ -400,7 +406,11 @@ h1,h2{margin:0}
 
 /* ---------- 로그인 / 가입 게이트 ---------- */
 .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(1200px 600px at 70% -10%, #ffe6f4 0%, transparent 55%), var(--bg)}
-.auth-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:28px 26px}
+.auth-card{width:100%;max-width:404px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:28px 26px}
+.auth-brandlock{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.auth-tagline{font-size:13px;line-height:1.55;color:var(--slate);margin:0 0 16px;padding-bottom:16px;border-bottom:1px solid var(--line-2)}
+.auth-slogan{font-size:12px;color:var(--muted);margin:16px 0 0;line-height:1.55}
+.auth-slogan b{color:var(--magenta-d);font-weight:700}
 .auth-brand{margin-bottom:6px}
 .auth-sub{color:var(--muted);font-size:13px;margin:2px 0 16px}
 .auth-tabs{display:flex;gap:6px;background:#f4f5f7;border-radius:11px;padding:4px;margin-bottom:16px}
@@ -412,6 +422,16 @@ h1,h2{margin:0}
 .auth-err{background:#fff0f2;border:1px solid #ffd0d8;color:#c11d3b;font-size:12.5px;border-radius:9px;padding:9px 11px;margin-bottom:12px}
 .auth-submit{width:100%;justify-content:center;margin-top:2px}
 .auth-note{color:var(--muted);font-size:11px;line-height:1.5;margin-top:14px}
+.voice-banner{position:relative;overflow:hidden;background:linear-gradient(135deg,#fdf0f7 0%,var(--surface) 70%);border:1px solid #f1d3e4;border-radius:var(--radius);padding:22px 24px;margin-bottom:20px}
+.vb-lock{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.vb-tag{font-size:14px;line-height:1.6;color:var(--slate);margin:0 0 18px;max-width:60ch}
+.vb-acro{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.vb-acro-i{display:flex;align-items:baseline;gap:8px;background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.vb-acro-k{font:800 18px/1 var(--sans);color:var(--magenta);flex:0 0 auto;width:18px}
+.vb-acro-i b{font-size:12.5px;font-weight:700;color:var(--ink);flex:0 0 auto}
+.vb-acro-i span{font-size:11.5px;color:var(--muted);line-height:1.4}
+.vb-slogan{font-size:13px;color:var(--slate);margin:0;padding-top:14px;border-top:1px solid var(--line-2)}
+.vb-slogan b{color:var(--magenta-d);font-weight:800}
 .side-acct{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line-2)}
 .side-acct-email{font-size:11px;color:var(--slate);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
 .side-logout{border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:11px;border-radius:7px;padding:4px 8px;cursor:pointer;flex:0 0 auto}

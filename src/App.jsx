@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { sharedEnabled, listAll, listSince, insertMany, clearAll } from './shared.js'
 
 /* ============================================================
-   U+ VOC Action Copilot — 공모전 MVP (정적 프로토타입 · React)
+   U+ VOICE · VOC Action Copilot — 공모전 MVP (정적 프로토타입 · React)
+   VOC Orchestration & Insight-driven CX Engine
    채널 수집 + 화면 직접 입력. 샘플은 하드코딩(입력분은 useState).
    분류표: depth1 4그룹(정형 3 + 열림 1) + 열림 그룹의 표준분류 22개.
    ============================================================ */
@@ -433,7 +434,7 @@ function SubLNB({ screen, setScreen }) {
   ]
   return (
     <aside className="sublnb">
-      <div className="slnb-brand"><span className="brand-mark">U+</span><span className="slnb-title">VOC Action <b>Copilot</b></span></div>
+      <div className="slnb-brand"><span className="brand-mark">U+</span><span className="brand-lock"><b className="brand-svc">VOICE</b><span className="brand-desc">VOC Action Copilot</span></span></div>
       {SECTIONS.map((sec) => (
         <React.Fragment key={sec.label}>
           <div className="slnb-sec-l">{sec.label}</div>
@@ -442,7 +443,7 @@ function SubLNB({ screen, setScreen }) {
       ))}
       <div className="slnb-sec-l">분류 체계</div>
       <div className="slnb-pin">4그룹 게이트 + 표준분류 22종<br />Copilot 분류 · 사람 검수 후 처리</div>
-      <div className="slnb-foot">공모전 MVP · 사내 전용</div>
+      <div className="slnb-foot">고객의 목소리가 서비스 개선으로 이어지는 순간, <b>U+ VOICE</b><br />공모전 MVP · 사내 전용</div>
     </aside>
   )
 }
@@ -457,7 +458,7 @@ function Topbar({ title, mode, setMode, agentTitle, shareState, sharedEnabled, o
     <header className="topbar">
       {mode !== 'expanded' && (
         <div className="tb-main">
-          <div className="crumb">U+ Agent<span className="crumb-sep">›</span>VOC Action Copilot<span className="crumb-sep">›</span><b>{title}</b></div>
+          <div className="crumb">U+ VOICE<span className="crumb-sep">›</span>VOC Action Copilot<span className="crumb-sep">›</span><b>{title}</b></div>
           <div className="tb-main-right">
             <ShareBadge state={shareState} />
             {sharedEnabled && <button className="tb-share-btn" onClick={onShareTools} title="공유 저장소 도구 (데모)">⚙ 공유 저장소 도구</button>}
@@ -1369,6 +1370,16 @@ function Architecture() {
   ]
   return (
     <div className="screen">
+      <div className="voice-banner">
+        <div className="vb-lock"><span className="brand-mark lg">U+</span><span className="brand-lock"><b className="brand-svc lg">VOICE</b><span className="brand-desc">VOC Orchestration &amp; Insight-driven CX Engine</span></span></div>
+        <p className="vb-tag">고객의 목소리를 분석해, 실행 가능한 CX 개선 액션으로 연결하는 AI 서비스</p>
+        <div className="vb-acro">
+          {[['V', 'VOC', '고객의 목소리'], ['O', 'Orchestration', '흩어진 VOC를 연결·조율'], ['I', 'Insight-driven', '인사이트 기반 분석'], ['C', 'CX', '고객경험 개선'], ['E', 'Engine', '실행을 돕는 AI 엔진']].map(([k, t, d]) => (
+            <div key={k} className="vb-acro-i"><span className="vb-acro-k">{k}</span><b>{t}</b><span>{d}</span></div>
+          ))}
+        </div>
+        <p className="vb-slogan">고객의 목소리가 서비스 개선으로 이어지는 순간, <b>U+ VOICE</b></p>
+      </div>
       <div className="page-head"><div>
         <h1 className="page-title">솔루션 구조 (TO-BE)</h1>
         <p className="page-sub">VOC 자동 분류 → 개선안 도출까지, Copilot이 전체 흐름을 자동 수행합니다.</p>
@@ -2078,7 +2089,8 @@ function Login({ onAuthed }) {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <div className="brand auth-brand"><span className="brand-mark">U+</span><span className="brand-name">VOC Action <b>Copilot</b></span></div>
+        <div className="auth-brandlock"><span className="brand-mark lg">U+</span><span className="brand-lock"><b className="brand-svc lg">VOICE</b><span className="brand-desc">VOC Action Copilot</span></span></div>
+        <p className="auth-tagline">고객의 목소리를 분석해, 실행 가능한 CX 개선 액션으로 연결하는 AI 서비스</p>
         <p className="auth-sub">사내 전용 — {mode === 'login' ? '로그인 후 이용하세요.' : '회사 이메일과 사내 인증 코드로 가입하세요.'}</p>
         <div className="auth-tabs">
           <button className={'auth-tab' + (mode === 'login' ? ' on' : '')} onClick={() => { setMode('login'); setErr('') }}>로그인</button>
@@ -2089,6 +2101,7 @@ function Login({ onAuthed }) {
         {mode === 'signup' && <label className="auth-field"><span>사내 인증 코드</span><input className="in-text" placeholder="회사에서 공유받은 코드" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={onKey} /></label>}
         {err && <div className="auth-err">{err}</div>}
         <button className="btn btn-primary auth-submit" disabled={busy} onClick={submit}>{busy ? '처리 중…' : (mode === 'login' ? '로그인' : '가입하고 시작')}</button>
+        <p className="auth-slogan">고객의 목소리가 서비스 개선으로 이어지는 순간, <b>U+ VOICE</b></p>
         <p className="auth-note">⚠ 시연용 접근 게이트입니다. 실제 사내 전용 운영에는 사내 SSO 연동 또는 사내망 한정 배포가 필요합니다.</p>
       </div>
     </div>

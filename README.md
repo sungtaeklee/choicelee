@@ -1,4 +1,6 @@
-# U+ VOC Action Copilot (공모전 MVP · 사내 전용)
+# U+ VOICE · VOC Action Copilot (공모전 MVP · 사내 전용)
+
+> VOC Orchestration & Insight-driven CX Engine — 고객의 목소리를 분석해 실행 가능한 CX 개선 액션으로 연결하는 AI 서비스
 
 React + Vite 정적 SPA. VOC를 수집·자동분류하고 선제조치를 돕는 데모.
 
