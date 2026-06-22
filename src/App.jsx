@@ -490,12 +490,23 @@ function hydrate(recs) {
   return recs.map((r) => {
     const e = enrichRow({ channel: r.c, content: r.t, customer: r.n, date: r.d, week: r.w, occur: r.o }, r.id,
       { group: r.gr, cat: r.ct, area1: r.a1, area2: r.a2, severity: r.sv, status: r.s, owner: r.ow })
-    return { ...e, jiraUrl: r.j || '', ownerNote: r.on || '' }
+    const out = { ...e, jiraUrl: r.j || '', ownerNote: r.on || '' }
+    if (r.im) {  // 사내 에이전트 등록 건: 에이전트 응대문 그대로 복원(템플릿 재생성 대신)
+      out.imported = true
+      if (r.aw) out.answer = r.aw
+      if (r.pm) out.sms = r.pm
+      if (r.mt || r.mb) out.mail = { to: (e.mail && e.mail.to) || e.org || '', subject: r.mt || '', body: r.mb || '' }
+    }
+    return out
   })
 }
 // 보강 레코드 → 압축 레코드 (저장·내보내기 공통)
 function toCompact(arr) {
-  return (arr || []).map((v) => ({ id: v.id, c: v.channel, t: v.content, n: v.customerRaw || '', d: v.date || '', w: v.week || '', o: v.occur || '', s: v.status, ow: v.owner, j: v.jiraUrl || '', on: v.ownerNote || '', gr: v.group, ct: v.cat, a1: v.area1, a2: v.area2, sv: v.severity }))
+  return (arr || []).map((v) => {
+    const r = { id: v.id, c: v.channel, t: v.content, n: v.customerRaw || '', d: v.date || '', w: v.week || '', o: v.occur || '', s: v.status, ow: v.owner, j: v.jiraUrl || '', on: v.ownerNote || '', gr: v.group, ct: v.cat, a1: v.area1, a2: v.area2, sv: v.severity }
+    if (v.imported) { r.im = 1; r.aw = v.answer || ''; r.pm = v.sms || ''; r.mt = (v.mail && v.mail.subject) || ''; r.mb = (v.mail && v.mail.body) || '' }
+    return r
+  })
 }
 function loadAdded() {
   try {
@@ -640,10 +651,28 @@ function ImpPill({ v }) {
   const t = /높|high|부정|negative/i.test(s) ? 'hi' : /보통|중간|medium|중립|neutral/i.test(s) ? 'mid' : /낮|low|긍정|positive/i.test(s) ? 'lo' : 'neu'
   return <span className={'imp-pill imp-' + t}>{s}</span>
 }
-function ImportResult({ notify }) {
-  const [raw, setRaw] = useState(''); const [res, setRes] = useState(null); const [err, setErr] = useState('')
+function ImportResult({ notify, added, setAdded, shared, sharedInsert, openCase }) {
+  const [raw, setRaw] = useState(''); const [res, setRes] = useState(null); const [err, setErr] = useState(''); const [reg, setReg] = useState(null)
   const copy = (t, l) => { if (t && navigator.clipboard) navigator.clipboard.writeText(t).then(() => notify && notify.toast(l + ' 복사됨')).catch(() => { }) }
-  const load = () => { const { data, error } = parsePastedJSON(raw); if (error) { setErr(error); setRes(null) } else { setErr(''); setRes(data) } }
+  const load = () => { const { data, error } = parsePastedJSON(raw); if (error) { setErr(error); setRes(null); setReg(null) } else { setErr(''); setRes(data); setReg(null) } }
+  const SEV_MAP = { '높음': 'High', '높': 'High', high: 'High', '보통': 'Medium', '중간': 'Medium', medium: 'Medium', '낮음': 'Low', '낮': 'Low', low: 'Low' }
+  const register = () => {
+    if (!res) { notify && notify.toast('먼저 JSON을 불러오세요'); return }
+    const cc = res.classification || {}
+    const ov = { group: cc.group || undefined, cat: cc.category || undefined, area1: cc.depth1 || undefined, area2: cc.depth2 || undefined, severity: SEV_MAP[String(cc.severity || '').trim().toLowerCase()] || SEV_MAP[String(cc.severity || '').trim()] || undefined }
+    const seq = (added || []).reduce((m, v) => { const n = parseInt(String(v.id).replace(/\D/g, ''), 10); return n > m ? n : m }, 0) + 1
+    const id = shared ? 'IN-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) : 'IN-' + String(seq).padStart(3, '0')
+    const v = enrichRow({ channel: '사내 에이전트', content: res.voc || '(원문 없음)', customer: '', date: '', week: '', occur: '' }, id, ov)
+    const rr = res.response || {}, mm = rr.internalMail || {}
+    v.imported = true
+    if (rr.customerMessage) v.answer = rr.customerMessage
+    if (rr.pushMessage) v.sms = rr.pushMessage
+    if (mm.title || mm.body) v.mail = { to: (v.mail && v.mail.to) || v.org || '', subject: mm.title || (v.mail && v.mail.subject) || '', body: mm.body || '' }
+    setAdded && setAdded([v, ...(added || [])])
+    if (shared && sharedInsert) sharedInsert(toCompact([v]))
+    setReg(v)
+    notify && notify.toast(`${v.id} 등록됨 — ${v.group} · ${v.cat}`)
+  }
   const c = (res && res.classification) || {}, ins = (res && res.insight) || {}, act = (res && res.actions) || {}, rsp = (res && res.response) || {}, mail = rsp.internalMail || {}, imp = (res && res.improvements) || []
   return (
     <div className="screen">
@@ -654,12 +683,23 @@ function ImportResult({ notify }) {
         <div className="imp-actions">
           <button className="btn btn-primary" onClick={load}>카드로 표시</button>
           <button className="btn btn-ghost" onClick={() => { setRaw(JSON.stringify(IMP_SAMPLE, null, 2)); setErr('') }}>예시 채우기</button>
-          {(raw || res) && <button className="btn btn-ghost" onClick={() => { setRaw(''); setRes(null); setErr('') }}>지우기</button>}
+          {(raw || res) && <button className="btn btn-ghost" onClick={() => { setRaw(''); setRes(null); setErr(''); setReg(null) }}>지우기</button>}
         </div>
         {err && <div className="ai-err">{err}</div>}
       </div>
       {res && (
         <>
+          {reg ? (
+            <div className="imp-reg-ok">
+              <span><b>{reg.id}</b> 등록 완료 — 분류 보드·추이·처리 목록에 반영되었습니다.</span>
+              {openCase && <button className="btn btn-ghost sm" onClick={() => openCase(reg.id)}>처리 화면에서 보기 →</button>}
+            </div>
+          ) : (
+            <div className="imp-reg-bar">
+              <span className="muted">이 결과를 VOC 케이스로 등록하면 분류 보드·추이·처리 목록에 함께 쌓입니다 (분류값은 에이전트 결과 그대로 유지).</span>
+              <button className="btn btn-primary" onClick={register}>＋ VOC로 등록</button>
+            </div>
+          )}
           <div className="panel">
             <div className="card-title">요약</div>
             <div className="imp-row"><span className="imp-k">VOC 구분</span><span>{c.group ? <GroupBadge v={c.group} /> : '—'} {c.category && <Tag>{c.category}</Tag>}</span></div>
@@ -3076,7 +3116,7 @@ export default function App() {
                     {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} addSent={addSent} openCase={openCase} />}
                     {screen === 'insight' && <InsightReport added={added} openCase={openCase} />}
                     {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
-                    {screen === 'import' && <ImportResult notify={notify} />}
+                    {screen === 'import' && <ImportResult notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} openCase={openCase} />}
                   </div>
                 </main>
               )}

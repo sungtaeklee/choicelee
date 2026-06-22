@@ -1417,3 +1417,7 @@ svg.ltrend .lt-line:hover{opacity:1}
   .imp-row{flex-direction:column;gap:4px}
   .imp-k{flex-basis:auto}
 }
+.imp-reg-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:13px 16px;background:#fbf3f8;border:1px solid #f1d7e8;border-radius:12px;font-size:13px}
+.imp-reg-bar .muted{flex:1;min-width:220px;line-height:1.5}
+.imp-reg-ok{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:13px 16px;background:#e9f7ee;border:1px solid #bfe6cd;border-radius:12px;font-size:13.5px;color:#1a7f43}
+.imp-reg-ok b{color:#13683a}
