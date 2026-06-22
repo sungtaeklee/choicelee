@@ -585,6 +585,27 @@ function PivotView({ tree, weeks, l1order }) {
     </table></div>
   )
 }
+/* 다중 라인(꺾은선) 추이 — VOC구분1·2 조합별, 라인/범례 클릭 시 강조 */
+const COMBO_COLORS = ['#e6007e', '#6938ef', '#1570ef', '#12b76a', '#f79009', '#ef4444', '#06b6d4', '#9333ea', '#84cc16', '#64748b']
+function MultiLine({ labels, series, sel, onSel, perPoint = 0 }) {
+  if (!labels.length || !series.length) return <p className="micro">표시할 데이터가 없습니다.</p>
+  const H = 220, padT = 14, padB = 36, padL = 40, padR = 14, plotH = H - padT - padB
+  const innerW = perPoint ? Math.max(560, labels.length * perPoint) : 660
+  const W = innerW + padL + padR
+  const maxV = Math.max(1, ...series.flatMap((s) => s.values))
+  const x = (i) => padL + (labels.length === 1 ? innerW / 2 : i / (labels.length - 1) * innerW)
+  const y = (v) => padT + plotH - (v / maxV) * plotH
+  const path = (vals) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+  const lblStep = Math.max(1, Math.ceil(labels.length / 12))
+  return (
+    <svg className="ltrend" viewBox={`0 0 ${W} ${H}`} width={perPoint ? W : '100%'} height={H} preserveAspectRatio="xMinYMin meet">
+      {[0, 0.5, 1].map((f, i) => { const yy = padT + plotH - f * plotH; return <g key={i}><line x1={padL} y1={yy} x2={W - padR} y2={yy} stroke="var(--line-2)" strokeWidth="1" /><text x={padL - 6} y={yy + 3} textAnchor="end" className="lt-axis">{Math.round(maxV * f)}</text></g> })}
+      {labels.map((l, i) => (i % lblStep === 0 || i === labels.length - 1) ? <text key={i} x={x(i)} y={H - 12} textAnchor="middle" className="lt-axis">{l}</text> : null)}
+      {series.map((s) => { const on = !sel || sel === s.key; return <path key={s.key} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={sel === s.key ? 3 : 1.8} opacity={on ? 1 : 0.1} strokeLinejoin="round" strokeLinecap="round" onClick={() => onSel && onSel(sel === s.key ? null : s.key)}><title>{s.label}</title></path> })}
+      {sel && series.filter((s) => s.key === sel).map((s) => s.values.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r="2.6" fill={s.color} />))}
+    </svg>
+  )
+}
 function VOCTrends({ added }) {
   const data0 = added || []
   const [d1, setD1] = useState(''); const [d2, setD2] = useState('')
@@ -602,10 +623,23 @@ function VOCTrends({ added }) {
   }, [data])
   const maxD = Math.max(1, ...byDay.map((x) => x.n))
   const dayRange = useMemo(() => { const ds = data0.map(recDay).filter(Boolean).sort(); return ds.length ? { min: ds[0], max: ds[ds.length - 1] } : null }, [data0])
+  // VOC구분1·2 조합별 시계열(상위 8개 조합)
+  const [selCombo, setSelCombo] = useState(null)
+  const trend = useMemo(() => {
+    const SEP = '\u0001', tot = {}, dayMap = {}, wkMap = {}
+    for (const d of data) {
+      const g = d.group || '기타', c = d.cat || '기타', key = g + SEP + c
+      tot[key] = (tot[key] || 0) + 1
+      const day = recDay(d); if (day) { (dayMap[key] || (dayMap[key] = {}))[day] = ((dayMap[key] || {})[day] || 0) + 1 }
+      const w = d.week; if (w) { (wkMap[key] || (wkMap[key] = {}))[w] = ((wkMap[key] || {})[w] || 0) + 1 }
+    }
+    const combos = Object.entries(tot).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([key, n], i) => { const [g, c] = key.split(SEP); return { key, g, c, n, label: `${g} › ${c}`, color: COMBO_COLORS[i % COMBO_COLORS.length] } })
+    const daySeries = combos.map((cb) => ({ ...cb, values: byDay.map((b) => (dayMap[cb.key] || {})[b.day] || 0) }))
+    const weekSeries = combos.map((cb) => ({ ...cb, values: weeks.map((w) => (wkMap[cb.key] || {})[w] || 0) }))
+    return { combos, daySeries, weekSeries }
+  }, [data, byDay, weeks])
   const pv1 = useMemo(() => buildPivot(data, (d) => d.group, (d) => d.cat), [data])
   const pv2 = useMemo(() => buildPivot(data, (d) => d.area1, (d) => d.area2), [data])
-  const totalsByWeek = weeks.map((w) => ({ w, n: data.filter((d) => d.week === w).length }))
-  const maxW = Math.max(1, ...totalsByWeek.map((t) => t.n))
   // 발생영역 히트맵: 대응영역1 × 주차 집중도
   const heat = useMemo(() => {
     const rows = AREA1_LIST.filter((a) => data.some((d) => d.area1 === a))
@@ -629,14 +663,25 @@ function VOCTrends({ added }) {
         </div>
       </div>
       <div className="panel">
-        <div className="card-title">일별 VOC 추이 <span className="muted">{byDay.length}일 · 최대 {maxD.toLocaleString()}건/일</span></div>
+        <div className="card-title">VOC구분1·2 조합별 추이 <span className="muted">상위 {trend.combos.length}개 조합 · 라인/범례를 클릭하면 해당 유형만 강조됩니다</span></div>
+        <div className="lt-legend">
+          {trend.combos.map((cb) => (
+            <button key={cb.key} className={'lt-leg' + (selCombo === cb.key ? ' on' : '') + (selCombo && selCombo !== cb.key ? ' off' : '')} onClick={() => setSelCombo(selCombo === cb.key ? null : cb.key)}>
+              <span className="lt-dot" style={{ background: cb.color }} />{cb.label}<em>{cb.n}</em>
+            </button>
+          ))}
+          {selCombo && <button className="lt-leg clear" onClick={() => setSelCombo(null)}>전체 보기</button>}
+        </div>
+      </div>
+      <div className="panel">
+        <div className="card-title">일별 VOC 추이 <span className="muted">{byDay.length}일 · 최대 {maxD.toLocaleString()}건/일{selCombo ? ` · ${selCombo.replace('\u0001', ' › ')} 강조` : ''}</span></div>
         {byDay.length ? (
-          <div className="trend-bars day-bars">{byDay.map((t) => <div key={t.day} className="tb-col" title={`${t.day} · ${t.n}건`}><div className="tb-v">{t.n}</div><div className="tb-bar" style={{ height: Math.max(4, t.n / maxD * 120) + 'px' }} /><div className="tb-k">{t.day.slice(5).replace('-', '/')}</div></div>)}</div>
+          <div className="lt-scroll"><MultiLine labels={byDay.map((b) => b.day.slice(5).replace('-', '/'))} series={trend.daySeries} sel={selCombo} onSel={setSelCombo} perPoint={16} /></div>
         ) : <p className="micro">일자(인입일자/발생일자) 정보가 있는 데이터가 없어 일별 추이를 표시할 수 없습니다.</p>}
       </div>
       <div className="panel">
         <div className="card-title">주차별 VOC 추이 <span className="muted">{data.length.toLocaleString()}건 · {weeks.length}개 주차</span></div>
-        <div className="trend-bars">{totalsByWeek.map((t) => <div key={t.w} className="tb-col"><div className="tb-v">{t.n}</div><div className="tb-bar" style={{ height: Math.max(4, t.n / maxW * 120) + 'px' }} /><div className="tb-k">{t.w}</div></div>)}</div>
+        <MultiLine labels={weeks} series={trend.weekSeries} sel={selCombo} onSel={setSelCombo} />
       </div>
       <div className="panel"><div className="card-title">① 기간별 VOC 추이 <span className="muted">VOC구분1 · 구분2 × 주차</span></div><PivotView tree={pv1} weeks={weeks} l1order={GROUPS} /></div>
       <div className="panel"><div className="card-title">② 영역별 VOC <span className="muted">대응영역1 · 2 × 주차</span></div><PivotView tree={pv2} weeks={weeks} l1order={AREA1_LIST} /></div>
