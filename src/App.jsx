@@ -233,21 +233,40 @@ const PASTE_HEADERS = {
 }
 // 실제 파일 컬럼 순서: 0 인입일자 1 인입채널 2 고객번호 3~7 (구분/영역) 8 내용 9~13 (답변/개발/진행/티켓/비고) 14 월내주차 15 발생일자
 const PASTE_POS = { date: 0, channel: 1, customer: 2, content: 8, week: 14, occur: 15 }
+// 엑셀/스프레드시트 클립보드(TSV)를 따옴표·줄바꿈을 고려해 2차원 격자로 파싱.
+// - 탭=열 구분, 줄바꿈=행 구분 (단, "..."로 감싼 셀 안의 탭/줄바꿈은 셀 내용으로 보존)
+// - 셀을 감싼 바깥 따옴표는 제거, 내부의 ""는 "로 복원
+function parseGrid(text) {
+  const s = String(text).replace(/\r\n?/g, '\n')
+  const rows = []; let row = [], cell = '', inQ = false
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]
+    if (inQ) {
+      if (ch === '"') { if (s[i + 1] === '"') { cell += '"'; i++ } else inQ = false }
+      else cell += ch
+    } else if (ch === '"' && cell === '') { inQ = true }       // 셀 시작 위치의 따옴표만 인용 시작으로 인식
+    else if (ch === '\t') { row.push(cell); cell = '' }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = '' }
+    else cell += ch
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row) }
+  return rows.filter((r) => r.some((c) => (c || '').trim() !== '')) // 완전 빈 행 제거
+}
 function parsePaste(text) {
-  const lines = String(text).split(/\r?\n/).filter((l) => l.trim() !== '')
-  if (!lines.length) return []
+  const grid = parseGrid(text)
+  if (!grid.length) return []
   const idx = {}
-  lines[0].split('\t').forEach((cell, i) => {
+  grid[0].forEach((cell, i) => {
     const nc = norm(cell); if (!nc) return
     for (const [f, syns] of Object.entries(PASTE_HEADERS)) {
       if (idx[f] == null && syns.some((s) => { const ns = norm(s); return nc.includes(ns) || ns.includes(nc) })) idx[f] = i
     }
   })
   const hasHeader = idx.content != null || idx.channel != null
-  const dataLines = hasHeader ? lines.slice(1) : lines
+  const dataRows = hasHeader ? grid.slice(1) : grid
+  const dateRe = /^\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2}/
   const out = []
-  for (const line of dataLines) {
-    const cells = line.split('\t')
+  for (const cells of dataRows) {
     let content = '', channel = '', customer = '', date = '', week = '', occur = ''
     if (hasHeader) {
       const g = (k) => (idx[k] != null ? (cells[idx[k]] || '').trim() : '')
@@ -257,7 +276,13 @@ function parsePaste(text) {
       content = g(PASTE_POS.content); channel = g(PASTE_POS.channel); customer = g(PASTE_POS.customer)
       date = g(PASTE_POS.date); week = g(PASTE_POS.week); occur = g(PASTE_POS.occur)
     } else {
-      content = cells.length === 1 ? cells[0].trim() : (cells.map((c) => c.trim()).sort((a, b) => b.length - a.length)[0] || '')
+      const tr = cells.map((c) => (c || '').trim())
+      if (tr.length === 1) { content = tr[0] }
+      else {
+        let rest = tr
+        if (dateRe.test(tr[0])) { date = tr[0]; rest = tr.slice(1) } // 첫 열이 날짜면 인입일자로
+        content = rest.slice().sort((a, b) => b.length - a.length)[0] || '' // 가장 긴 셀(전사/본문)을 내용으로
+      }
     }
     if (!content) continue
     out.push({ content, channel: channel || '고객의소리', customer, date, week, occur })
@@ -836,14 +861,16 @@ function PasteSheetModal({ onClose, onSubmit }) {
     const text = (e.clipboardData || window.clipboardData).getData('text')
     if (!text || (!text.includes('\t') && !text.includes('\n'))) return // 단일 셀 → 기본 붙여넣기
     e.preventDefault()
-    const grid = text.replace(/\r/g, '').split('\n').filter((l) => l !== '').map((l) => l.split('\t'))
+    const grid = parseGrid(text) // 따옴표 안의 줄바꿈·탭을 보존하며 2차원 격자로 파싱
+    if (!grid.length) return
     const maxCols = Math.max(...grid.map((g) => g.length))
     const headerNamed = /인입일자|채널|고객번호|내용|주차|발생/.test((grid[0] || []).join(' '))
-    if (maxCols >= 10 || headerNamed) { // 전체 export(16열) 또는 헤더 포함 → 표준 파서로 인식
+    const hasMultiline = grid.some((r) => r.some((c) => /\n/.test(c || ''))) // 전사처럼 줄바꿈 든 셀 = VOC 레코드 신호
+    if (maxCols >= 10 || headerNamed || hasMultiline) { // 전체 export·헤더 포함·다중행 셀 → 표준 파서로 인식
       const parsed = parsePaste(text)
       if (parsed.length) { setRows([...parsed.map((p) => ({ date: p.date || '', channel: p.channel || '', customer: p.customer || '', content: p.content || '', week: p.week || '', occur: p.occur || '' })), emptyRow(), emptyRow()]); return }
     }
-    setRows((rs) => { // 6열 이하 → 엑셀처럼 현재 셀 기준 위치 채우기
+    setRows((rs) => { // 단순 격자(6열 이하) → 엑셀처럼 현재 셀 기준 위치 채우기
       const next = rs.map((r) => ({ ...r }))
       grid.forEach((cells, r) => { const tr = ri + r; while (next.length <= tr) next.push(emptyRow()); cells.forEach((val, c) => { const col = SHEET_COLS[ci + c]; if (col) next[tr][col.k] = (val || '').trim() }) })
       return next
