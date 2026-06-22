@@ -878,8 +878,21 @@ function MultiLine({ labels, series, sel, onSel, perPoint = 0 }) {
   const maxV = Math.max(1, ...series.flatMap((s) => s.values))
   const x = (i) => padL + (labels.length === 1 ? innerW / 2 : i / (labels.length - 1) * innerW)
   const y = (v) => padT + plotH - (v / maxV) * plotH
-  const path = (vals) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
-  const areaPath = (vals) => `${path(vals)} L${x(vals.length - 1).toFixed(1)} ${(padT + plotH).toFixed(1)} L${x(0).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`
+  const pts = (vals) => vals.map((v, i) => [x(i), y(v)])
+  const smooth = (vals) => {
+    const p = pts(vals); if (!p.length) return ''
+    if (p.length < 3) return p.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join(' ')
+    let d = `M${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)}`
+    for (let i = 0; i < p.length - 1; i++) {
+      const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6
+      d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`
+    }
+    return d
+  }
+  const path = (vals) => smooth(vals)
+  const areaPath = (vals) => `${smooth(vals)} L${x(vals.length - 1).toFixed(1)} ${(padT + plotH).toFixed(1)} L${x(0).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`
   const selSeries = sel ? series.find((s) => s.key === sel) : null
   const lblStep = Math.max(1, Math.ceil(labels.length / 12))
   return (
@@ -897,7 +910,11 @@ function MultiLine({ labels, series, sel, onSel, perPoint = 0 }) {
       {labels.map((l, i) => (i % lblStep === 0 || i === labels.length - 1) ? <text key={i} x={x(i)} y={H - 12} textAnchor="middle" className="lt-axis">{l}</text> : null)}
       {selSeries && <path d={areaPath(selSeries.values)} fill="url(#ltFill)" stroke="none" />}
       {series.map((s) => { const on = !sel || sel === s.key; return <path key={s.key} className="lt-line" d={path(s.values)} fill="none" stroke={s.color} strokeWidth={sel === s.key ? 2.6 : 1.8} opacity={on ? 1 : 0.12} strokeLinejoin="round" strokeLinecap="round" onClick={() => onSel && onSel(sel === s.key ? null : s.key)}><title>{s.label}</title></path> })}
-      {selSeries && selSeries.values.map((v, i) => (i === selSeries.values.length - 1 || labels.length <= 16) ? <circle key={i} cx={x(i)} cy={y(v)} r={i === selSeries.values.length - 1 ? 3.4 : 2.3} fill="#fff" stroke={selSeries.color} strokeWidth="1.8" /> : null)}
+      {selSeries && selSeries.values.map((v, i) => (i === selSeries.values.length - 1 || labels.length <= 16) ? <circle key={i} cx={x(i)} cy={y(v)} r={i === selSeries.values.length - 1 ? 3.6 : 2.3} fill="#fff" stroke={selSeries.color} strokeWidth="1.8" /> : null)}
+      {selSeries && selSeries.values.length > 0 && (() => {
+        const li = selSeries.values.length - 1, lv = selSeries.values[li]
+        return <text x={x(li)} y={Math.max(padT + 9, y(lv) - 9)} textAnchor="end" className="lt-end" fill={selSeries.color}>{lv}</text>
+      })()}
     </svg>
   )
 }
@@ -2634,15 +2651,33 @@ function Phase2({ notify }) {
       <div className="phase-note">같은 분류·대응 엔진을 <b>양쪽 끝</b>에서 씁니다 — 내부 Copilot(사후) ↔ U+one 임베드(사전). 앱에서 처리·미처리된 결과가 내부 엔진으로 돌아가 선제 정확도를 높이는 <b>닫힌 루프</b>가 일반 챗봇과의 차별점입니다.</div>
 
       <h2 className="sec-title">대표 시나리오 <span className="sec-note">요금/청구 선제조치 · 첨부 콘셉트 화면 기준</span></h2>
-      <div className="p2-scenario">
-        <div className="phone-demo">
+      <div className="p2-phones">
+        <div className="p2-phone-wrap">
+          <div className="p2-phone-cap"><span className="p2-step-no">1</span> 청구서 진입 · 선제 버블</div>
           <div className="pd-frame">
             <div className="pd-status"><span>9:41</span><span>ixi ▾</span></div>
             <div className="pd-h">‹ 이번달 청구서</div>
             <div className="pd-amt-l">3월 총 청구금액</div>
             <div className="pd-amt">180,000<span>원</span></div>
             <div className="pd-sub">모바일 (010-65**-84**)</div>
-            <div className="pd-card">
+            <div className="pd-tabs"><span className="on">청구내역</span><span>청구내역 상세</span></div>
+            <div className="pd-info">
+              <div className="pd-info-r"><span>사용기간</span><b>3.1 ~ 3.31</b></div>
+              <div className="pd-info-r"><span>청구서 작성일</span><b>2026.3.1</b></div>
+              <div className="pd-info-r"><span>납부 방법</span><b>자동이체</b></div>
+            </div>
+            <div className="pd-bubble"><span className="pd-bubble-i">!</span><span>이번달 요금이 <b>12,300원</b> 늘었어요. 분석된 원인을 확인할까요?</span></div>
+          </div>
+        </div>
+        <div className="p2-arrow" aria-hidden="true">→</div>
+        <div className="p2-phone-wrap">
+          <div className="p2-phone-cap"><span className="p2-step-no">2</span> 분석 결과 · 인앱 액션</div>
+          <div className="pd-frame">
+            <div className="pd-status"><span>9:41</span><span>ixi ▾</span></div>
+            <div className="pd-h">‹ 이번달 청구서</div>
+            <div className="pd-amt-l">3월 총 청구금액</div>
+            <div className="pd-amt">180,000<span>원</span></div>
+            <div className="pd-card pd-sheet">
               <div className="pd-card-h">분석 결과 <span className="pd-ai">AI가 최근 6개월 분석</span></div>
               <div className="pd-lead">새로운 <b>결제 2건</b>이 발생해 이번달 요금이 <b className="up">12,300원</b> 늘었어요</div>
               <ul className="pd-items">
@@ -2655,10 +2690,10 @@ function Phase2({ notify }) {
             </div>
           </div>
         </div>
-        <ol className="p2-steps">{steps.map((s, i) => (
-          <li key={i}><b>{s.t}</b><span>{s.d}</span></li>
-        ))}</ol>
       </div>
+      <ol className="p2-steps p2-steps-row">{steps.map((s, i) => (
+        <li key={i}><b>{s.t}</b><span>{s.d}</span></li>
+      ))}</ol>
 
       <h2 className="sec-title">적용 우선순위 <span className="sec-note">VOC 볼륨 × 인앱 액션 가능성 × 데이터 가용성</span></h2>
       <div className="effect-row">{place.map((p) => (

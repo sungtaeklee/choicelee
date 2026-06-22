@@ -1246,29 +1246,46 @@ svg.ltrend .lt-line:hover{opacity:1}
 .phase-d{font-size:12px;color:var(--muted)}
 .phase-note{background:var(--magenta-soft);border-radius:10px;padding:13px 15px;font-size:12.5px;color:var(--ink);line-height:1.6;margin-bottom:8px}
 .phase-note b{color:var(--magenta-d)}
-.p2-scenario{display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start;margin-bottom:8px}
+.p2-phones{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.p2-phone-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.p2-phone-cap{display:flex;align-items:center;gap:7px;font:700 12.5px var(--sans);color:var(--slate)}
+.p2-step-no{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--magenta);color:#fff;font:800 11px var(--sans)}
+.p2-arrow{font-size:24px;color:var(--magenta);font-weight:700}
 .phone-demo{display:flex;justify-content:center}
-.pd-frame{width:300px;border:1px solid var(--line);border-radius:22px;background:#fff;padding:16px 16px 18px;box-shadow:var(--shadow)}
-.pd-status{display:flex;justify-content:space-between;font:600 11px var(--mono);color:var(--faint);margin-bottom:10px}
-.pd-h{font:700 13px var(--sans);color:var(--ink);margin-bottom:14px}
-.pd-amt-l{font-size:11.5px;color:var(--muted)}
-.pd-amt{font:800 28px var(--sans);color:var(--ink);letter-spacing:-.02em;line-height:1.1}
-.pd-amt span{font-size:14px;margin-left:2px;color:var(--slate)}
-.pd-sub{font-size:11px;color:var(--faint);margin-bottom:14px}
-.pd-card{background:linear-gradient(180deg,#fdf2f8,#fff);border:1px solid var(--magenta-soft);border-radius:14px;padding:14px}
-.pd-card-h{display:flex;align-items:center;gap:6px;font:700 12px var(--sans);color:var(--ink);margin-bottom:9px}
-.pd-ai{font:600 9.5px var(--sans);color:var(--magenta-d);background:#fff;border:1px solid var(--magenta-soft);border-radius:6px;padding:2px 6px}
-.pd-lead{font:600 13px var(--sans);color:var(--ink);line-height:1.5;margin-bottom:12px}
+.pd-frame{width:248px;border:1px solid var(--line);border-radius:22px;background:#fff;padding:14px 14px 16px;box-shadow:var(--shadow)}
+.pd-status{display:flex;justify-content:space-between;font:600 10.5px var(--mono);color:var(--faint);margin-bottom:9px}
+.pd-h{font:700 12.5px var(--sans);color:var(--ink);margin-bottom:12px}
+.pd-amt-l{font-size:11px;color:var(--muted)}
+.pd-amt{font:800 26px var(--sans);color:var(--ink);letter-spacing:-.02em;line-height:1.1}
+.pd-amt span{font-size:13px;margin-left:2px;color:var(--slate)}
+.pd-sub{font-size:10.5px;color:var(--faint);margin-bottom:12px}
+.pd-tabs{display:flex;gap:6px;margin-bottom:12px}
+.pd-tabs span{flex:1;text-align:center;font:600 11.5px var(--sans);padding:7px 0;border-radius:8px;background:#f1f3f7;color:var(--muted)}
+.pd-tabs span.on{background:var(--ink);color:#fff}
+.pd-info{display:flex;flex-direction:column;gap:9px;padding:12px;background:#fafbfc;border-radius:10px;margin-bottom:12px}
+.pd-info-r{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+.pd-info-r b{color:var(--ink);font-weight:700}
+.pd-bubble{display:flex;align-items:flex-start;gap:8px;padding:11px 12px;border-radius:12px;background:linear-gradient(120deg,#f6e7fb,#e9eafc);font:600 11.5px var(--sans);color:var(--ink);line-height:1.5}
+.pd-bubble b{color:var(--magenta-d)}
+.pd-bubble-i{flex-shrink:0;width:18px;height:18px;border-radius:50%;background:var(--magenta);color:#fff;font:800 11px/18px var(--sans);text-align:center}
+.pd-card{background:linear-gradient(180deg,#fdf2f8,#fff);border:1px solid var(--magenta-soft);border-radius:14px;padding:13px}
+.pd-sheet{box-shadow:0 -6px 16px rgba(0,0,0,.06)}
+.pd-card-h{display:flex;align-items:center;gap:6px;font:700 11.5px var(--sans);color:var(--ink);margin-bottom:9px}
+.pd-ai{font:600 9px var(--sans);color:var(--magenta-d);background:#fff;border:1px solid var(--magenta-soft);border-radius:6px;padding:2px 6px}
+.pd-lead{font:600 12.5px var(--sans);color:var(--ink);line-height:1.5;margin-bottom:11px}
 .pd-lead .up{color:var(--magenta-d)}
-.pd-items{list-style:none;margin:0 0 13px;padding:0;display:flex;flex-direction:column;gap:7px}
-.pd-items li{display:flex;justify-content:space-between;font-size:12px;color:var(--slate)}
+.pd-items{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:7px}
+.pd-items li{display:flex;justify-content:space-between;font-size:11.5px;color:var(--slate)}
 .pd-items li span{font-weight:700;color:var(--ink)}
 .pd-items li span.up{color:#e23b3b}
-.pd-cta{display:flex;gap:8px}
-.pd-cta button{flex:1;font:600 12px var(--sans);padding:9px 0;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--slate);cursor:pointer}
+.pd-cta{display:flex;gap:7px}
+.pd-cta button{flex:1;font:600 11.5px var(--sans);padding:9px 0;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--slate);cursor:pointer}
 .pd-cta button.pri{background:var(--magenta);color:#fff;border-color:var(--magenta)}
 .p2-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
-.p2-steps li{display:flex;flex-direction:column;gap:2px;padding:11px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
-.p2-steps li b{font:700 13px var(--sans);color:var(--ink)}
-.p2-steps li span{font-size:12px;color:var(--muted);line-height:1.5}
-@media (max-width:760px){.phase-row{grid-template-columns:1fr}.p2-scenario{grid-template-columns:1fr}}
+.p2-steps-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.p2-steps li{display:flex;flex-direction:column;gap:3px;padding:11px 13px;background:var(--surface);border:1px solid var(--line);border-radius:10px;border-top:3px solid var(--magenta-soft)}
+.p2-steps li b{font:700 12.5px var(--sans);color:var(--ink)}
+.p2-steps li span{font-size:11.5px;color:var(--muted);line-height:1.5}
+.lt-end{font:800 12px var(--sans)}
+@media (max-width:980px){.p2-steps-row{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){.phase-row{grid-template-columns:1fr}.p2-arrow{transform:rotate(90deg)}}
