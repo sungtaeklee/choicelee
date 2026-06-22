@@ -1041,7 +1041,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
                     onDragEnd={() => { setDragCol(null); setDragId(null) }}
                     onClick={() => openCase(v.id)}>
                     <div className="kcard-top"><ChannelChip channel={v.channel} /><SevBadge v={v.severity} /></div>
-                    <div className="kcard-content">{v.content}</div>
+                    <div className="kcard-content" title={v.content}>{v.summary || v.content}</div>
                     <div className="kcard-foot"><GroupBadge v={v.group} /></div>
                     <div className="kcard-foot"><Tag>{v.cat}</Tag><span className="muted">{v.action}</span></div>
                   </div>
@@ -1052,6 +1052,43 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/* ---------- 전사(대화) → 채팅 말풍선 렌더 ---------- */
+const TRANSCRIPT_SPEAKERS = [
+  { re: /^(customer|cust|고객|이용자|사용자|손님)$/i, side: 'cust', label: '고객' },
+  { re: /^(user|agent|staff|상담사|상담원|직원|담당)$/i, side: 'staff', label: '상담사' },
+]
+function parseTranscript(text) {
+  const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  const reSpk = /^([A-Za-z가-힣]+)\s*[:：]\s*(.*)$/s
+  const turns = []; let cur = null; let speakerTurns = 0
+  for (const line of lines) {
+    const m = line.match(reSpk)
+    const who = m ? TRANSCRIPT_SPEAKERS.find((s) => s.re.test(m[1])) : null
+    if (m && who) {
+      cur = { side: who.side, label: who.label, text: m[2] }; turns.push(cur); speakerTurns++
+    } else if (cur) {
+      cur.text += (cur.text ? ' ' : '') + line // 화자 표기 없는 줄 → 직전 발화에 이어붙임
+    } else {
+      cur = { side: 'note', label: '', text: line }; turns.push(cur)
+    }
+  }
+  return speakerTurns >= 2 ? turns : null // 화자가 둘 이상 잡힌 진짜 대화만 채팅으로
+}
+function Transcript({ text }) {
+  const turns = parseTranscript(text)
+  if (!turns) return <p className="voc-raw">{text}</p>
+  return (
+    <div className="chat-log">
+      {turns.map((t, i) => (
+        <div key={i} className={'chat-row chat-' + t.side}>
+          {t.side !== 'note' && <span className="chat-who">{t.label}</span>}
+          <span className="chat-bubble">{t.text}</span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -1123,7 +1160,7 @@ function CaseDetail({ caseId, notify, added, updateCases, addSent, openCase }) {
               <div className="kv-i"><span className="kv-k">개발 대응</span><span className="kv-v">{c.devNeeded || '-'}</span></div>
             </div>
             {c.summary && <div className="block"><div className="block-label">AI 요약 초안</div><p className="voc-raw">{c.summary}</p></div>}
-            <div className="block"><div className="block-label">VOC 원문(내용)</div><p className="voc-raw">{c.content}</p></div>
+            <div className="block"><div className="block-label">VOC 원문(내용)</div><Transcript text={c.content} /></div>
           </div>
           <div className="panel ai-panel"><div className="ai-head">Copilot AI 분석 <span className="ai-tag">초안 · 담당자 검수 필요</span></div><ul className="ai-list">{c.analysis.map((a, i) => <li key={i}>{a}</li>)}</ul>
             <div className="ai-ans"><div className="ai-ans-k">예상 답안 (고객 응대 초안)</div><div className="ai-ans-v">{c.answer}</div></div>
