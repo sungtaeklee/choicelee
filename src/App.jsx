@@ -219,6 +219,42 @@ function aiSummarize(content) {
   const s = clause.length >= 8 ? clause : t
   return s.length > 45 ? s.slice(0, 45) + '…' : s
 }
+/* 본문 형식 자동 판별 → 핵심 의도 텍스트 추출
+   ① 상담 노트("고객요청내용: ㆍ…") → 요청 불릿, ② USER/CUSTOMER 전사 → 고객 발화, ③ 평문 → 원문 */
+function coreIssue(content) {
+  const raw = String(content || '')
+  const m = raw.match(/고객\s*요청\s*내용\s*[:：]?\s*([\s\S]*?)(?:처리\s*내용|작업\s*내용|상담\s*결과|조치\s*내용|답변\s*내용|$)/)
+  if (m && m[1].trim().length >= 4) {
+    const bul = m[1].split(/[\nㆍ•·]|\s-\s/).map((s) => s.trim()).filter((s) => s.length >= 4)
+    if (bul.length) return bul.slice(0, 4).join(' / ')
+  }
+  return customerIssueText(raw)   // 전사면 고객 발화만, 아니면 원문
+}
+/* 구어체 선두 군더더기(맞장구·간투사) 제거 */
+const FILLER_LEAD = /^(예+|네+|아+|어+|음+|응+|그+|저+|저기|아니+요?|뭐|이게|그게|저는|제가|그러면은?|그래가지고|그래서|그러니까|근데|그런데|혹시|좀|지금|이제|일단|있잖아요?|저기요|다름이\s*아니라)\s+/
+function cleanClause(s) {
+  let t = String(s).replace(/tag:[A-Z_]+\([^)]*\)/g, '').replace(/\s+/g, ' ').trim()
+  for (let i = 0; i < 6; i++) { const n = t.replace(FILLER_LEAD, ''); if (n === t) break; t = n }
+  return t.replace(/^[\s.,·ㆍ\-]+/, '').replace(/[\s.,]+$/, '').trim()
+}
+const ISSUE_KW = ['결제', '선결제', '가상계좌', '납부', '연체', '미납', '환불', '청구', '요금', '요금제', '위약', '약정', '해지', '번호이동', '가입', '개통', '결합', '로밍', '출국', '해외', '유심', '이심', '데이터', '부가서비스', '멤버십', '쿠폰', '혜택', '영화', 'vip', '네트워크', '통화', '끊', '안터', '와이파이', '속도', '느', '인터넷', '로그인', '인증', '비밀번호', '아이디', '회원', '탈퇴', '오류', '에러', '안돼', '안되', '안됨', '먹통', '튕', '설치', '리모컨', 'iptv', '셋톱', '유독', '넷플릭스', '디즈니', '배송', '매장', '대리점', '상담', '기기', '기변', '단말', '문의', '신청', '변경', '조회', '확인', '취소', '불가', '안내', '어떻게', '얼마', '방법', '왜', '문제', '불편']
+/* 핵심 의도 한 줄 요약: 노트/전사/평문 모두 → 신호어 밀집 절을 골라 군더더기 제거·축약 */
+function smartSummary(content) {
+  const issue = coreIssue(content)
+  const raw = String(issue || '').replace(/tag:[A-Z_]+\([^)]*\)/g, '')
+  if (!raw.trim()) return aiSummarize(content)
+  if (raw.includes(' / ')) { const s = raw.replace(/\s+/g, ' ').trim(); return s.length > 60 ? s.slice(0, 60) + '…' : s } // 노트 불릿
+  // 구어체 절 분리: 종결·연결어미 + 구두점
+  const parts = raw.split(/(?<=거든요)|(?<=는데요)|(?<=는데)|(?<=구요)|(?<=고요)|(?<=려고요?)|(?<=려구요)|(?<=을까요)|(?<=나요)|(?<=드려요)|(?<=거예요)|(?<=합니다)|(?<=했어요)|(?<=해요)|[.!?。…\n·]/)
+  let cands = parts.map(cleanClause).filter((s) => s.length >= 6)
+  if (!cands.length) cands = [cleanClause(raw)].filter(Boolean)
+  if (!cands.length) return aiSummarize(content)
+  const score = (s) => { const sl = s.toLowerCase(); return ISSUE_KW.reduce((n, k) => n + (sl.includes(k) ? 1 : 0), 0) }
+  cands.sort((a, b) => (score(b) - score(a)) || (Math.abs(a.length - 24) - Math.abs(b.length - 24)))
+  let best = cands[0] || ''
+  if (best.length > 46) best = best.slice(0, 46).replace(/\s+\S*$/, '') + '…'
+  return best || aiSummarize(content)
+}
 /* 표준분류/정형분류 → 대응 영역(1 넓은 / 2 세부). 사내 라우팅 taxonomy (영역 트리 기준). */
 const AREA_BY_CAT = {
   // 열림 그룹 22개
@@ -240,12 +276,74 @@ function catToArea(group, cat) {
 }
 function ownerForArea(area1) { return OWNER_BY_AREA[area1] || '미지정' }
 function devNeeded(group) { return (group === '장애/오류' || group === '성능' || group === '개선 요청/희망') ? 'Y' : 'N' }
-function draftAnswer(group, cat, content) {
-  const key = extractKey(content)
-  const lead = key ? `말씀해주신 "${key}" 내용을 확인했습니다. ` : ''
-  if (group === '장애/오류' || group === '성능') return `${lead}불편을 드려 죄송합니다. 해당 '${cat}' 증상은 담당 부서에서 원인을 확인하고 있으며, 확인되는 대로 신속히 안내드리겠습니다.`
-  if (group === '개선 요청/희망') return `${lead}소중한 의견 감사합니다. '${cat}' 관련 개선 의견을 담당 부서에 전달했으며 검토 후 반영을 추진하겠습니다.`
-  return `${lead}문의 주신 '${cat}' 관련 사항을 확인하여 정확히 안내드리겠습니다. 추가로 궁금한 점이 있으시면 언제든 말씀해 주세요.`
+/* ── 분류별 고객 응대·내부 조치 가이드 (실 VOC taxonomy 기준) ── */
+const CAT_GUIDE = {
+  '네트워크/통신품질/와이파이': { cust: '통신 품질 불편을 확인했습니다. 사용 지역·시간대를 확인해 망 품질을 점검하고, 필요 시 중계기 점검을 요청드리겠습니다.', act: '발생 지역·시간 확인 → 망 품질 점검 의뢰 후 회신' },
+  '인터넷·통신속도 불만': { cust: '인터넷·데이터 속도 불편을 확인했습니다. 회선 상태와 속도를 점검해 원인을 안내드리겠습니다.', act: '회선 속도 점검 → 원인 안내, 필요 시 기사 방문' },
+  '앱·웹 이용문의': { cust: '앱·웹 이용 방법 문의를 확인했습니다. 해당 메뉴 위치와 이용 방법을 안내드리겠습니다.', act: '이용 방법 안내' },
+  '요금제': { cust: '요금제 관련 문의를 확인했습니다. 사용 패턴에 맞는 요금제를 비교해 안내드리겠습니다.', act: '사용량 기반 요금제 진단·추천' },
+  '해지/약정/위약금': { cust: '해지·약정 관련 문의를 확인했습니다. 약정 잔여·예상 위약금을 정확히 확인해 안내드리겠습니다.', act: '약정/위약금 조회 → 정확 금액·절차 안내' },
+  '가입/개통/결합': { cust: '가입·개통·결합 관련 문의를 확인했습니다. 진행 조건과 절차를 안내드리겠습니다.', act: '가입/결합 조건 확인 후 절차 안내' },
+  '부가서비스': { cust: '부가서비스 관련 문의를 확인했습니다. 가입·해지·이용 방법을 안내드리겠습니다.', act: '부가서비스 가입/해지 처리·안내' },
+  '데이터(사용량/선물/충전)': { cust: '데이터 관련 문의를 확인했습니다. 사용량·충전·선물 방법을 안내드리겠습니다.', act: '데이터 사용량 조회·충전/선물 안내' },
+  '로밍': { cust: '로밍 관련 문의를 확인했습니다. 출국 전 로밍 요금제와 해외 이용 방법을 안내드리겠습니다.', act: '로밍 요금제/이용 방법 안내' },
+  '유심/이심/IMSI': { cust: '유심·이심 관련 문의를 확인했습니다. 교체·전환 절차와 준비물을 안내드리겠습니다.', act: '유심/이심 교체·전환 절차 안내' },
+  '단말/기기/액세서리': { cust: '단말기 관련 문의를 확인했습니다. 기기 설정·변경 방법을 안내드리겠습니다.', act: '기기 설정/변경 안내' },
+  '멤버십/쿠폰/혜택/VIP콕': { cust: '멤버십·혜택 관련 문의를 확인했습니다. 쿠폰·혜택 사용 방법과 적용 여부를 확인해 안내드리겠습니다.', act: '쿠폰/혜택 적용 확인·안내' },
+  '설치/AS(홈상품)': { cust: '설치·AS 관련 문의를 확인했습니다. 일정 확인 후 기사 방문을 안내드리겠습니다.', act: '설치/AS 일정 확인·배정' },
+  'IPTV/셋톱박스': { cust: 'IPTV·셋톱박스 관련 문의를 확인했습니다. 증상 점검 후 해결 방법을 안내드리겠습니다.', act: '셋톱박스 점검·조치 안내' },
+  '상담/고객지원': { cust: '상담 연결 불편을 확인했습니다. 빠르게 담당자가 연결되도록 조치하겠습니다.', act: '상담 이력 확인 → 우선 연결/콜백' },
+  '매장/대리점': { cust: '매장 이용 관련 불편을 확인했습니다. 사실관계를 확인해 안내드리겠습니다.', act: '매장 사실관계 확인 후 회신' },
+  '회원/로그인/인증': { cust: '로그인·인증 문제를 확인했습니다. 본인확인 후 정상 이용되도록 도와드리겠습니다.', act: '계정/인증 상태 점검 → 복구 안내' },
+  '요금/청구/납부/환불': { cust: '요금·청구·납부 관련 문의를 확인했습니다. 청구 내역을 확인해 정확한 금액과 납부 방법을 안내드리겠습니다.', act: '청구/납부 내역 확인 → 정정·환불 필요 시 처리' },
+  '휴대폰결제/소액결제': { cust: '휴대폰결제 관련 문의를 확인했습니다. 한도·이용 내역을 확인해 안내드리겠습니다.', act: '결제 한도/내역 확인·안내' },
+  '유독/모바일TV/익시오/스마트홈': { cust: '유독·모바일TV 등 서비스 문의를 확인했습니다. 이용·해지 방법을 안내드리겠습니다.', act: '구독 서비스 이용/해지 안내' },
+  '배송': { cust: '배송 관련 문의를 확인했습니다. 배송 현황을 확인해 안내드리겠습니다.', act: '배송 현황 확인·안내' },
+  '검색/챗봇/AI': { cust: '검색·챗봇 이용 관련 문의를 확인했습니다. 정확한 결과가 나오도록 점검하겠습니다.', act: '검색/챗봇 동작 점검' },
+}
+function guideFor(cat) { return CAT_GUIDE[cat] || null }
+/* 고객 응대 초안(예상 답안): 분류 가이드 + 핵심 의도 반영 */
+function draftCustomerMsg(group, cat, summary) {
+  const g = guideFor(cat)
+  if (g) return (group === '장애/오류' || group === '성능') ? `불편을 드려 죄송합니다. ${g.cust}` : g.cust
+  const lead = summary ? `요청하신 "${summary}" 건을 확인했습니다. ` : ''
+  if (group === '장애/오류' || group === '성능') return `${lead}불편을 드려 죄송합니다. '${cat}' 증상을 담당 부서에서 확인 중이며, 조치되는 대로 신속히 안내드리겠습니다.`
+  if (group === '개선 요청/희망') return `${lead}소중한 의견 감사합니다. '${cat}' 개선 의견을 담당 부서에 전달해 검토하겠습니다.`
+  return `${lead}'${cat}' 관련 사항을 확인해 정확히 안내드리겠습니다. 추가 문의는 언제든 말씀해 주세요.`
+}
+/* 문자/푸시 초안(짧게, 항상 생성) */
+function draftSms(group, cat, summary) {
+  const g = guideFor(cat)
+  const apo = (group === '장애/오류' || group === '성능') ? '불편을 드려 죄송합니다. ' : ''
+  const core = g ? g.cust : (group === '개선 요청/희망' ? `'${cat}' 개선 의견을 검토하겠습니다.` : `'${cat}' 문의를 확인해 안내드리겠습니다.`)
+  let body = `[U+] 고객님, ${apo}${core}`
+  return body.length > 110 ? body.slice(0, 108) + '…' : body
+}
+/* 분석용: 내용에서 실제 감지된 신호어(사전 단어) 추출 — 분류 근거 설명 */
+function detectedSignals(issue, cat) {
+  const v = norm(issue), out = []
+  const kws = (CAT_KW.find(([c]) => c === cat) || [null, []])[1]
+  for (const k of kws) { if (out.length >= 3) break; const nk = norm(k); if (nk && v.includes(nk) && !out.includes(k)) out.push(k) }
+  if (!out.length) { for (const [re, c] of PRIORITY_RULES) { if (c === cat && re.test(v)) { out.push(String(cat).split(/[/·]/)[0]); break } } }
+  return [...new Set(out)].slice(0, 3)
+}
+function severityReason(group, severity, issue) {
+  if (group === '장애/오류') return '장애·오류 그룹'
+  const v = norm(issue)
+  if (/이중|중복청구|위약금|환불|미납|접속불가|먹통|불가|끊김|안터/.test(v)) return '고위험 신호어(환불·위약·중복청구 등) 감지'
+  if (group === '성능') return '성능 저하'
+  if (severity === 'Medium') return '불만·불편 표현 감지'
+  return '일반 문의 수준'
+}
+/* Copilot AI 분석: 내용 기반 4줄(핵심 의도 → 분류 근거 → 심각도/감성 → 라우팅) */
+function buildAnalysis(o) {
+  const sig = (o.signals && o.signals.length) ? ` — 신호어(${o.signals.join(', ')}) 감지` : (o.mode === '정형' ? ' — 장애/성능/개선 게이트 매칭' : '')
+  return [
+    `핵심 의도: ${o.summary || '내용 확인 필요'}`,
+    `분류 근거: '${o.cat}'${sig} → 그룹 '${o.group}' (${o.mode})`,
+    `심각도 ${o.severity} (${o.severityReason}) · 고객 감성 ${o.sentiment}`,
+    `대응영역 ${o.area1} › ${o.area2} · 담당 ${o.owner} · 개발대응 ${o.dev} · 진행 ${o.status}`,
+  ]
 }
 
 /* ---------- PII 마스킹 (입력/붙여넣기 시점 · 전화·이메일·이름) ---------- */
@@ -340,44 +438,43 @@ function parsePaste(text) {
 
 /* 화면에서 직접 입력한 VOC(채널+내용) → 우리 스키마로 분류·보강.
    구분1/2·대응영역·요약·답변·개발대응·진행상황을 모두 도출(검토용 초안). */
-function enrichRow(r, id) {
+function enrichRow(r, id, ov) {
   const content = maskPII(r.content || '(내용 없음)')
   const issue = customerIssueText(content)      // 전사면 고객 발화만, 아니면 원문 — 상담사 인사말 노이즈 제거
-  const isTranscript = issue !== content
-  // 1) 고객 발화 기준으로 그룹·분류 도출
+  // 1) 고객 발화 기준으로 그룹·분류 도출 (저장된 값 ov가 있으면 그 값을 우선 — 표시·생성 일관성)
   const cls = demoClassify(issue) || { group: '단순 문의/불만/기타', mode: '열림' }
-  const group = cls.group, mode = cls.mode
-  let cat, conf, review
+  const mode = cls.mode
+  let group = cls.group, cat, conf, review
   if (mode === '정형') { cat = pickFixedCat(group, issue); conf = '보통'; review = false }
   else { const p = pick22(issue); cat = p.cat; conf = p.conf; review = p.review }
-  const severity = deriveSeverity(group, issue)
+  if (ov && ov.group) group = ov.group
+  if (ov && ov.cat) cat = ov.cat       // 이후 답안·문자·분석·영역이 모두 최종 분류 기준으로 생성됨
+  const severity = (ov && ov.severity) || deriveSeverity(group, issue)
   const sentiment = deriveSentiment('', group, issue)
   const { action, org } = deriveAction(group)
-  // 2) 나머지 컬럼 자동 생성(검토용 초안) — 전사면 고객 핵심문장을 요약으로
-  const summary = isTranscript ? (extractKey(issue) || aiSummarize(issue)) : aiSummarize(content)
-  const [area1, area2] = catToArea(group, cat)
+  // 2) 나머지 컬럼 자동 생성(검수용 초안) — 핵심 의도 기반 요약·답안·문자·분석
+  const summary = smartSummary(content)
+  const da = catToArea(group, cat)
+  const area1 = (ov && ov.area1) || da[0], area2 = (ov && ov.area2) || da[1]
   const dev = devNeeded(group)
-  const answer = draftAnswer(group, cat, content)
-  const status = severity === 'High' ? '처리 필요' : '분류 완료'
-  // 3) 액션 초안 라우팅: 고객 응대 채널이면 문자 초안, 정형/High면 담당 메일 초안
-  const toCustomer = /call|고객센터|고객의소리/i.test(r.channel || '')
-  const sms = (group === '단순 문의/불만/기타' && toCustomer) ? answer : ''
+  const owner = (ov && ov.owner) || ownerForArea(area1)
+  const signals = detectedSignals(issue, cat)
+  const answer = draftCustomerMsg(group, cat, summary)
+  const status = (ov && ov.status) || (severity === 'High' ? '처리 필요' : '분류 완료')
+  // 3) 액션 초안: 문자/푸시는 항상 생성(분류별 안내), 메일은 정형/High면 담당 전달용
+  const sms = draftSms(group, cat, summary)
   const mail = (group !== '단순 문의/불만/기타' || severity === 'High')
-    ? { to: org, subject: `[VOC ${severity}] ${cat} — ${summary}`, body: `${content}\n\n분류: ${group} · ${cat} / 대응영역: ${area1} › ${area2}\n담당 검토 후 처리 요청 (개발 대응: ${dev}).` }
+    ? { to: org, subject: `[VOC ${severity}] ${cat} — ${summary}`, body: `핵심 의도: ${summary}\n\n${content}\n\n분류: ${group} · ${cat} / 대응영역: ${area1} › ${area2}\n권장 조치: ${guideFor(cat) ? guideFor(cat).act : action}\n담당 검토 후 처리 요청 (개발 대응: ${dev}).` }
     : null
   return {
     id, source: 'input',
     channel: cleanChannel(r.channel), customer: maskPII(r.customer) || '****', customerRaw: (r.customer || '').trim(),
     date: r.date || '', week: r.week || '', occur: r.occur || '',
     content, summary, group, cat, severity, sentiment, status, conf, review, action, org, mode,
-    area1, area2, devNeeded: dev, owner: ownerForArea(area1), jiraUrl: '', ownerNote: '',
-    analysis: [
-      `채널·내용 기반 분류 → '${group}' (${mode})`,
-      mode === '정형' ? `정형 — 닫힌 분류값 '${cat}'로 매핑` : `열림 — 표준분류 22개 중 '${cat}'로 추론`,
-      `대응 영역 초안: ${area1} › ${area2} · 개발 대응: ${dev} · 진행상황: ${status}`,
-    ],
+    area1, area2, devNeeded: dev, owner, jiraUrl: '', ownerNote: '',
+    analysis: buildAnalysis({ summary, cat, group, mode, signals, severity, severityReason: severityReason(group, severity, issue), sentiment, area1, area2, owner, dev, status }),
     sms, mail, answer,
-    improvement: { problem: summary, suggestion: `${org} 확인 후 개선/안내`, effect: '재문의·불편 감소' },
+    improvement: { problem: summary, suggestion: `${guideFor(cat) ? guideFor(cat).act : org + ' 확인 후 개선/안내'}`, effect: '재문의·불편 감소' },
     ticket: '',
   }
 }
@@ -390,11 +487,9 @@ const LS_KEY = 'voc-action-copilot:added:v1'
 function hydrate(recs) {
   if (!Array.isArray(recs)) return []
   return recs.map((r) => {
-    const e = enrichRow({ channel: r.c, content: r.t, customer: r.n, date: r.d, week: r.w, occur: r.o }, r.id)
-    return {
-      ...e, status: r.s || e.status, owner: r.ow || e.owner, jiraUrl: r.j || '', ownerNote: r.on || '',
-      group: r.gr || e.group, cat: r.ct || e.cat, area1: r.a1 || e.area1, area2: r.a2 || e.area2, severity: r.sv || e.severity,
-    }
+    const e = enrichRow({ channel: r.c, content: r.t, customer: r.n, date: r.d, week: r.w, occur: r.o }, r.id,
+      { group: r.gr, cat: r.ct, area1: r.a1, area2: r.a2, severity: r.sv, status: r.s, owner: r.ow })
+    return { ...e, jiraUrl: r.j || '', ownerNote: r.on || '' }
   })
 }
 // 보강 레코드 → 압축 레코드 (저장·내보내기 공통)
@@ -1056,7 +1151,7 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert }) {
             <div className="co-row"><span className="co-k">요약</span><span className="muted">{result.summary}</span></div>
             <div className="co-row"><span className="co-k">진행 / 개발</span><StatBadge v={result.status} /><span className="muted">개발 대응: {result.devNeeded}</span></div>
             <div className="co-row"><span className="co-k">신뢰 / 검토</span><ConfBadge v={result.conf} />{result.review && <span className="rev-y">검토필요 Y</span>}</div>
-            <div className="co-ans"><div className="co-ans-k">예상 답안 (STT 핵심문장 반영 · 고객 응대 초안)</div><div className="co-ans-v">{result.answer}</div></div>
+            <div className="co-ans"><div className="co-ans-k">예상 답안 (분류 기반 고객 응대 초안)</div><div className="co-ans-v">{result.answer}</div></div>
             <div className="co-ans"><div className="co-ans-k">예상 처리 방안</div><div className="co-ans-v">{result.action}{result.devNeeded === 'Y' ? ' · 개발 대응 필요' : ''} · 담당 {result.org}</div></div>
             <p className="micro">{result.id} 추가됨 — 표/보드에서 확인하고 행을 클릭하면 답변 초안 등 상세가 열립니다. (담당자 검수 후 처리)</p>
           </div>
