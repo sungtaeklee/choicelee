@@ -1308,3 +1308,87 @@ svg.ltrend .lt-line:hover{opacity:1}
 .demo-btns .primary{background:var(--magenta);border-color:var(--magenta)}
 .demo-btns .primary:hover{background:var(--magenta-d)}
 @media (max-width:600px){.demo-cap{font-size:14px}.demo-btns{width:100%;margin-left:0}}
+
+/* ===================================================================
+   모바일 / 태블릿 반응형 전체 정리
+   데스크톱 고정 뷰포트(레일 + 서브LNB + 분할 패널) → 문서 흐름 + 하단 탭바
+=================================================================== */
+@media (max-width: 860px) {
+  /* 셸: 고정 뷰포트 해제 → 자연 스크롤, 하단 레일 공간 확보 */
+  .app { display: block; height: auto; min-height: 100vh; overflow: visible; padding-bottom: 58px; }
+
+  /* 아이콘 레일 → 화면 하단 고정 탭바 (가로) */
+  .rail {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    width: 100%; height: 56px; flex-direction: row;
+    align-items: center; justify-content: space-between;
+    padding: 0 8px; border-top: 1px solid #2a2833; z-index: 60;
+  }
+  .rail-top { flex-direction: row; gap: 2px; flex: 1; justify-content: space-around; }
+  .rail-bot { flex-direction: row; gap: 8px; align-items: center; }
+  .rail-ai { display: none; }
+  .rail-bot > .rail-ic { display: none; }
+  .rail-ic { width: auto; min-width: 52px; height: 46px; padding: 0 6px; border-radius: 9px; }
+  .rail-ic span { font-size: 9px; }
+  .rail-avatar { width: 30px; height: 30px; font-size: 12px; }
+
+  /* 워크스페이스: 전체폭 + 자연 스크롤 */
+  .workspace, .workspace.portal { height: auto; min-height: 0; overflow: visible; }
+  .portal-top { position: sticky; top: 0; z-index: 30; padding: 0 14px; height: 52px; }
+  .portal-body, .portal-body.home-body { overflow: visible; height: auto; }
+
+  /* 서브 LNB → 상단 가로 스크롤 탭 스트립 */
+  .sublnb {
+    width: 100%; height: auto; flex-direction: row; align-items: center;
+    gap: 6px; padding: 8px 12px; overflow-x: auto; overflow-y: hidden;
+    border-right: 0; border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; background: var(--surface); z-index: 25;
+  }
+  .slnb-brand, .slnb-sec-l, .slnb-pin, .slnb-foot { display: none; }
+  .sublnb .slnb-nav { flex-direction: row; gap: 6px; flex-shrink: 0; }
+  .slnb-item { white-space: nowrap; padding: 8px 13px; font-size: 12.5px; }
+
+  /* 상단바 간결화 + Agent 작업영역 세로 적층 */
+  .topbar { position: static; }
+  .tb-main { padding: 0 14px; }
+  .tb-agent { display: none; }
+  .tb-share-btn { padding: 5px 8px; }
+  .workbody { flex-direction: column; }
+  .main-nav { overflow: visible; }
+  .content { padding: 16px 14px 28px; }
+  .agent-panel, .mode-split .agent-panel, .mode-expanded .agent-panel {
+    width: 100%; flex: none; max-width: none; margin: 0;
+    border-left: 0; border-top: 1px solid var(--line);
+  }
+  .ap-body { overflow: visible; }
+
+  /* 표/차트 가로 스크롤 */
+  .table-wrap, .lt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* 그리드 1열화 */
+  .case-grid, .two-col, .ba-grid, .prompt-grid, .dash-charts,
+  .phase-row, .eng-grid, .pat-grid { grid-template-columns: 1fr; }
+  .case-side { position: static; }
+  .stat-row, .effect-row, .card-row, .dash-kpis, .p2-steps-row { grid-template-columns: repeat(2, 1fr); }
+  .kanban { grid-template-columns: 1fr; }
+
+  /* 입력/필터 줄바꿈 */
+  .date-filter { flex-wrap: wrap; gap: 8px; }
+  .modal { width: calc(100vw - 28px); }
+
+  /* 플로팅 요소는 하단 레일 위로 */
+  .demo-fab { bottom: 70px; right: 14px; }
+  .demo-bar { bottom: 70px; width: calc(100vw - 18px); }
+}
+
+@media (max-width: 480px) {
+  .content { padding: 14px 12px 24px; }
+  .stat-row, .effect-row, .card-row, .dash-kpis, .p2-steps-row, .kpi-row { grid-template-columns: 1fr; }
+  .page-title { font-size: 20px; }
+  .rail-ic { min-width: 44px; }
+  .rail-ic span { font-size: 8px; }
+  .portal-top .ai-pill { display: none; }
+  .crumb { font-size: 12px; }
+  .pd-frame { width: 100%; max-width: 300px; }
+  .mr-from { width: 84px; } .mr-date { width: 86px; }
+}
