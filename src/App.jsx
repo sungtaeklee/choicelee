@@ -1186,7 +1186,8 @@ function FlowMap() {
   )
 }
 function Architecture() {
-  const [open, setOpen] = useState(null)
+  const Box = ({ t, d }) => <div className="fc-box"><b>{t}</b>{d && <span>{d}</span>}</div>
+  const Arrow = () => <span className="fc-arrow" aria-hidden="true" />
   const flow = ['VOC 발생', 'Copilot 분석', '고객 대응 생성', '개선 과제 도출', '리포트 생성']
   const roles = [
     { t: '분석', d: '유형 · 심각도 자동 분류' },
@@ -1194,10 +1195,16 @@ function Architecture() {
     { t: '개선', d: '개선 과제 도출' },
     { t: '리포트', d: '현황 · 인사이트 요약' },
   ]
-  const steps = [
-    { t: 'Step 1 · 고객 접점', items: ['VOC 발생 (상담콜 · 앱 · 홈페이지)', '셀프 가이드로 사전 해결 시도', '미해결 건만 상담 연결'] },
-    { t: 'Step 2 · 수집 · 분류', items: ['채널 수집 · 전처리 (STT · 마스킹)', 'Copilot 자동 분류 (4그룹 · 22개)', '감성 · 긴급도 우선순위화'] },
-    { t: 'Step 3 · 운영 · 개선', items: ['대시보드로 추이 · 처리현황 확인', '담당자 알림 + 예상 답안 안내', '개선 과제 → 서비스 반영'] },
+  const intake = [
+    { t: '채널 수집', d: '상담콜 · 앱 · 홈페이지' },
+    { t: '전처리', d: 'STT · 개인정보 마스킹' },
+    { t: '자동 분류', d: '4그룹 · 22개 표준분류' },
+    { t: '우선순위화', d: '감성 · 긴급도 스코어링' },
+  ]
+  const operate = [
+    { t: '대시보드', d: '유형·영역 추이 · 처리현황' },
+    { t: '인사이트 · 담당자 알림', d: '예상 답안 · 처리 가이드' },
+    { t: '서비스 반영', d: '근본 원인 개선' },
   ]
   const effects = [
     { t: '상담 Call 감소', d: '셀프 해결로 인입 감소' },
@@ -1220,30 +1227,60 @@ function Architecture() {
       <h2 className="sec-title">Copilot 역할</h2>
       <div className="effect-row">{roles.map((r) => <div key={r.t} className="effect-card"><div className="effect-t">{r.t}</div><div className="effect-d">{r.d}</div></div>)}</div>
 
-      <h2 className="sec-title">문제 → 해결</h2>
-      <div className="ba-grid">
-        <div className="panel ba-before"><div className="ba-tag">AS-IS</div><ul className="ba-list"><li>수기 분류</li><li>중복 처리</li><li>대응 지연</li></ul></div>
-        <div className="panel ba-after"><div className="ba-tag after">TO-BE</div><ul className="ba-list"><li>Copilot 자동 분류</li><li>자동 메시지 생성</li><li>실시간 대응</li></ul></div>
+      <h2 className="sec-title">처리 흐름 <span className="sec-note">셀프 해결 → 미해결 시 수집·분류 → 운영·반영</span></h2>
+      <FlowMap />
+
+      <h2 className="sec-title">단계별 상세 <span className="sec-note">3개 레인 · 수집부터 반영까지</span></h2>
+      <div className="flowchart">
+        <div className="fc-lane">
+          <div className="fc-lane-h"><span className="n">1</span>고객 접점 · 셀프 해결</div>
+          <Box t="VOC 발생" />
+          <Arrow />
+          <div className="fc-decision"><span className="fc-dia">◆</span> 셀프 가이드로 해결 가능?</div>
+          <div className="fc-branch">
+            <div className="fc-leg">
+              <span className="fc-yes">예</span>
+              <Box t="고객 셀프 해결" d="접수 전 맞춤 가이드" />
+              <Arrow />
+              <div className="fc-pill end">END · 인입콜 감소</div>
+            </div>
+            <div className="fc-leg">
+              <span className="fc-no">아니오</span>
+              <Box t="상담 연결 · VOC 접수" d="미해결 건만 전달" />
+              <Arrow />
+              <div className="fc-next">↳ 레인 2로 유입</div>
+            </div>
+          </div>
+        </div>
+        <div className="fc-lane">
+          <div className="fc-lane-h"><span className="n">2</span>수집 · 자동 분류</div>
+          {intake.map((s, i) => <React.Fragment key={s.t}><Box t={s.t} d={s.d} />{i < intake.length - 1 && <Arrow />}</React.Fragment>)}
+          <div className="fc-loop">⟲ 처리 결과는 분류 모델 학습으로 되먹임</div>
+        </div>
+        <div className="fc-lane">
+          <div className="fc-lane-h"><span className="n">3</span>운영 · 서비스 반영</div>
+          {operate.map((s, i) => <React.Fragment key={s.t}><Box t={s.t} d={s.d} />{i < operate.length - 1 && <Arrow />}</React.Fragment>)}
+          <Arrow />
+          <div className="fc-pill end">END · 처리율 · 속도 향상</div>
+        </div>
       </div>
 
-      <h2 className="sec-title">상세 구조 <span className="sec-note">제목을 클릭하면 펼쳐집니다</span></h2>
-      <div className="sol-acc">{steps.map((st, i) => (
-        <div key={st.t} className={'sol-acc-item' + (open === i ? ' open' : '')}>
-          <button className="sol-acc-h" onClick={() => setOpen(open === i ? null : i)}><span>{st.t}</span><span className="sol-acc-x">{open === i ? '▲' : '▼'}</span></button>
-          {open === i && <ul className="sol-acc-b">{st.items.map((t) => <li key={t}>{t}</li>)}</ul>}
-        </div>
-      ))}</div>
+      <h2 className="sec-title">문제 → 해결</h2>
+      <div className="ba-grid">
+        <div className="panel ba-before"><div className="ba-tag">AS-IS</div><ul className="ba-list"><li>수기 분류 · 태깅</li><li>채널별 중복 처리</li><li>대응 지연 · 반복 인입</li></ul></div>
+        <div className="panel ba-after"><div className="ba-tag after">TO-BE</div><ul className="ba-list"><li>Copilot 자동 분류</li><li>문자·메일 자동 생성</li><li>실시간 대응 · 셀프 해결</li></ul></div>
+      </div>
 
       <h2 className="sec-title">기대 효과</h2>
       <div className="effect-row">{effects.map((e) => <div key={e.t} className="effect-card"><div className="effect-t">{e.t}</div><div className="effect-d">{e.d}</div></div>)}</div>
 
       <h2 className="sec-title">구현 로드맵</h2>
       <div className="roadmap">
-        <div className="rm-step rm-now"><div className="rm-t">PoC <span className="rm-badge">현재</span></div></div>
+        <div className="rm-step rm-now"><div className="rm-t">PoC <span className="rm-badge">현재</span></div><div className="rm-d">핵심 분류·대시보드 프로토타입</div></div>
         <span className="rm-ar">→</span>
-        <div className="rm-step"><div className="rm-t">파일럿</div></div>
+        <div className="rm-step"><div className="rm-t">파일럿</div><div className="rm-d">실 VOC·STT로 정확도 고도화</div></div>
         <span className="rm-ar">→</span>
-        <div className="rm-step"><div className="rm-t">전사 확산</div></div>
+        <div className="rm-step"><div className="rm-t">전사 확산</div><div className="rm-d">CX 전 영역·타 채널 확대</div></div>
       </div>
     </div>
   )
