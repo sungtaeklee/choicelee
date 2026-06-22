@@ -64,7 +64,7 @@ async function callAnthropic({ system, user, signal }) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', signal,
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model, max_tokens: 1024, system, messages: [{ role: 'user', content: user }] }),
+    body: JSON.stringify({ model, max_tokens: 1536, system, messages: [{ role: 'user', content: user }] }),
   })
   if (!res.ok) throw new Error('anthropic ' + res.status + ' ' + (await res.text()).slice(0, 200))
   const data = await res.json()
@@ -81,7 +81,7 @@ async function callAzure({ system, user, signal }) {
     headers: { 'content-type': 'application/json', 'api-key': key },
     body: JSON.stringify({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      max_tokens: 1024, temperature: 0.2, response_format: { type: 'json_object' },
+      max_tokens: 1536, temperature: 0.2, response_format: { type: 'json_object' },
     }),
   })
   if (!res.ok) throw new Error('azure ' + res.status + ' ' + (await res.text()).slice(0, 200))
@@ -102,7 +102,8 @@ async function callOpenAICompat({ system, user, signal }) {
     method: 'POST', signal,
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
     body: JSON.stringify({
-      model, max_tokens: 1024, temperature: 0.2,
+      model, max_tokens: 1536, temperature: 0.2,
+      response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     }),
   })
@@ -111,11 +112,27 @@ async function callOpenAICompat({ system, user, signal }) {
   return data.choices?.[0]?.message?.content || ''
 }
 
+function tryParse(t) { try { return JSON.parse(t) } catch { return null } }
+/* 잘린 JSON 복구: 열린 따옴표/괄호 닫고 trailing comma 제거 */
+function repairJson(t) {
+  let s = String(t)
+  if (((s.match(/(?<!\\)"/g) || []).length) % 2 === 1) s += '"'
+  const oa = (s.match(/\[/g) || []).length, ca = (s.match(/\]/g) || []).length
+  const ob = (s.match(/\{/g) || []).length, cb = (s.match(/\}/g) || []).length
+  s += ']'.repeat(Math.max(0, oa - ca)) + '}'.repeat(Math.max(0, ob - cb))
+  return s.replace(/,\s*([}\]])/g, '$1')
+}
 function parseModelJson(text) {
   let t = String(text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
   const i = t.indexOf('{'), j = t.lastIndexOf('}')
   if (i >= 0 && j > i) t = t.slice(i, j + 1)
-  const o = JSON.parse(t)
+  else if (i >= 0) t = t.slice(i)            // 닫힘 '}' 없음(잘림) → 시작부터 보존 후 복구
+  let o = tryParse(t) || tryParse(repairJson(t))
+  if (!o) {                                  // 그래도 실패 시 정규식으로 핵심 필드만 추출
+    const get = (k) => { const m = t.match(new RegExp('"' + k + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"')); return m ? m[1].replace(/\\"/g, '"').replace(/\\n/g, ' ') : '' }
+    o = { summary: get('summary'), rootCause: get('rootCause'), group: get('group'), cat: get('cat'), reason: get('reason'), sentiment: get('sentiment'), urgency: get('urgency'), customerReply: get('customerReply'), smsDraft: get('smsDraft'), nextActions: [] }
+    if (!o.summary && !o.cat) throw new Error('JSON 파싱 실패(응답 형식 확인 필요)')
+  }
   // 스키마 정규화 + 안전값
   const oneOf = (v, list, dflt) => (list.includes(v) ? v : dflt)
   return {
