@@ -1236,7 +1236,7 @@ function AiBox({ q, rows, acts, dismissable = true }) {
     </div>
   )
 }
-function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
+function HomePortal({ account, added, goAgent, setRail, openCase, notify, aiMode, setAiMode }) {
   const data = added || []
   const total = data.length
   const todo = data.filter((v) => v.status === '처리 필요').length
@@ -1368,10 +1368,50 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
     </div>
   )
 
+  const todoCards = (
+    <div className="todo-cards">
+      <div className="todo-card">
+        <div className="tc-head"><span>{anomalyTitle}</span></div>
+        <div className="tc-bars">{barData.map((b, i) => (
+          <div key={i} className="tc-bar"><div className={'tc-bcol' + (b.hot ? ' mag' : '')} style={{ height: Math.max(6, Math.round(b.n / barMax * 100)) + '%' }} /><span className="tc-bn">{b.n.toLocaleString()}건</span><span className="tc-bl" title={b.l}>{b.l}</span></div>
+        ))}</div>
+        <div className="tc-cap">{anomalyCap}</div>
+        <button className="ai-pill-btn" onClick={() => goAgent('trends')}>추이 상세</button>
+      </div>
+      <div className="todo-card">
+        <div className="tc-head"><span>검토 필요 케이스 정리</span></div>
+        <div className="tc-quote">“{sampleCase ? (sampleCase.summary || sampleCase.content) : '검토 대상이 없어요'}”</div>
+        <div className="tc-cap">검토필요 {review.toLocaleString()}건 · 분류 확인 필요</div>
+        <button className="ai-pill-btn" onClick={() => sampleCase ? (openCase && openCase(sampleCase.id)) : goAgent('detail')}>케이스 열기</button>
+      </div>
+      <div className="todo-card">
+        <div className="tc-head"><span>처리 라인 진행</span></div>
+        <div className="tc-stepper">
+          <div className="step done"><span className="dot">{clsDoneN.toLocaleString()}</span><span className="s-l">분류 완료</span></div>
+          <span className="step-line" />
+          <div className="step doing"><span className="dot">{doing.toLocaleString()}</span><span className="s-l">처리 중</span></div>
+          <span className="step-line" />
+          <div className="step"><span className="dot">{doneN.toLocaleString()}</span><span className="s-l">처리 완료</span></div>
+        </div>
+        <button className="ai-pill-btn primary" onClick={() => goAgent('board')}>분류 보드 열기</button>
+      </div>
+    </div>
+  )
+
+  // 홈(컴팩트) 우측 패널 — 이미지1
   const aiPanel = (
-    <aside className="home-ai">
+    <aside className="home-ai compact">
       <div className="ai-badge">✦ VOC Copilot</div>
       <h3>무엇을 도와드릴까요?</h3>
+      <div className="brief-l">todo 브리핑</div>
+      <div className="brief-box">{(brief.slice(0, 4)).map((b, i) => (
+        <div key={i} className="brief-item"><span className="b-t">{b.t}</span><span className={'imp ' + b.imp}>{b.imp === 'hi' ? '중요도 높음' : '중요도 보통'}</span></div>
+      ))}</div>
+      <div className="chips">
+        <button className="chip-btn" onClick={() => goAgent('trends')}>이상 징후 요약</button>
+        <button className="chip-btn" onClick={() => goAgent('detail')}>처리 필요 정리</button>
+        <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위</button>
+      </div>
       <div className="ai-input">
         <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
         <input placeholder="VOC 관련 무엇이든 물어보세요" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
@@ -1380,45 +1420,51 @@ function HomePortal({ account, added, goAgent, setRail, openCase, notify }) {
           <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.ai-input').querySelector('input'))}>↑</button>
         </div>
       </div>
-      <div className="chips">
-        <button className="chip-btn" onClick={() => goAgent('trends')}>이상 징후 요약</button>
-        <button className="chip-btn" onClick={() => goAgent('detail')}>처리 필요 정리</button>
-        <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위</button>
-      </div>
-      <div className="brief-l">오늘의 VOC 브리핑</div>
-      <div className="brief-box">{(brief.slice(0, 4)).map((b, i) => (
-        <div key={i} className="brief-item"><span className="b-t">{b.t}</span><span className={'imp ' + b.imp}>{b.imp === 'hi' ? '중요도 높음' : '중요도 보통'}</span></div>
-      ))}</div>
-      <div className="todo-rec"><span className="tr-l">오늘의 todo 추천</span><button className="refresh" onClick={() => askDemo('todo 새로고침')}>↻ 새로고침</button></div>
-      <div className="panel-todos">
-        <div className="todo-card">
-          <div className="tc-head"><span>{anomalyTitle}</span></div>
-          <div className="tc-bars">{barData.map((b, i) => (
-            <div key={i} className="tc-bar"><div className={'tc-bcol' + (b.hot ? ' mag' : '')} style={{ height: Math.max(6, Math.round(b.n / barMax * 100)) + '%' }} /><span className="tc-bn">{b.n.toLocaleString()}건</span><span className="tc-bl" title={b.l}>{b.l}</span></div>
-          ))}</div>
-          <div className="tc-cap">{anomalyCap}</div>
-          <button className="ai-pill-btn" onClick={() => goAgent('trends')}>추이 상세</button>
-        </div>
-        <div className="todo-card">
-          <div className="tc-head"><span>검토 필요 케이스 정리</span></div>
-          <div className="tc-quote">“{sampleCase ? (sampleCase.summary || sampleCase.content) : '검토 대상이 없어요'}”</div>
-          <div className="tc-cap">검토필요 {review.toLocaleString()}건 · 분류 확인 필요</div>
-          <button className="ai-pill-btn" onClick={() => sampleCase ? (openCase && openCase(sampleCase.id)) : goAgent('detail')}>케이스 열기</button>
-        </div>
-        <div className="todo-card">
-          <div className="tc-head"><span>처리 라인 진행</span></div>
-          <div className="tc-stepper">
-            <div className="step done"><span className="dot">{clsDoneN.toLocaleString()}</span><span className="s-l">분류 완료</span></div>
-            <span className="step-line" />
-            <div className="step doing"><span className="dot">{doing.toLocaleString()}</span><span className="s-l">처리 중</span></div>
-            <span className="step-line" />
-            <div className="step"><span className="dot">{doneN.toLocaleString()}</span><span className="s-l">처리 완료</span></div>
-          </div>
-          <button className="ai-pill-btn primary" onClick={() => goAgent('board')}>분류 보드 열기</button>
-        </div>
-      </div>
-      <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다. todo는 수집된 VOC 기준 추천입니다.</p>
+      <button className="ai-expand-link" onClick={() => setAiMode && setAiMode(true)}>AI 워크스페이스 펼치기 <span className="ex-ic">⤢</span></button>
+      <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다.</p>
     </aside>
+  )
+
+  // 펼침 AI 워크스페이스 — 이미지2 (좌측 카드 레일 + 중앙 AI)
+  const aiWorkspace = (
+    <div className="home-ai-work">
+      <div className="aiw-side">
+        {cardAgent}
+        {cardAnomaly}
+        {cardCase}
+      </div>
+      <div className="aiw-main">
+        <div className="aiw-band"><span className="aiw-sub">AI 시작하기</span></div>
+        <div className="aiw-body">
+          <div className="aiw-hero">
+            <div className="aiw-spark">✦</div>
+            <h2>안녕하세요, <b>{name}</b> 님<span className="dot">.</span></h2>
+          </div>
+          <div className="aiw-inputbox">
+            <div className="ai-i-top"><span className="ai-spark">✦</span>AI</div>
+            <input placeholder="어떤 일이든 시작해보세요 — VOC 분류 · 추이 · 개선" onKeyDown={(e) => { if (e.key === 'Enter') sendDemo(e.currentTarget) }} />
+            <div className="ai-i-bot">
+              <div className="ai-i-tools"><span onClick={() => askDemo('리서치')}>⌕ 리서치</span><span onClick={() => askDemo('툴')}>✎ 툴</span></div>
+              <button className="ai-send" onClick={(e) => sendDemo(e.currentTarget.closest('.aiw-inputbox').querySelector('input'))}>↑</button>
+            </div>
+          </div>
+          <div className="aiw-chips">
+            <button className="chip-btn" onClick={() => goAgent('trends')}>오늘 급증 VOC 정리해줘</button>
+            <button className="chip-btn" onClick={() => goAgent('detail')}>검토필요 케이스 보여줘</button>
+            <button className="chip-btn" onClick={() => goAgent('backlog')}>개선 우선순위 알려줘</button>
+          </div>
+          <div className="todo-rec"><span className="tr-l">오늘의 todo 추천</span><button className="refresh" onClick={() => askDemo('todo 새로고침')}>↻ 새로고침</button></div>
+          {todoCards}
+          <p className="ai-foot">사내 네트워크 정책으로 데모에서는 실제 AI 호출 대신 키워드 기반으로 동작합니다. todo는 수집된 VOC 기준 추천입니다.</p>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (aiMode) return (
+    <div className="portal-screen home-wide">
+      {aiWorkspace}
+    </div>
   )
 
   return (
@@ -1699,6 +1745,7 @@ export default function App() {
   const [modal, setModal] = useState({ open: false, title: '', body: '' })
   const [panelMode, setPanelMode] = useState('split') // 'split'(분할·기본) | 'collapsed'(Nav 전체) | 'expanded'(Agent 전체)
   const [railView, setRail] = useState('home') // 'home'|'agent'|'mail'|'cal'|'org'|'pay'|'grid'
+  const [homeAi, setHomeAi] = useState(false) // 홈 우측: false=홈(컴팩트 패널) / true=AI 펼침 워크스페이스
   const [selected, setSelected] = useState([]) // 체크박스로 선택한 케이스 id (대시보드 ↔ Agent 패널 공유)
   const [added, setAdded] = useState(loadAdded) // 입력/붙여넣은 VOC — localStorage에 저장되어 재접속 시 복원됨
   const [sentLog, setSentLog] = useState(loadSent)
@@ -1750,11 +1797,19 @@ export default function App() {
         <div className="workspace portal">
           <header className="portal-top">
             <div className="crumb">U+ Work<span className="crumb-sep">›</span><b>{PORTAL_TITLES[railView]}</b></div>
-            <span className="ai-pill">● 통합 업무 · 데모</span>
+            <div className="pt-right">
+              {railView === 'home' && (
+                <div className="ai-toggle" role="tablist" aria-label="홈/AI 전환">
+                  <button className={homeAi ? '' : 'on'} onClick={() => setHomeAi(false)}>홈</button>
+                  <button className={homeAi ? 'on' : ''} onClick={() => setHomeAi(true)}>✦ AI</button>
+                </div>
+              )}
+              <span className="ai-pill">● 통합 업무 · 데모</span>
+            </div>
           </header>
           <main className="portal-body">
             <div className="content">
-              {railView === 'home' && <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} openCase={openCase} notify={notify} />}
+              {railView === 'home' && <HomePortal account={authEmail} added={added} goAgent={goAgent} setRail={setRail} openCase={openCase} notify={notify} aiMode={homeAi} setAiMode={setHomeAi} />}
               {railView === 'mail' && <MailApp sentLog={sentLog} />}
               {railView === 'cal' && <CalendarApp />}
               {railView === 'org' && <OrgApp />}

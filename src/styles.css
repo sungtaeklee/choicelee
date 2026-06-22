@@ -611,6 +611,7 @@ h1,h2{margin:0}
 /* ---------- 통합 홈(포털) + 업무 앱 ---------- */
 .workspace.portal{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .portal-top{height:56px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff}
+.pt-right{display:flex;align-items:center;gap:12px}
 .portal-body{flex:1;overflow:auto}
 .portal-screen{max-width:1180px}
 .demo-banner{background:var(--magenta-soft);color:var(--magenta-d);border-radius:10px;padding:9px 14px;font-size:12.5px;margin-bottom:14px}
@@ -746,6 +747,11 @@ h1,h2{margin:0}
 .home-ai::-webkit-scrollbar{width:8px}
 .home-ai::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
 @media(max-width:1080px){.home-ai{position:static;max-height:none;overflow:visible}}
+.home-ai.compact{max-height:none;overflow:visible}
+.ai-expand-link{align-self:flex-start;border:0;background:none;color:var(--magenta-d);font:700 12px var(--sans);padding:2px 0;display:inline-flex;align-items:center;gap:5px}
+.ai-expand-link:hover{text-decoration:underline}
+.ai-expand-link .ex-ic{font-size:13px}
+.aiw-hero h2 .dot{color:var(--magenta)}
 .ai-badge{align-self:flex-start;font:700 11px var(--sans);color:var(--magenta-d);background:var(--magenta-soft);padding:4px 10px;border-radius:20px}
 .home-ai h3{font:800 18px var(--sans);letter-spacing:-.02em;margin:0;color:var(--ink)}
 .brief-l{font-size:11.5px;font-weight:700;color:var(--faint)}
@@ -780,8 +786,8 @@ h1,h2{margin:0}
 .aiw-side .hcard{margin:0}
 .aiw-main{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;min-width:0}
 .aiw-band{background:linear-gradient(120deg,#fbe6f2 0%,#ede9fb 52%,#e4f0fb 100%);padding:15px 22px;display:flex;align-items:center;gap:13px}
-.ai-toggle{display:inline-flex;background:rgba(255,255,255,.7);border:1px solid #fff;border-radius:11px;padding:3px}
-.ai-toggle button{border:0;background:none;padding:6px 16px;border-radius:8px;font:700 12.5px var(--sans);color:var(--slate);transition:.12s}
+.ai-toggle{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:3px}
+.ai-toggle button{border:0;background:none;padding:6px 15px;border-radius:8px;font:700 12.5px var(--sans);color:var(--muted);transition:.12s;display:inline-flex;align-items:center;gap:4px}
 .ai-toggle button.on{background:var(--ink);color:#fff}
 .ai-toggle button:not(.on):hover{color:var(--ink)}
 .aiw-sub{font-size:12.5px;color:var(--slate);font-weight:600}
