@@ -1045,7 +1045,37 @@ function Donut({ segments, total, centerLabel }) {
     </svg>
   )
 }
-/* ---------- [2] VOC Inbox (채널 수집 + 화면 직접 입력) ---------- */
+/* 세로 막대 차트(최대값 강조) — 레퍼런스 '시간대별 현황' 스타일 */
+function Bar({ data }) {
+  const max = Math.max(1, ...data.map((d) => d.n))
+  if (!data.length) return <p className="micro">표시할 데이터가 없습니다.</p>
+  return (
+    <div className="barc">
+      {data.map((d, i) => {
+        const h = Math.max(4, Math.round((d.n / max) * 100))
+        const top = d.n === max
+        return (
+          <div key={i} className="barc-col" title={`${d.k} · ${d.n}건`}>
+            <div className="barc-track"><div className={'barc-fill' + (top ? ' top' : '')} style={{ height: h + '%' }}><span>{d.n}</span></div></div>
+            <span className="barc-x">{d.k}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+/* KPI 카드(증감 델타) — 레퍼런스 상단 지표 스타일. up=증가(빨강·나쁨), down=감소(파랑) */
+function DashKpi({ label, value, unit, delta, deltaLabel, sub, accent }) {
+  return (
+    <div className={'dkpi' + (accent ? ' dkpi-' + accent : '')}>
+      <div className="dkpi-l">{label}</div>
+      <div className="dkpi-v">{value}<span className="dkpi-u">{unit}</span></div>
+      {typeof delta === 'number'
+        ? <div className={'dkpi-d ' + (delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat')}>{delta > 0 ? '▲' : delta < 0 ? '▼' : '–'} {Math.abs(delta)}건 <span>{deltaLabel}</span></div>
+        : <div className="dkpi-d flat"><span>{sub}</span></div>}
+    </div>
+  )
+}
 const INPUT_CHANNELS = ['고객의소리', 'Call', 'Medallia', 'App Store', '고객센터']
 const SHEET_COLS = [
   { k: 'date', label: '인입일자', w: 108 }, { k: 'channel', label: '인입채널', w: 104 },
@@ -1432,6 +1462,15 @@ function InsightReport({ added, openCase }) {
   const pr = (i) => i < 3 ? 'P1' : i < 7 ? 'P2' : 'P3'
   const devCnt = data.filter((v) => v.devNeeded === 'Y').length
   const reviewN = data.filter((v) => v.review).length
+  // 레퍼런스형 대시보드용 집계
+  const GROUP_COLORS = { '장애/오류': '#3b5ba5', '성능': '#ff7c43', '개선 요청/희망': '#ffb020', '단순 문의/불만/기타': '#36a2c9' }
+  const segs = groupSplit.filter((g) => g.n > 0).map((g) => ({ label: g.g, value: g.n, color: GROUP_COLORS[g.g] || 'var(--magenta)' }))
+  const weeks = useMemo(() => { const s = new Set(); data.forEach((v) => v.week && s.add(v.week)); return [...s].sort() }, [data])
+  const weekCounts = weeks.map((w) => data.filter((v) => v.week === w).length)
+  const trendSeries = [{ key: 'voc', label: 'VOC 건수', values: weekCounts, color: 'var(--magenta)' }]
+  const wkDelta = weekCounts.length >= 2 ? weekCounts[weekCounts.length - 1] - weekCounts[weekCounts.length - 2] : 0
+  const areaCounts = useMemo(() => { const m = {}; data.forEach((v) => { m[v.area1] = (m[v.area1] || 0) + 1 }); return Object.entries(m).map(([k, n]) => ({ k, n })).sort((a, b) => b.n - a.n).slice(0, 6) }, [data])
+  const highPct = Math.round((highList.length / (data.length || 1)) * 100)
   const insights = []
   if (highList.length) insights.push(`High 리스크 ${highList.length}건 — 즉시 처리 우선순위`)
   if (dist[0]) insights.push(`가장 많은 유형은 '${dist[0].k}' (${dist[0].n}건, ${dist[0].pct}%) — 우선 대응 검토`)
@@ -1443,6 +1482,31 @@ function InsightReport({ added, openCase }) {
   return (
     <div className="screen">
       <PageHead title="인사이트 리포트" sub="High 리스크 이슈 · 유사 VOC 개선 우선순위 · 분포와 자동 인사이트를 한 곳에서" />
+      <div className="dash-kpis">
+        <DashKpi label="총 VOC" value={data.length.toLocaleString()} unit="건" delta={wkDelta} deltaLabel="직전 주차 대비" />
+        <DashKpi label="High 리스크" value={highList.length.toLocaleString()} unit="건" sub={`전체의 ${highPct}%`} accent="warn" />
+        <DashKpi label="검토 필요" value={reviewN.toLocaleString()} unit="건" sub="분류 확인 필요" />
+        <DashKpi label="개발 대응" value={devCnt.toLocaleString()} unit="건" sub="개발/UX 개선 연계" accent="brand" />
+      </div>
+      <div className="dash-charts">
+        <div className="panel dash-card">
+          <div className="card-title">VOC 구분(그룹) 분포 <span className="muted">총 {data.length.toLocaleString()}건</span></div>
+          <div className="dash-donut">
+            <Donut segments={segs} total={data.length} centerLabel="총 VOC" />
+            <ul className="dash-legend">{segs.map((s) => (
+              <li key={s.label}><span className="dl-dot" style={{ background: s.color }} />{s.label}<b>{Math.round((s.value / (data.length || 1)) * 100)}%</b></li>
+            ))}</ul>
+          </div>
+        </div>
+        <div className="panel dash-card">
+          <div className="card-title">주차별 VOC 추이 <span className="muted">{weeks.length ? `${weeks[0]} ~ ${weeks[weeks.length - 1]}` : '데이터 없음'}</span></div>
+          {weeks.length ? <MultiLine labels={weeks} series={trendSeries} perPoint={1} /> : <p className="micro">주차 데이터가 없습니다.</p>}
+        </div>
+        <div className="panel dash-card">
+          <div className="card-title">대응영역별 건수 <span className="muted">상위 {areaCounts.length}개</span></div>
+          <Bar data={areaCounts} />
+        </div>
+      </div>
       <div className="panel">
         <div className="card-title">High 리스크 이슈 <span className="muted">즉시 처리 우선 · {highList.length.toLocaleString()}건 · 행 클릭 시 VOC 처리로 이동</span></div>
         {highList.length ? (
@@ -2413,8 +2477,8 @@ const ORG_TREE = {
         { name: '디지털CX트라이브', children: [
           { name: '디지털CX전략팀' },
           { name: '디지털커머스CX팀' },
-          { name: '디지털통합CX팀', people: ['p_t1', 'p_t2'] },
-          { name: '디자인시스템스쿼드', people: ['p_lead', 'p_ux', 'p_fe', 'p_res', 'p_pm'] },
+          { name: '디지털통합CX팀', people: ['p_khg', 'p_t1', 'p_t2'] },
+          { name: '디자인시스템스쿼드', people: ['p_lst', 'p_lead', 'p_ux', 'p_fe', 'p_res', 'p_pm'] },
           { name: '디지털혜택CX팀' },
           { name: '디지털가입CX스쿼드' },
           { name: 'AI검색TF' },
@@ -2427,6 +2491,8 @@ const ORG_TREE = {
 const ORG_OPEN_DEFAULT = ['LG유플러스', 'Consumer부문', '모바일/디지털사업그룹', '디지털CX트라이브', '디자인시스템스쿼드']
 const BREAD = 'Consumer부문 › 모바일/디지털사업그룹 › 디지털CX트라이브'
 const ORG_PROFILES = {
+  p_lst: { name: '이성택', title: 'UX Architect', team: '디자인시스템스쿼드', email: 'ds.architect@uplus-demo.kr', phone: '010-****-****', work: ['UX Architect', '[2025~] Communication service UX', '- 너겟 / VOC Action Copilot'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
+  p_khg: { name: '김형걸', title: 'CX 책임', team: '디지털통합CX팀', email: 'cx.lead@uplus-demo.kr', phone: '010-****-****', work: ['CX 책임', 'VOC 대응·개선 총괄', '- Copilot 경진대회 운영'], mission: '고객을 위한 디지털통합CX팀 미션' },
   p_lead: { name: '강도현', title: '스쿼드 리드', team: '디자인시스템스쿼드', email: 'ds.lead@uplus-demo.kr', phone: '010-****-****', work: ['Design System Lead', '[2024~] CX 디자인시스템 총괄', '- 너겟 / VOC Action Copilot'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
   p_ux: { name: '이도현', title: 'UX Architect', team: '디자인시스템스쿼드', email: 'ds.ux@uplus-demo.kr', phone: '010-****-****', work: ['UX Architect', '[2025~] Communication service UX', '- 너겟 / VOC Action Copilot'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
   p_fe: { name: '정우진', title: 'Frontend Engineer', team: '디자인시스템스쿼드', email: 'ds.fe@uplus-demo.kr', phone: '010-****-****', work: ['Frontend Engineer', 'React · 디자인시스템 컴포넌트', '- VOC Action Copilot 프로토타입'], mission: '고객을 위한 디자인시스템스쿼드 미션' },
@@ -2437,7 +2503,7 @@ const ORG_PROFILES = {
 }
 function initials(n) { return (n || '·').slice(0, 1) }
 function OrgApp({ notify }) {
-  const [sel, setSel] = useState('p_ux')
+  const [sel, setSel] = useState('p_lst')
   const [openSet, setOpenSet] = useState(() => new Set(ORG_OPEN_DEFAULT))
   const [q, setQ] = useState('')
   const toggle = (n) => setOpenSet((s) => { const x = new Set(s); x.has(n) ? x.delete(n) : x.add(n); return x })
