@@ -1677,3 +1677,11 @@ svg.ltrend .lt-line:hover{opacity:1}
 .an-item-id{font-size:12px;color:var(--slate);flex-shrink:0}
 .an-item-sum{flex:1;min-width:0;font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .an-item-go{flex-shrink:0;font-size:11.5px;font-weight:600;color:var(--magenta-d)}
+
+/* ---------- VOC 처리: 돌아갈 곳 안내(웨이파인딩) ---------- */
+.cd-nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.cd-back{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px 12px;font:600 12.5px var(--sans);color:var(--slate);cursor:pointer}
+.cd-back:hover{border-color:var(--magenta);color:var(--magenta-d)}
+.cd-crumb{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.cd-crumb b{color:var(--ink)}
+.cd-sep{color:var(--faint)}

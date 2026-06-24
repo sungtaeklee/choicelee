@@ -208,9 +208,17 @@ function ActNeed({ list, openCase, currentId }) {
 }
 
 const ACT_KIND = { status: '상태', owner: '담당', comment: '코멘트', send: '발송' }
+// 한국어 조사: 받침 없음/ㄹ받침 → '로', 그 외 받침 → '으로'
+function josaRo(word) {
+  const s = String(word || '').trim(); if (!s) return '로'
+  const code = s.charCodeAt(s.length - 1)
+  if (code < 0xAC00 || code > 0xD7A3) return '로'
+  const jong = (code - 0xAC00) % 28
+  return (jong === 0 || jong === 8) ? '로' : '으로'
+}
 function fmtTs(t) { try { return new Date(t).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
 
-function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, addComment, sentLog, account, openCase }) {
+function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, addComment, sentLog, account, openCase, goBack, backLabel }) {
   const [showNum, setShowNum] = useState(false)
   const [cmt, setCmt] = useState('')
   const [lnk, setLnk] = useState({ label: '', url: '' })
@@ -251,6 +259,7 @@ function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, ad
   const catOpts = (g) => g === '단순 문의/불만/기타' ? CAT22 : (FIXED_DEPTH2[g] || CAT22)
   const withCur = (opts, cur) => (cur && !opts.includes(cur)) ? [cur, ...opts] : opts
   const setField = (patch) => updateCases && updateCases([c.id], patch)
+  const bl = backLabel || '목록'; const ro = josaRo(bl) // 받침에 따라 로/으로
   const actList = (added || []).filter(actionNeeded)
   // 표시값: AI 결과가 있으면 AI를, 없으면(또는 생성 중) 휴리스틱을 보여줌
   const summaryShown = (ai && ai.summary) || c.summary
@@ -265,7 +274,13 @@ function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, ad
   const aiPill = aiLoading ? 'AI 분석 생성 중…' : (ai ? 'AI 생성 · 검수 필요' : '키워드 기반 · 검수 필요')
   return (
     <div className="screen">
-      <PageHead title="VOC 처리" sub="분류 결과 확인 · 문자/메일 초안 · 처리 상태 관리" />
+      <div className="cd-nav">
+        {goBack && <button className="cd-back" onClick={goBack}>← {bl}{ro} 돌아가기</button>}
+        <span className="cd-crumb">{bl}<span className="cd-sep">›</span><b>VOC 처리</b><span className="cd-sep">›</span><span className="mono">{c.id}</span></span>
+      </div>
+      <PageHead title="VOC 처리" sub="처리 후엔 상단/우측의 ‘돌아가기’로 목록으로 이동하세요">
+        {goBack && <button className="btn btn-ghost" onClick={goBack}>← {bl}{ro} 돌아가기</button>}
+      </PageHead>
       <div className="panel act-need">
         <div className="ip-head">조치 필요 VOC <span className="ip-note">장애/성능/개선 중 분류 미확정(검토필요) 또는 우선순위 High이면서 처리 전 단계 — 단순 문의/불만/기타는 제외됩니다. 유형을 누르면 목록이 펼쳐지고, 항목을 누르면 처리 화면으로 이동합니다.</span></div>
         <ActNeed list={actList} openCase={openCase} currentId={c.id} />

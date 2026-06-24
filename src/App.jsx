@@ -39,13 +39,14 @@ const TITLES = {
   board: ['VOC 보드', '티켓을 보고·판단·처리하는 작업 보드'],
   detail: ['VOC 처리', '케이스 분석 및 액션'],
   insight: ['인사이트 리포트', '개선 인사이트와 기대효과'],
-  import: ['VOC 결과 불러오기', '사내 에이전트 JSON → 카드'],
+  import: ['Copilot Studio Agent 연동', 'Copilot Studio Agent JSON → 티켓 변환·등록'],
 }
 
 /* ---------- 자동 시연 (심사용): 화면 자동 이동 + 음성(브라우저 TTS) + 자막 ---------- */
 export default function App() {
   const [authEmail, setAuthEmail] = useState(getSession)
   const [screen, setScreen] = useState('inbox')
+  const [prevScreen, setPrevScreen] = useState('board') // VOC 처리에서 '돌아갈 곳'(직전 목록 화면)
   const [caseId, setCaseId] = useState('VOC-1001')
   const [toast, setToast] = useState('')
   const [toastAction, setToastAction] = useState(null) // 토스트의 실행취소 버튼 {label, onClick}
@@ -129,7 +130,7 @@ export default function App() {
     // 확인/취소 다이얼로그 (window.confirm 대체 — 디자인 일관성·접근성)
     confirm: (title, body, onConfirm, opts = {}) => setModal({ open: true, title, body, onConfirm, confirmLabel: opts.confirmLabel || '확인', danger: !!opts.danger }),
   }), [])
-  const openCase = (id) => { setRail('agent'); setCaseId(id); setScreen('detail'); setPanelMode((m) => m === 'collapsed' ? 'split' : m) }
+  const openCase = (id) => { setRail('agent'); if (screen !== 'detail' && TITLES[screen]) setPrevScreen(screen); setCaseId(id); setScreen('detail'); setPanelMode((m) => m === 'collapsed' ? 'split' : m) }
   const goAgent = (s) => { setRail('agent'); if (s) setScreen(s) }
   // 자동 시연 내비게이션 — 한 스텝의 위치로 이동
   const demoNav = (step) => {
@@ -205,7 +206,7 @@ export default function App() {
                     {screen === 'trends' && <VOCTrends added={added} openCase={openCase} />}
                     {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} />}
                     {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
-                    {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} bulkPatch={bulkPatch} addSent={addSent} addComment={logActivity} sentLog={sentLog} account={authEmail} openCase={openCase} />}
+                    {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} bulkPatch={bulkPatch} addSent={addSent} addComment={logActivity} sentLog={sentLog} account={authEmail} openCase={openCase} goBack={() => setScreen(prevScreen)} backLabel={(TITLES[prevScreen] || ['목록'])[0]} />}
                     {screen === 'insight' && <InsightReport added={added} openCase={openCase} updateCases={updateCases} bulkPatch={bulkPatch} notify={notify} addSent={addSent} />}
                     {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
                     {screen === 'import' && <ImportResult notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} openCase={openCase} />}

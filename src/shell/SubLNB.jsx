@@ -3,10 +3,10 @@ import React from 'react'
 function SubLNB({ screen, setScreen }) {
   const SECTIONS = [
     { label: '현황 · 분석', items: [['trends', '기간별·영역별 추이']] },
-    { label: '수집 · 자동분류', items: [['inbox', 'VOC 수집·입력'], ['board', '보드']] },
+    { label: '수집 · 자동분류', items: [['inbox', 'VOC 수집·입력'], ['board', 'VOC 보드']] },
     { label: '처리 · 개선', items: [['detail', 'VOC 처리'], ['insight', '인사이트 리포트']] },
     { label: '셀프 해결 · 엔진②', items: [['selfguide', '셀프 해결 가이드']] },
-    { label: '연동 · 사내 에이전트', items: [['import', 'VOC 결과 불러오기']] },
+    { label: '연동 · Copilot Studio', items: [['import', 'Copilot Agent 연동']] },
   ]
   return (
     <aside className="sublnb">
