@@ -45,7 +45,7 @@ export const GROUP_CLS = {
 export const norm = (s) => String(s).toLowerCase().replace(/[\s()[\]{}/\\.,;:!?~·・"'`+\-_*=|]/g, '')
 export const FAULT_KW = ['오류', '에러', '튕김', '튕겨', '튕기', '튕', '먹통', '접속불가', '접속안', '로그인불가', '로그인풀림', '깨짐', '강제종료', '강종', '화면이안', '앱이꺼', '앱이안']
 export const PERF_KW = ['느림', '느려', '느리', '백화', '버벅', '멈춤', '지연됨', '로딩']
-export const IMPROVE_KW = ['개선', '바꿔', '바뀌었으면', '추가했으면', '불편해서', '제안', '했으면좋겠', '좋겠', '었으면', '헷갈려서개선']
+export const IMPROVE_KW = ['개선', '바꿔', '바뀌었으면', '추가했으면', '불편해서', '제안', '했으면좋겠', '좋겠', '었으면', '헷갈려서개선', '키워주세요', '크게키워', '글씨가작', '글씨작', '알림만끄', '알림이너무']
 export const CAT_KW = [
   ['네트워크/통신품질/와이파이', ['네트워크', '통화품질', '통신망', '와이파이', '중계기', '기지국', '통화끊김', '끊김', '끊기', '안터짐', '안터', '음영', '신호']],
   ['인터넷·통신속도 불만', ['통신속도', '인터넷속도', '데이터품질', '속도불만', '인터넷느림', '속도느']],
@@ -149,7 +149,7 @@ export function pickFixedCat(group, text) {
   if (group === '성능') return /백화/.test(v) ? '앱/웹 백화 현상' : '앱/웹 속도 느림'
   if (group === '개선 요청/희망') {
     if (/로그인|회원|아이디|비밀번호|인증|가입/.test(v)) return '회원/로그인 개선'
-    if (/개선|추가|바꿔|바뀌|좋겠|불편|제안|했으면/.test(v)) return '앱/웹 기능 개선'
+    if (/개선|추가|바꿔|바뀌|좋겠|불편|제안|했으면|키워|글씨|알림|크게|끄게/.test(v)) return '앱/웹 기능 개선'
     return '기타'
   }
   return '앱/웹 기능 개선'
@@ -247,7 +247,11 @@ export function smartSummary(content) {
   if (!cands.length) cands = [cleanClause(raw)].filter(Boolean)
   if (!cands.length) return aiSummarize(content)
   const score = (s) => { const sl = s.toLowerCase(); return ISSUE_KW.reduce((n, k) => n + (sl.includes(k) ? 1 : 0), 0) }
-  cands.sort((a, b) => (score(b) - score(a)) || (Math.abs(a.length - 24) - Math.abs(b.length - 24)))
+  // 끝맺음 품질: 종결어미로 끝나면 가점, 연결어미(…서/…면/…는데 등)로 잘리면 감점 → 말이 끊긴 요약 회피
+  const CONNECT_END = /(는데|은데|구요|고요|아서|어서|여서|려고|려구|니까|는지|지만|거든|길래|면서|다가|면|러)$/
+  const FINAL_END = /(요|다|까|죠|함|됨|네|용|음)$/
+  const endBonus = (s) => (CONNECT_END.test(s) ? -2 : (FINAL_END.test(s) ? 1 : 0))
+  cands.sort((a, b) => ((score(b) + endBonus(b)) - (score(a) + endBonus(a))) || (Math.abs(a.length - 24) - Math.abs(b.length - 24)))
   let best = cands[0] || ''
   if (best.length > 46) best = best.slice(0, 46).replace(/\s+\S*$/, '') + '…'
   return best || aiSummarize(content)
@@ -469,6 +473,9 @@ export function enrichRow(r, id, ov) {
     date: r.date || '', week: r.week || '', occur: r.occur || '',
     content, summary, group, cat, severity, sentiment, status, conf, review, action, org, mode,
     area1, area2, devNeeded: dev, owner, jiraUrl: '', ownerNote: '',
+    labels: dev === 'Y' ? ['VOC', '전사IT업무요청'] : ['VOC'], reporter: '', watchers: [], // 티켓 메타(지라 대체)
+    relatedMenu: `${area1} › ${area2}`, errorType: '', resolveLevel: '', bugResult: '',
+    effort: { plan: '', design: '', pub: '', dev: dev === 'Y' ? '' : '' }, devStart: '', devEnd: '', deployEnd: '', attachments: [],
     analysis: buildAnalysis({ summary, cat, group, mode, signals, severity, severityReason: severityReason(group, severity, issue), sentiment, area1, area2, owner, dev, status }),
     sms, mail, answer,
     improvement: { problem: summary, suggestion: `${guideFor(cat) ? guideFor(cat).act : org + ' 확인 후 개선/안내'}`, effect: '재문의·불편 감소' },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { GROUP_CLS, parseTranscript } from './classify.js'
 
 /* ============================================================
@@ -10,9 +10,9 @@ import { GROUP_CLS, parseTranscript } from './classify.js'
 /* ---------- 메타/배지 상수 ---------- */
 export const SEVERITY = { High: 'sev sev-high', Medium: 'sev sev-med', Low: 'sev sev-low' }
 export const SENTIMENT = { Negative: 'sent sent-neg', Neutral: 'sent sent-neu', Positive: 'sent sent-pos' }
-export const STATUS = { '신규': 'stt stt-new', '분류 완료': 'stt stt-cls', '처리 필요': 'stt stt-todo', '처리 중': 'stt stt-doing', '처리 완료': 'stt stt-done' }
+export const STATUS = { '신규': 'stt stt-new', '분류 완료': 'stt stt-cls', '처리 필요': 'stt stt-todo', '처리 중': 'stt stt-doing', '보류(BLOCK)': 'stt stt-block', '처리 완료': 'stt stt-done' }
 export const CONF = { '높음': 'conf conf-h', '보통': 'conf conf-m', '낮음': 'conf conf-l' }
-export const KANBAN_COLS = ['신규', '분류 완료', '처리 필요', '처리 중', '처리 완료']
+export const KANBAN_COLS = ['신규', '분류 완료', '처리 필요', '처리 중', '보류(BLOCK)', '처리 완료']
 export const COMBO_COLORS = ['#e6007e', '#6938ef', '#1570ef', '#12b76a', '#f79009', '#ef4444', '#06b6d4', '#9333ea', '#84cc16', '#64748b']
 export const DONUT_COLORS = ['#e6007e', '#9b3fd4', '#4f7cf6', '#1bb59a', '#f5a623', '#9aa3b2']
 export const RAIL_ICONS = {
@@ -48,12 +48,52 @@ export const GroupBadge = ({ v }) => <span className={GROUP_CLS[v]}>{v}</span>
 export const Tag = ({ children }) => <span className="ctag">{children}</span>
 export const ChannelChip = ({ channel }) => <span className="chchip"><ChannelIcon channel={channel} /> {channel}</span>
 export const RailIcon = ({ d }) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+// 담당자 아바타(이니셜) — 이름 문자열에서 첫 글자, 빈 값이면 미지정 점선 원
+const AV_COLORS = ['#e6007e', '#6938ef', '#1570ef', '#12b76a', '#f79009', '#06b6d4', '#9333ea']
+export function Avatar({ name, size = 22 }) {
+  const n = String(name || '').trim()
+  if (!n) return <span className="avatar avatar-none" title="미지정" style={{ width: size, height: size }} />
+  const ch = n.replace(/^[^가-힣A-Za-z]+/, '')[0] || n[0]
+  let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0
+  const bg = AV_COLORS[h % AV_COLORS.length]
+  return <span className="avatar" title={n} style={{ width: size, height: size, background: bg, fontSize: Math.round(size * 0.42) }}>{ch.toUpperCase()}</span>
+}
 
 /* ---------- 토스트 · 모달 · 페이지 헤더 ---------- */
-export const Toast = ({ msg, onClose }) => msg ? <div className="toast" onClick={onClose}>{msg}</div> : null
-export const Modal = ({ open, title, body, onClose }) => !open ? null : (
-  <div className="modal-back" onClick={onClose}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-title">{title}</div><div className="modal-body">{body}</div><div className="modal-foot"><button className="btn btn-primary" onClick={onClose}>확인</button></div></div></div>
-)
+export const Toast = ({ msg, action, onClose }) => msg ? (
+  <div className="toast" role="status" aria-live="polite">
+    <span className="toast-msg" onClick={onClose}>{msg}</span>
+    {action && <button className="toast-act" onClick={(e) => { e.stopPropagation(); action.onClick(); onClose() }}>{action.label}</button>}
+  </div>
+) : null
+export function Modal({ open, title, body, onClose, onConfirm, confirmLabel = '확인', danger = false }) {
+  const ref = useRef(null)
+  // Esc 닫기 + 포커스 트랩(Tab 순환) + 닫을 때 이전 포커스 복원 — 키보드 접근성
+  useEffect(() => {
+    if (!open) return
+    const prev = document.activeElement
+    const focusables = () => ref.current ? [...ref.current.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((el) => !el.disabled && el.offsetParent !== null) : []
+    const f = focusables(); (f[0] || ref.current)?.focus()
+    const onKey = (e) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key === 'Tab') {
+        const items = focusables(); if (!items.length) return
+        const first = items[0], last = items[items.length - 1]
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey); if (prev && prev.focus) prev.focus() }
+  }, [open, onClose])
+  if (!open) return null
+  return (
+    <div className="modal-back" onClick={onClose}><div className="modal" role="dialog" aria-modal="true" ref={ref} tabIndex={-1} onClick={(e) => e.stopPropagation()}><div className="modal-title">{title}</div><div className="modal-body">{body}</div><div className="modal-foot">
+      {onConfirm && <button className="btn btn-ghost" onClick={onClose}>취소</button>}
+      <button className={'btn btn-primary' + (danger ? ' danger' : '')} onClick={onConfirm ? () => { onConfirm(); onClose() } : onClose}>{onConfirm ? confirmLabel : '확인'}</button>
+    </div></div></div>
+  )
+}
 export const PageHead = ({ title, sub, children }) => (
   <div className="page-head">
     <div><h1 className="page-title">{title}</h1>{sub && <p className="page-sub">{sub}</p>}</div>
@@ -228,6 +268,40 @@ export function MultiLine({ labels, series, sel, onSel, perPoint = 0 }) {
         return <text x={x(li)} y={Math.max(padT + 9, y(lv) - 9)} textAnchor="end" className="lt-end" fill={selSeries.color}>{lv}</text>
       })()}
     </svg>
+  )
+}
+
+/* ---------- 테이블 정렬 ----------
+   useSort(rows, accessors): 컬럼 키→값 추출 함수 맵을 받아 정렬된 행을 반환.
+   toggle(key)로 오름차순 → 내림차순 → 해제 순환. 숫자는 수치 비교, 그 외 ko 로케일 비교. */
+export function useSort(rows, accessors, initial = null) {
+  const [sort, setSort] = useState(initial) // { key, dir: 1(오름) | -1(내림) }
+  const sorted = useMemo(() => {
+    if (!sort || !accessors[sort.key]) return rows
+    const acc = accessors[sort.key]
+    return [...rows].sort((a, b) => {
+      const va = acc(a), vb = acc(b)
+      const ea = va == null || va === '', eb = vb == null || vb === ''
+      if (ea && eb) return 0
+      if (ea) return 1   // 빈 값은 항상 뒤로
+      if (eb) return -1
+      const r = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'ko')
+      return r * sort.dir
+    })
+  }, [rows, sort]) // eslint-disable-line
+  const toggle = (key) => setSort((s) => (s && s.key === key) ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 })
+  return { sorted, sort, toggle }
+}
+/* 정렬 가능한 테이블 헤더 셀 — 클릭/Enter/Space로 토글, 방향 화살표 + aria-sort */
+export function SortTh({ k, sort, toggle, children, className }) {
+  const active = sort && sort.key === k
+  return (
+    <th className={(className ? className + ' ' : '') + 'sortable' + (active ? ' sorted' : '')}
+      onClick={() => toggle(k)} role="button" tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(k) } }}
+      aria-sort={active ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
+      {children}<span className="sort-ar">{active ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}</span>
+    </th>
   )
 }
 

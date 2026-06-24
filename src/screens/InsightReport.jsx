@@ -1,9 +1,48 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { GROUPS, weekKey } from '../classify.js'
-import { PageHead, DashKpi, Donut, Bar, MultiLine, SevBadge, GroupBadge, Tag, EFFECTS } from '../ui.jsx'
+import { PageHead, DashKpi, Donut, Bar, MultiLine, SevBadge, GroupBadge, Tag, EFFECTS, useSort, SortTh } from '../ui.jsx'
+import { REPLY_TEMPLATES, buildClusterReply } from '../templates.js'
 
-function InsightReport({ added, openCase }) {
+/* 유사 VOC 클러스터 일괄 응대 모달 — 공통 응대문(템플릿) 작성 → 공통 문자 발송(데모) + N건 일괄 처리 */
+function ClusterRespond({ cluster, onClose, bulkPatch, notify, addSent }) {
+  const [text, setText] = useState(() => buildClusterReply(cluster.group, cluster.cat))
+  useEffect(() => { const onKey = (e) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [onClose])
+  const ids = cluster.ids || []
+  const insert = (t) => setText((s) => (s.trim() ? s.trim() + ' ' + t : t))
+  const sendAll = () => {
+    if (!text.trim()) { notify.toast('응대문을 입력하세요'); return }
+    if (addSent) ids.forEach((id) => addSent({ caseId: id, kind: '문자', owner: '일괄응대', to: '(고객)', content: text.trim() }))
+    notify.toast(`${ids.length}건 공통 문자 발송 기록됨 (데모) — 메일 › 발송 이력`)
+  }
+  const completeAll = () => { bulkPatch(ids, { status: '처리 완료' }, `${ids.length}건 처리 완료`); onClose() }
+  return (
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal cluster-modal" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head"><b>유사 VOC 일괄 응대 <span className="muted" style={{ fontWeight: 400 }}>· {cluster.area1} › {cluster.cat} · {ids.length}건</span></b><button className="modal-x" aria-label="닫기" onClick={onClose}>✕</button></div>
+        <p className="modal-note">같은 유형 <b>{ids.length}건</b>에 공통 응대문을 한 번에 보내고 일괄 처리합니다. 아래 초안을 검수·수정 후 사용하세요.</p>
+        <div className="cl-tpl">{REPLY_TEMPLATES.map((t) => <button key={t.key} className="cl-chip" onClick={() => insert(t.text)} title={t.text}>＋ {t.label}</button>)}</div>
+        <textarea className="cl-ta" value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder="공통 응대문" />
+        <div className="cl-foot">
+          <span className="muted">High {cluster.high || 0} · 개발대응 {cluster.dev ? 'Y' : 'N'}</span>
+          <div className="cl-actions">
+            <button className="btn btn-ghost" onClick={sendAll}>✉ 공통 문자 발송 ({ids.length})</button>
+            <button className="btn btn-primary" onClick={completeAll}>✓ {ids.length}건 처리 완료</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// 백로그 테이블 정렬 키 (우선순위는 점수 순위로 고정된 m.pr 기준)
+const BACKLOG_SORT = {
+  pr: (m) => m.pr, area: (m) => `${m.area1} › ${m.area2}`, cat: (m) => m.cat, n: (m) => m.n,
+  high: (m) => m.high, dev: (m) => m.dev, action: (m) => m.action, sample: (m) => m.sample,
+}
+
+function InsightReport({ added, openCase, updateCases, bulkPatch, notify, addSent }) {
   const data = added || []
+  const [clusterOpen, setClusterOpen] = useState(null) // 일괄 응대 모달 대상 클러스터
   const dist = useMemo(() => {
     const m = {}; data.forEach((v) => { m[v.cat] = (m[v.cat] || 0) + 1 })
     const arr = Object.entries(m).map(([k, n]) => ({ k, n })).sort((a, b) => b.n - a.n)
@@ -18,13 +57,15 @@ function InsightReport({ added, openCase }) {
     const m = {}
     pre.forEach((v) => {
       const key = v.area1 + '||' + v.cat
-      const g = m[key] || (m[key] = { area1: v.area1, area2: v.area2, cat: v.cat, group: v.group, n: 0, high: 0, dev: 0, action: v.action, sampleId: '', sample: '' })
-      g.n++; if (v.severity === 'High') g.high++; if (v.devNeeded === 'Y') g.dev++
+      const g = m[key] || (m[key] = { area1: v.area1, area2: v.area2, cat: v.cat, group: v.group, n: 0, high: 0, dev: 0, action: v.action, sampleId: '', sample: '', ids: [] })
+      g.n++; g.ids.push(v.id); if (v.severity === 'High') g.high++; if (v.devNeeded === 'Y') g.dev++
       if (!g.sampleId) { g.sampleId = v.id; g.sample = v.summary || v.content }
     })
-    return Object.values(m).map((g) => ({ ...g, score: g.high * 3 + g.n + (g.dev ? 2 : 0) })).sort((a, b) => b.score - a.score).slice(0, 12)
+    return Object.values(m).map((g) => ({ ...g, score: g.high * 3 + g.n + (g.dev ? 2 : 0) }))
+      .sort((a, b) => b.score - a.score).slice(0, 12)
+      .map((g, i) => ({ ...g, pr: i < 3 ? 'P1' : i < 7 ? 'P2' : 'P3' })) // 우선순위 = 점수 순위(정렬해도 고정)
   }, [data])
-  const pr = (i) => i < 3 ? 'P1' : i < 7 ? 'P2' : 'P3'
+  const { sorted: sortedGroups, sort: gSort, toggle: gToggle } = useSort(groups, BACKLOG_SORT)
   const devCnt = data.filter((v) => v.devNeeded === 'Y').length
   const reviewN = data.filter((v) => v.review).length
   // 레퍼런스형 대시보드용 집계
@@ -84,10 +125,20 @@ function InsightReport({ added, openCase }) {
         <div className="card-title">유사 VOC 그룹 · 개선 우선순위 <span className="muted">처리 전 단계 VOC를 영역·유형으로 묶어 우선순위화 · 행 클릭 시 대표 케이스</span></div>
         {groups.length ? (
           <div className="table-wrap"><table className="vtable backlog">
-            <thead><tr><th>우선순위</th><th>대응영역</th><th>유형</th><th>건수</th><th>High</th><th>개발</th><th>제안 액션</th><th>대표 원문</th></tr></thead>
-            <tbody>{groups.map((m, i) => (
+            <thead><tr>
+              <SortTh k="pr" sort={gSort} toggle={gToggle}>우선순위</SortTh>
+              <SortTh k="area" sort={gSort} toggle={gToggle}>대응영역</SortTh>
+              <SortTh k="cat" sort={gSort} toggle={gToggle}>유형</SortTh>
+              <SortTh k="n" sort={gSort} toggle={gToggle} className="pv-num">건수</SortTh>
+              <SortTh k="high" sort={gSort} toggle={gToggle} className="pv-num">High</SortTh>
+              <SortTh k="dev" sort={gSort} toggle={gToggle} className="pv-num">개발</SortTh>
+              <SortTh k="action" sort={gSort} toggle={gToggle}>제안 액션</SortTh>
+              <SortTh k="sample" sort={gSort} toggle={gToggle}>대표 원문</SortTh>
+              {updateCases && <th className="bk-act-h">일괄 응대</th>}
+            </tr></thead>
+            <tbody>{sortedGroups.map((m) => (
               <tr key={m.area1 + m.cat} className="row-click" onClick={() => m.sampleId && openCase && openCase(m.sampleId)}>
-                <td><span className={'pr-badge pr-' + pr(i).toLowerCase()}>{pr(i)}</span></td>
+                <td><span className={'pr-badge pr-' + m.pr.toLowerCase()}>{m.pr}</span></td>
                 <td className="nowrap muted">{m.area1} › {m.area2}</td>
                 <td className="nowrap"><GroupBadge v={m.group} /> <Tag>{m.cat}</Tag></td>
                 <td className="pv-num">{m.n.toLocaleString()}</td>
@@ -95,6 +146,7 @@ function InsightReport({ added, openCase }) {
                 <td className="pv-num">{m.dev ? 'Y' : ''}</td>
                 <td className="nowrap">{m.action}</td>
                 <td className="cell-content" title={m.sample}>{m.sample}</td>
+                {updateCases && <td className="bk-act" onClick={(e) => e.stopPropagation()}><button className="btn btn-ghost sm" onClick={() => setClusterOpen(m)}>✉ {m.n}건 응대</button></td>}
               </tr>
             ))}</tbody>
           </table></div>
@@ -127,6 +179,7 @@ function InsightReport({ added, openCase }) {
       <div className="card-row">{insights.map((t, i) => <div key={i} className="insight-card"><span className="insight-num">{i + 1}</span>{t}</div>)}</div>
       <h2 className="sec-title">기대효과</h2>
       <div className="effect-row">{EFFECTS.map((e) => <div key={e.t} className="effect-card"><div className="effect-t">{e.t}</div><div className="effect-d">{e.d}</div></div>)}</div>
+      {clusterOpen && updateCases && <ClusterRespond cluster={clusterOpen} onClose={() => setClusterOpen(null)} bulkPatch={bulkPatch || ((ids, p, label) => { updateCases(ids, p); notify && notify.toast(label) })} notify={notify} addSent={addSent} />}
     </div>
   )
 }

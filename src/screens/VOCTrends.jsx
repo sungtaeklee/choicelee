@@ -1,6 +1,12 @@
 import React, { useState, useMemo } from 'react'
 import { AREA1_LIST, GROUPS, weekKey, recDay } from '../classify.js'
-import { PageHead, PivotView, MultiLine, buildPivot, ChannelChip, GroupBadge, Tag, COMBO_COLORS } from '../ui.jsx'
+import { PageHead, PivotView, MultiLine, buildPivot, ChannelChip, GroupBadge, Tag, COMBO_COLORS, useSort, SortTh } from '../ui.jsx'
+
+// 원문 검색 결과 테이블 정렬 키
+const RESULT_SORT = {
+  id: (d) => d.id, week: (d) => (d.week ? weekKey(d.week) : null), channel: (d) => d.channel,
+  group: (d) => d.group, area: (d) => `${d.area1} › ${d.area2}`, content: (d) => d.summary || d.content,
+}
 
 function VOCTrends({ added, openCase }) {
   const data0 = added || []
@@ -51,6 +57,7 @@ function VOCTrends({ added, openCase }) {
     if (sd1 || sd2) { const dd = recDay(d); if (!dd) return false; if (sd1 && dd < sd1) return false; if (sd2 && dd > sd2) return false }
     return true
   })
+  const { sorted: sortedResults, sort: rSort, toggle: rToggle } = useSort(results, RESULT_SORT)
   if (!data0.length) return <div className="screen"><PageHead title="기간별·영역별 추이" sub="VOC구분·대응영역 추이와 원문 검색" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 입력하거나 붙여넣으면 추이·영역 피벗이 생성됩니다.</div></div>
   return (
     <div className="screen">
@@ -114,8 +121,15 @@ function VOCTrends({ added, openCase }) {
           <span className="muted nowrap">{results.length.toLocaleString()}건</span>
         </div>
         <div className="table-wrap"><table className="vtable">
-          <thead><tr><th>ID</th><th>주차</th><th>채널</th><th>구분</th><th>대응영역</th><th>원문</th></tr></thead>
-          <tbody>{results.slice(0, 200).map((d) => (
+          <thead><tr>
+            <SortTh k="id" sort={rSort} toggle={rToggle}>ID</SortTh>
+            <SortTh k="week" sort={rSort} toggle={rToggle}>주차</SortTh>
+            <SortTh k="channel" sort={rSort} toggle={rToggle}>채널</SortTh>
+            <SortTh k="group" sort={rSort} toggle={rToggle}>구분</SortTh>
+            <SortTh k="area" sort={rSort} toggle={rToggle}>대응영역</SortTh>
+            <SortTh k="content" sort={rSort} toggle={rToggle}>원문</SortTh>
+          </tr></thead>
+          <tbody>{sortedResults.slice(0, 200).map((d) => (
             <tr key={d.id} className="row-click" onClick={() => openCase && openCase(d.id)}><td className="mono">{d.id}</td><td className="nowrap muted">{d.week || '-'}</td><td><ChannelChip channel={d.channel} /></td><td className="nowrap"><GroupBadge v={d.group} /> <Tag>{d.cat}</Tag></td><td className="nowrap muted">{d.area1} › {d.area2}</td><td className="cell-content" title={d.content}>{d.summary || d.content}</td></tr>
           ))}</tbody>
         </table></div>

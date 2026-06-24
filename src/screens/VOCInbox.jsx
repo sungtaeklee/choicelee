@@ -1,7 +1,14 @@
-import React, { useState, useMemo } from 'react'
-import { GROUPS, parseGrid, parsePaste, enrichRow } from '../classify.js'
+import React, { useState, useMemo, useEffect } from 'react'
+import { GROUPS, parseGrid, parsePaste, enrichRow, weekKey } from '../classify.js'
 import { toCompact } from '../storage.js'
-import { PageHead, ChannelChip, GroupBadge, Tag, StatBadge, ConfBadge, KANBAN_COLS, VOCS } from '../ui.jsx'
+import { PageHead, ChannelChip, GroupBadge, Tag, StatBadge, ConfBadge, KANBAN_COLS, VOCS, useSort, SortTh } from '../ui.jsx'
+
+// VOC 목록 컬럼별 정렬 키 추출자 (주차는 weekKey로 수치 정렬)
+const LIST_SORT = {
+  id: (v) => v.id, date: (v) => v.date, channel: (v) => v.channel, customer: (v) => v.customer,
+  group: (v) => v.group, cat: (v) => v.cat, area: (v) => [v.area1, v.area2].filter(Boolean).join(' › '),
+  summary: (v) => v.summary || v.content, week: (v) => (v.week ? weekKey(v.week) : null), occur: (v) => v.occur,
+}
 
 const INPUT_CHANNELS = ['고객의소리', 'Call', 'Medallia', 'App Store', '고객센터']
 const SHEET_COLS = [
@@ -12,6 +19,7 @@ const SHEET_COLS = [
 const emptyRow = () => ({ date: '', channel: '', customer: '', content: '', week: '', occur: '' })
 function PasteSheetModal({ onClose, onSubmit }) {
   const [rows, setRows] = useState(() => Array.from({ length: 8 }, emptyRow))
+  useEffect(() => { const onKey = (e) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [onClose])
   const setCell = (ri, k, val) => setRows((rs) => rs.map((r, i) => i === ri ? { ...r, [k]: val } : r))
   const filled = rows.filter((r) => (r.content || '').trim()).length
   const onPaste = (e, ri, ci) => {
@@ -73,6 +81,7 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert }) {
   const all = useMemo(() => [...added, ...VOCS], [added])
   // 필터 결과 메모이즈 — 입력창 타이핑(text state)마다 전체 목록을 재필터링하지 않도록
   const rows = useMemo(() => all.filter((v) => (fch === '전체' || v.channel === fch) && (fgrp === '전체' || v.group === fgrp) && (fst === '전체' || v.status === fst)), [all, fch, fgrp, fst])
+  const { sorted: sortedRows, sort, toggle } = useSort(rows, LIST_SORT) // 컬럼 헤더 클릭으로 정렬 (정렬 후 상위 100건 표시)
   const chOpts = useMemo(() => {
     const base = ['전체', ...INPUT_CHANNELS]
     const extra = [...new Set(added.map((u) => u.channel))].filter((c) => c && !base.includes(c))
@@ -116,7 +125,7 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert }) {
           <button className="btn btn-primary" onClick={addVoc}>Copilot 분류 후 추가</button>
           <button className="btn btn-ghost" onClick={() => { setText(''); setCustomer(''); setVDate(''); setVWeek(''); setVOccur(''); setResult(null) }}>초기화</button>
           <button className="btn btn-ghost" onClick={() => setSheetOpen(true)}>＋ 엑셀 시트로 입력 / 붙여넣기</button>
-          {!shared && added.length > 0 && <button className="btn btn-ghost" onClick={() => { if (window.confirm(`저장된 입력 ${added.length.toLocaleString()}건을 모두 삭제할까요? (되돌릴 수 없습니다)`)) { setAdded([]); setResult(null) } }}>입력 항목 비우기</button>}
+          {!shared && added.length > 0 && <button className="btn btn-ghost" onClick={() => notify.confirm('입력 항목 비우기', `저장된 입력 ${added.length.toLocaleString()}건을 모두 삭제할까요? (되돌릴 수 없습니다)`, () => { setAdded([]); setResult(null) }, { danger: true, confirmLabel: '모두 삭제' })}>입력 항목 비우기</button>}
           {added.length > 0 && <span className="up-summary">입력 <b>{added.length}</b>건 · 표 상단에 표시됨</span>}
         </div>
         {result && (
@@ -143,8 +152,19 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert }) {
       {rows.length > 100 && <div className="list-note">전체 {rows.length.toLocaleString()}건 중 상위 100건만 표시합니다 — 채널·구분·상태 필터로 좁혀 보세요. 행을 클릭하면 내용·심각도·상태·검토·담당 등 상세가 열립니다. (집계·대시보드는 전체 기준)</div>}
       <div className="table-wrap">
         <table className="vtable">
-          <thead><tr><th>ID</th><th>인입일자</th><th>채널</th><th>고객번호</th><th>VOC구분1</th><th>표준분류</th><th>대응영역</th><th>요약</th><th>주차</th><th>발생일자</th></tr></thead>
-          <tbody>{rows.slice(0, 100).map((v) => (
+          <thead><tr>
+            <SortTh k="id" sort={sort} toggle={toggle}>ID</SortTh>
+            <SortTh k="date" sort={sort} toggle={toggle}>인입일자</SortTh>
+            <SortTh k="channel" sort={sort} toggle={toggle}>채널</SortTh>
+            <SortTh k="customer" sort={sort} toggle={toggle}>고객번호</SortTh>
+            <SortTh k="group" sort={sort} toggle={toggle}>VOC구분1</SortTh>
+            <SortTh k="cat" sort={sort} toggle={toggle}>표준분류</SortTh>
+            <SortTh k="area" sort={sort} toggle={toggle}>대응영역</SortTh>
+            <SortTh k="summary" sort={sort} toggle={toggle}>요약</SortTh>
+            <SortTh k="week" sort={sort} toggle={toggle}>주차</SortTh>
+            <SortTh k="occur" sort={sort} toggle={toggle}>발생일자</SortTh>
+          </tr></thead>
+          <tbody>{sortedRows.slice(0, 100).map((v) => (
             <tr key={v.id} className={v.source === 'input' ? 'row-up' : ''} onClick={() => openCase(v.id)}>
               <td className="mono">{v.id}{v.source === 'input' && <span className="src-pill">입력</span>}</td>
               <td className="muted nowrap">{v.date || '-'}</td>

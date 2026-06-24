@@ -37,6 +37,14 @@ describe('demoClassify — 게이트 + 우선순위 규칙', () => {
   it('개선 요청 키워드 → 개선 그룹', () => {
     expect(demoClassify('이 기능 좀 개선해주세요').group).toBe('개선 요청/희망')
   })
+  it('UX 개선 요청(폰트 확대·알림 설정)이 기타가 아닌 개선 그룹으로 분류된다', () => {
+    const r1 = enrichRow({ channel: 'Call', content: '앱 글씨가 작아서 시니어가 쓰기 불편해요 크게 키워주세요' }, 'T-A')
+    expect(r1.group).toBe('개선 요청/희망')
+    expect(r1.cat).not.toBe('기타')
+    const r2 = enrichRow({ channel: 'Call', content: '알림이 너무 많아요 유튜브 프리미엄 관련 알림만 끄게 해주세요' }, 'T-B')
+    expect(r2.group).toBe('개선 요청/희망')
+    expect(r2.cat).not.toBe('기타')
+  })
   it('빈 입력 → null', () => {
     expect(demoClassify('   ')).toBeNull()
   })

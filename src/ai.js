@@ -14,6 +14,6 @@ export async function analyzeCaseAI(c) {
     body: JSON.stringify({ content: c.content, channel: c.channel, hintGroup: c.group, hintCat: c.cat }),
   })
   const data = await res.json().catch(() => ({ ok: false, error: '응답 파싱 실패(함수 미배포일 수 있음)' }))
-  if (!data || !data.ok) throw new Error((data && data.error) || 'AI 분석 실패')
+  if (!data || !data.ok) throw new Error(((data && data.error) || 'AI 분석 실패') + (data && data.provider ? ` [provider=${data.provider}]` : ''))
   return data.result
 }
