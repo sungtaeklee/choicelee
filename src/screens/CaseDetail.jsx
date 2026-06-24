@@ -3,6 +3,7 @@ import { CAT22, FIXED_DEPTH2, AREA_TREE, AREA1_LIST, GROUPS, actionNeeded, recDa
 import { AI_AUTO, aiCacheGet, aiCacheSet, analyzeCaseAI } from '../ai.js'
 import { PageHead, GroupBadge, Tag, SevBadge, SentBadge, StatBadge, ConfBadge, ChannelChip, Transcript, KANBAN_COLS, VOCS, Avatar } from '../ui.jsx'
 import { REPLY_TEMPLATES, SLA_DAYS, defaultChecklist } from '../templates.js'
+import { jiraMailto } from '../jira.js'
 import { PeoplePicker, LabelPicker } from '../pickers.jsx'
 import { RESOLVE_LEVELS, BUG_RESULTS, ERROR_TYPES } from '../directory.js'
 import { saveAttach } from '../storage.js'
@@ -244,6 +245,8 @@ function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, ad
     finally { setAiLoading(false) }
   }
   const copy = (t, l) => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => notify.toast(l + ' 복사됨')).catch(() => notify.toast('복사 실패')); else notify.toast('복사 불가') }
+  // 지라 메일 등록: 메일 클라이언트를 제목·본문 채워 열기 (발송 시 Jira가 이슈 생성)
+  const mailToJira = () => { try { const a = document.createElement('a'); a.href = jiraMailto(c); a.click() } catch { /* noop */ } notify.toast('지라 등록 메일을 열었어요 — 수신처 확인 후 발송') }
   const doSend = () => {
     if (!snd.to.trim() || !snd.body.trim()) { notify.toast('수신·내용을 입력하세요'); return }
     if (addSent) addSent({ caseId: c.id, kind: snd.kind, owner: own || c.owner || '미지정', to: snd.to.trim(), content: snd.body.trim() })
@@ -277,10 +280,10 @@ function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, ad
       <div className="cd-nav">
         {goBack && <button className="cd-back" onClick={goBack}>← {bl}{ro} 돌아가기</button>}
         <span className="cd-crumb">{bl}<span className="cd-sep">›</span><b>VOC 처리</b><span className="cd-sep">›</span><span className="mono">{c.id}</span></span>
+        <span className="cd-nav-sp" />
+        <button className="cd-jira" onClick={mailToJira} title="이 티켓을 사내 Jira 프로젝트 메일로 등록(메일 발송 시 이슈 생성)">✉ 지라 메일 등록</button>
       </div>
-      <PageHead title="VOC 처리" sub="처리 후엔 상단/우측의 ‘돌아가기’로 목록으로 이동하세요">
-        {goBack && <button className="btn btn-ghost" onClick={goBack}>← {bl}{ro} 돌아가기</button>}
-      </PageHead>
+      <PageHead title="VOC 처리" sub="처리 후엔 상단의 ‘돌아가기’로 목록으로 이동하세요" />
       <div className="panel act-need">
         <div className="ip-head">조치 필요 VOC <span className="ip-note">장애/성능/개선 중 분류 미확정(검토필요) 또는 우선순위 High이면서 처리 전 단계 — 단순 문의/불만/기타는 제외됩니다. 유형을 누르면 목록이 펼쳐지고, 항목을 누르면 처리 화면으로 이동합니다.</span></div>
         <ActNeed list={actList} openCase={openCase} currentId={c.id} />

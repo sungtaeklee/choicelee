@@ -1,0 +1,98 @@
+/* ============================================================
+   VOC 케이스 → 사내 Jira 티켓 형식 JSON (추출/자동생성 연동용)
+   표준 필드 + customFields(이름 키 — 사내 Jira 커스텀필드 ID로 매핑).
+   보드 일괄 추출 / 상세 단건 추출 공통 사용.
+   ============================================================ */
+export function buildJiraIssue(c) {
+  const eff = c.effort || {}
+  const description = [
+    '■ 고객정보 (휴대폰번호/청구계정번호/명의자명/사업자고객여부)',
+    `  - ${c.customer || '(마스킹)'}`,
+    '■ 발생일시(일자/시간)',
+    `  - ${c.occur || c.date || '미상'}`,
+    '■ 고객문의 및 확인요청 사항',
+    `  - ${c.content || c.summary || ''}`,
+    '■ 고객 이용 채널',
+    `  - ${c.channel || '미상'}`,
+    '■ 핵심 의도',
+    `  - ${c.summary || ''}`,
+  ].join('\n')
+  return {
+    key: c.id,
+    fields: {
+      summary: `${c.cat}${c.summary ? ' — ' + c.summary.slice(0, 40) : ''}_${c.id}`,
+      issuetype: '버그(VOC)',
+      status: c.status,
+      priority: c.severity,
+      labels: c.labels || [],
+      components: [c.area1].filter(Boolean),
+      assignee: c.owner || '',
+      reporter: c.reporter || '',
+      watchers: c.watchers || [],
+      description,
+      customFields: {
+        'VOC구분': c.group, '표준분류': c.cat, '대응영역': `${c.area1} › ${c.area2}`,
+        '관련메뉴': c.relatedMenu || '', '오류타입': c.errorType || '', '처리가능단계': c.resolveLevel || '',
+        '기획 실공수(Day)': eff.plan || '', '디자인 실공수(Day)': eff.design || '', '퍼블리싱 실공수(Day)': eff.pub || '', '개발 실공수(Day)': eff.dev || '',
+        'BUG 처리 결과': c.bugResult || '', '개발 착수일자': c.devStart || '', '개발 완료일자': c.devEnd || '', '배포 완료일자': c.deployEnd || '',
+        '감성': c.sentiment, '신뢰도': c.conf, '검토필요': c.review ? 'Y' : 'N',
+      },
+      comments: (c.activity || []).filter((a) => a.kind === 'comment' || a.kind === 'status').map((a) => ({ author: a.who, created: a.t, body: a.text })),
+      links: (c.links || []).map((l) => l.url),
+    },
+  }
+}
+
+/* VOC 케이스 배열 → Jira "CSV 가져오기"용 CSV (Power Automate 없이 Jira Import로 일괄 생성)
+   - 표준 필드 + 커스텀필드를 컬럼으로 평면화. Jira 가져오기 마법사에서 컬럼↔필드 매핑 1회. */
+export function toJiraCsv(cases) {
+  const cols = ['Summary', 'Issue Type', 'Priority', 'Status', 'Labels', 'Assignee', 'Reporter', 'Components', 'Description',
+    'VOC구분', '표준분류', '대응영역', '관련메뉴', '오류타입', '처리가능단계',
+    '기획 실공수(Day)', '디자인 실공수(Day)', '퍼블리싱 실공수(Day)', '개발 실공수(Day)',
+    'BUG 처리 결과', '개발 착수일자', '개발 완료일자', '배포 완료일자']
+  const esc = (v) => { const s = v == null ? '' : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s }
+  const rows = (cases || []).map((c) => {
+    const j = buildJiraIssue(c).fields, cf = j.customFields
+    return [j.summary, j.issuetype, j.priority, j.status, (j.labels || []).join(' '), j.assignee, j.reporter, (j.components || []).join(' '), j.description,
+      cf['VOC구분'], cf['표준분류'], cf['대응영역'], cf['관련메뉴'], cf['오류타입'], cf['처리가능단계'],
+      cf['기획 실공수(Day)'], cf['디자인 실공수(Day)'], cf['퍼블리싱 실공수(Day)'], cf['개발 실공수(Day)'],
+      cf['BUG 처리 결과'], cf['개발 착수일자'], cf['개발 완료일자'], cf['배포 완료일자']].map(esc).join(',')
+  })
+  return [cols.map(esc).join(','), ...rows].join('\r\n')
+}
+export function exportCsv(text, filename) {
+  try {
+    const blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }) // BOM: 한글 깨짐 방지
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  } catch { /* noop */ }
+}
+
+/* 사내 Jira 프로젝트 인입 메일 주소 — 실제 주소로 교체 (Jira 관리자: 메일 핸들러 1회 설정 시 메일→이슈 자동 생성) */
+export const JIRA_INTAKE_EMAIL = 'jira-voc@your-domain.atlassian.net'
+/* VOC 케이스 → Jira 메일 등록용 mailto (메일 클라이언트가 제목·본문 채워 열림 → 발송하면 이슈 생성) */
+export function jiraMailto(c) {
+  const j = buildJiraIssue(c).fields, cf = j.customFields
+  const body = [
+    j.description, '',
+    `[VOC구분] ${cf['VOC구분']} / ${cf['표준분류']}`,
+    `[대응영역] ${cf['대응영역']}`,
+    `[심각도] ${j.priority}  [담당자] ${j.assignee}  [보고자] ${j.reporter}`,
+    `[레이블] ${(j.labels || []).join(', ')}`,
+    `[관련메뉴] ${cf['관련메뉴']}  [오류타입] ${cf['오류타입']}`,
+    `[원본 VOC ID] ${c.id}`,
+  ].join('\n')
+  return `mailto:${JIRA_INTAKE_EMAIL}?subject=${encodeURIComponent(j.summary)}&body=${encodeURIComponent(body)}`
+}
+
+/* 문자열 → 클립보드 복사 + 파일 다운로드 (둘 다 시도, 실패해도 무해) */
+export function exportJson(obj, filename) {
+  const json = JSON.stringify(obj, null, 2)
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json).catch(() => { })
+  try {
+    const blob = new Blob([json], { type: 'application/json' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  } catch { /* noop */ }
+  return json
+}

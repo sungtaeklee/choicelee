@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { GROUPS, GROUP_MODE, FIXED_DEPTH2, CAT22, recDay } from '../classify.js'
 import { KANBAN_COLS, VOCS, SevBadge, GroupBadge, Tag, ChannelIcon, Avatar, PageHead } from '../ui.jsx'
 import { SLA_DAYS } from '../templates.js'
+import { toJiraCsv, exportCsv } from '../jira.js'
 
 /* 티켓 유형 글리프 (지라 이슈 타입 대체) */
 const TYPE_GLYPH = { '장애/오류': '🐞', '성능': '⚡', '개선 요청/희망': '✦', '단순 문의/불만/기타': '💬' }
@@ -43,6 +44,12 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
     return over > 0 ? { over: true, text: `SLA +${over}d` } : { over: false, text: `D-${-over}` }
   }
   const activeFilter = q || fOwner !== '전체' || fGroup !== '전체'
+  // 지라 "CSV 가져오기"용 — Power Automate 없이 Jira Import로 일괄 생성
+  const exportCsvAll = () => {
+    if (!filtered.length) { notify.toast('추출할 티켓이 없습니다'); return }
+    exportCsv(toJiraCsv(filtered), `voc-jira-${filtered.length}건.csv`)
+    notify.toast(`지라 CSV ${filtered.length}건 저장됨 — Jira ‘이슈 가져오기’에 업로드`)
+  }
 
   return (
     <div className="screen">
@@ -55,6 +62,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
         <span className="muted nowrap">{filtered.length.toLocaleString()}건{activeFilter ? ` / 전체 ${all.length.toLocaleString()}` : ''}</span>
         {activeFilter && <button className="btn btn-ghost sm" onClick={() => { setQ(''); setFOwner('전체'); setFGroup('전체') }}>필터 초기화</button>}
         <div className="bb-spacer" />
+        <button className="btn btn-ghost sm" onClick={exportCsvAll} title="현재 필터된 티켓을 Jira ‘이슈 가져오기’용 CSV로 추출 — 일괄 생성">⤓ 지라 CSV ({filtered.length})</button>
         <button className="btn btn-ghost sm" onClick={() => setShowTax((s) => !s)}>{showTax ? '분류 체계 닫기' : '분류 체계 보기'}</button>
         <button className="btn btn-primary sm" onClick={() => notify.modal('Copilot AI로 분류', '실제 적용 시 Copilot AI가 최신 수집 VOC를 4개 그룹·22개 표준분류 기준으로 자동 분류합니다. 정형 그룹은 닫힌 분류로 매핑하고, 열림 그룹은 22개로 추론합니다.')}>✦ Copilot 분류</button>
       </div>
