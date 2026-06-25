@@ -982,30 +982,40 @@ h1,h2{margin:0}
 .cal2-leg-t{font:700 11px var(--sans);color:var(--faint)}
 .cal2-leg{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--slate)}
 .cal2-dot{width:10px;height:10px;border-radius:50%}
-.cal2-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+/* 캘린더: 주 단위 그리드 + 기간 막대(spanning bar) */
+.cal2-cal{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line)}
+.cal2-dows{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
 .cal2-dow{background:var(--surface);padding:9px 8px;text-align:center;font:700 12px var(--sans);color:var(--slate)}
 .cal2-dow.sun{color:#d92d20}.cal2-dow.sat{color:#2440b3}
-.cal2-cell{background:#fff;min-height:104px;padding:5px 5px 6px;display:flex;flex-direction:column;gap:3px;cursor:pointer}
+.cal2-weeks{display:flex;flex-direction:column;gap:1px;margin-top:1px}
+.cal2-week{position:relative}
+.cal2-week-cells{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
+.cal2-cell{background:#fff;min-height:108px;padding:4px 4px 6px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
 .cal2-cell.out{background:#fafbfc}
 .cal2-cell.out .cal2-daynum{color:var(--faint)}
 .cal2-cell.today{background:var(--magenta-soft)}
-.cal2-cell:hover{box-shadow:inset 0 0 0 2px var(--magenta-soft)}
-.cal2-daynum{font:700 12px var(--mono,monospace);color:var(--slate);padding:1px 2px}
+.cal2-daynum{font:700 12px var(--mono,monospace);color:var(--slate);padding:1px 3px}
 .cal2-cell.today .cal2-daynum{color:var(--magenta-d)}
-.cal2-evs{display:flex;flex-direction:column;gap:2px;overflow:hidden}
-.cal2-ev{display:flex;align-items:center;gap:4px;width:100%;text-align:left;border:0;border-left:4px solid var(--magenta);background:#f5f6f8;border-radius:4px;padding:2px 5px;cursor:default}
-.cal2-ev.clickable{cursor:pointer}
-.cal2-ev.clickable:hover{background:var(--magenta-soft)}
+.cal2-band{flex-shrink:0}
+.cal2-pts{display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.cal2-pt{display:flex;align-items:center;gap:4px;width:100%;text-align:left;border:0;border-left:4px solid var(--magenta);background:#f5f6f8;border-radius:4px;padding:2px 5px;cursor:default}
+.cal2-pt.clickable{cursor:pointer}
+.cal2-pt.clickable:hover{background:var(--magenta-soft)}
 .cal2-evk{flex:0 0 auto;font:700 8.5px var(--sans);padding:1px 4px;border-radius:4px;background:#e6e8ec;color:var(--slate)}
 .cal2-k-sla{background:var(--high-soft);color:var(--high)}
-.cal2-k-deployEnd{background:var(--low-soft);color:var(--low)}
-.cal2-k-devStart,.cal2-k-devEnd{background:var(--med-soft);color:var(--med)}
-.cal2-k-custom{background:var(--magenta-soft);color:var(--magenta-d)}
+.cal2-k-deploy{background:var(--low-soft);color:var(--low)}
+.cal2-k-intake{background:var(--magenta-soft);color:var(--magenta-d)}
 .cal2-evt{flex:1;font-size:10.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cal2-evx{flex:0 0 auto;color:var(--faint);font-size:10px;padding:0 2px}
-.cal2-evx:hover{color:var(--high)}
 .cal2-more{font-size:10px;color:var(--faint);padding:1px 5px}
-@media (max-width:760px){.cal2-cell{min-height:78px}.cal2-evt{display:none}.cal2-search{min-width:140px}}
+/* 기간 막대 오버레이 — 날짜 칸 위(요일·날짜번호 아래)에 떠서 주를 가로지름 */
+.cal2-rbars{position:absolute;left:0;right:0;top:23px;height:0}
+.cal2-rbar{position:absolute;height:16px;border:0;border-radius:5px;color:#fff;padding:0 7px;display:flex;align-items:center;cursor:default;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.cal2-rbar.clickable{cursor:pointer}
+.cal2-rbar.clickable:hover{filter:brightness(1.08)}
+.cal2-rbar.cont-l{border-top-left-radius:0;border-bottom-left-radius:0}
+.cal2-rbar.cont-r{border-top-right-radius:0;border-bottom-right-radius:0}
+.cal2-rbar-t{font:700 10px var(--sans);color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:760px){.cal2-cell{min-height:84px}.cal2-evt{display:none}.cal2-search{min-width:140px}.cal2-rbar-t{font-size:9px}}
 
 .org-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
 .org-h{font:700 15px var(--sans);color:var(--magenta-d);padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:10px}
@@ -1678,6 +1688,9 @@ svg.ltrend .lt-line:hover{opacity:1}
 .bb-f select{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:13px var(--sans);background:#fff;max-width:180px}
 .bb-f select:focus{outline:none;border-color:var(--magenta)}
 .bb-spacer{flex:1}
+/* 보드: 스크롤바 숨김 + 우측 그라데이션으로 '더 있음' 힌트 */
+.jboard-wrap{position:relative}
+.jboard-wrap::after{content:"";position:absolute;top:0;right:0;bottom:10px;width:36px;pointer-events:none;background:linear-gradient(90deg,rgba(244,244,246,0),var(--bg,#f4f4f6));border-radius:0 12px 12px 0}
 .jboard{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 /* 보드 스크롤바 숨김(복잡해 보이지 않게) — 휠·키보드·트랙패드 스크롤은 그대로 동작 */
 .jboard::-webkit-scrollbar,.jcol-body::-webkit-scrollbar{width:0;height:0;display:none}

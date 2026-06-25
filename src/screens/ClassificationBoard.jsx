@@ -76,6 +76,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
         </div>
       )}
 
+      <div className="jboard-wrap">
       <div className="jboard">
         {KANBAN_COLS.map((col) => {
           const items = byStatus[col] || []
@@ -125,6 +126,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
             </div>
           )
         })}
+      </div>
       </div>
       <p className="micro" style={{ marginTop: 10 }}>티켓 = VOC 케이스. 카드 클릭 → 상세(보고자·레이블·참조자·체크리스트·SLA·활동 이력). 드래그/‹ ›로 단계 이동, 저장됩니다.</p>
     </div>

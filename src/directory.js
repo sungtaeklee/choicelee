@@ -25,31 +25,36 @@ export const MEMBERS = [
 // "이름 팀" 표시 문자열 ↔ 멤버 매칭
 export const memberLabel = (m) => `${m.name} ${m.team}`
 
-/* ── 가입 계정(이 앱에 실제 로그인한 계정) ──
-   알림은 '현재 가입된 계정' 기준으로 전달되어야 하므로, 로그인 시 계정을 등록·영속한다.
-   - SELF: 지금 로그인한 본인 (담당/참조 지정·@멘션 대상이 본인이면 본인 계정으로 알림)
-   - REGISTERED: 과거에 로그인했던 동료 계정들 (멀티 사용자/공유 모드에서 각자 본인 알림 수신) */
-const LS_ACCTS = 'voc-action-copilot:accounts:v1'
+/* ── 가입 계정(이 앱에 가입한 실계정) ──
+   auth.js가 'accounts:v1'에 [{email,salt,hash}, …]로 저장한다. 디렉터리는 이를 **읽기 전용**으로
+   이메일만 추출해 가입계정으로 활용한다(절대 이 키에 쓰지 않음 — 인증 데이터 오염 방지).
+   - SELF: 지금 로그인한 본인. 본인 지정·@멘션 시 본인 계정으로 알림. */
+const ACCT_KEY = 'voc-action-copilot:accounts:v1'
 let SELF = null
-let REGISTERED = []
-try { REGISTERED = JSON.parse(localStorage.getItem(LS_ACCTS) || '[]') } catch { REGISTERED = [] }
-// 가입 계정 → 멤버 객체. 데모 명단에 있는 계정이면 한글 이름·팀을 유지, 아니면 메일 아이디로 표기.
-const acctMember = (email) => { const m = MEMBERS.find((x) => x.email === email); return m ? { ...m, registered: true } : { name: String(email).split('@')[0], team: '가입 계정', email, registered: true } }
+function readAccountEmails() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(ACCT_KEY) || '[]')
+    if (!Array.isArray(raw)) return []
+    return raw.map((a) => (typeof a === 'string' ? a : (a && a.email))).filter((e) => typeof e === 'string' && e)
+  } catch { return [] }
+}
+// 가입 계정(이메일 문자열) → 멤버 객체. 데모 명단에 있으면 한글 이름·팀 유지, 아니면 메일 아이디로.
+const acctMember = (email) => {
+  const e = String(email || '')
+  const m = MEMBERS.find((x) => x.email === e)
+  return m ? { ...m, registered: true } : { name: (e.split('@')[0] || e), team: '가입 계정', email: e, registered: true }
+}
 export function setSelf(email) {
   SELF = email ? acctMember(email) : null
-  if (SELF && !MEMBERS.find((m) => m.email === email)) SELF.team = '나'
-  if (email && !REGISTERED.includes(email)) {
-    REGISTERED = [email, ...REGISTERED].slice(0, 50)
-    try { localStorage.setItem(LS_ACCTS, JSON.stringify(REGISTERED)) } catch { /* noop */ }
-  }
+  if (SELF && !MEMBERS.find((m) => m.email === SELF.email)) SELF.team = '나'
 }
-export function registeredAccounts() { return REGISTERED.slice() }
-// 디렉터리 = 본인 + 가입 계정(실계정) + 데모 명단. 이메일 중복은 앞선(실계정) 항목 우선.
+export function registeredAccounts() { return readAccountEmails() }
+// 디렉터리 = 본인 + 가입 계정(실계정 이메일) + 데모 명단. 이메일 중복은 앞선 항목 우선.
 export function allMembers() {
   const out = [], seen = new Set()
-  const push = (m) => { if (m && m.email && !seen.has(m.email)) { seen.add(m.email); out.push(m) } }
+  const push = (m) => { if (m && typeof m.email === 'string' && m.email && !seen.has(m.email)) { seen.add(m.email); out.push(m) } }
   if (SELF) push(SELF)
-  REGISTERED.forEach((e) => push(acctMember(e)))
+  readAccountEmails().forEach((e) => push(acctMember(e)))
   MEMBERS.forEach(push)
   return out
 }

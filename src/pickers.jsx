@@ -27,7 +27,7 @@ export function PeoplePicker({ value, onChange, multi = false, placeholder = 'ì
           {results.map((l) => { const m = allMembers().find((x) => memberLabel(x) === l); return (
             <button key={l} className="pk-opt" onMouseDown={(e) => { e.preventDefault(); pick(l) }}>
               <Avatar name={l} size={24} />
-              <span className="pk-opt-main"><b>{m?.name}</b> <span className="muted">{m?.team}</span><br /><span className="pk-opt-email">{m?.email}</span></span>
+              <span className="pk-opt-main"><b>{typeof m?.name === 'string' ? m.name : ''}</b> <span className="muted">{typeof m?.team === 'string' ? m.team : ''}</span><br /><span className="pk-opt-email">{typeof m?.email === 'string' ? m.email : ''}</span></span>
             </button>
           ) })}
         </div>
