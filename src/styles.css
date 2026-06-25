@@ -1187,10 +1187,42 @@ svg.ltrend .lt-line:hover{opacity:1}
 .sg-import{margin-bottom:14px}
 .sg-import-ta{width:100%;min-height:150px;font:400 12px var(--mono,monospace);white-space:pre;overflow:auto}
 /* 솔루션 설명 탭 */
-.soldoc-tabs{display:flex;gap:8px;margin-bottom:8px}
-.soldoc-tab{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 16px;font:700 13px var(--sans);color:var(--slate);cursor:pointer;transition:.12s}
-.soldoc-tab:hover{border-color:var(--magenta);color:var(--magenta-d)}
-.soldoc-tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+/* 솔루션 설명 — 탭(세그먼트 컨트롤) */
+.soldoc-head{margin-bottom:14px}
+.soldoc-eyebrow{display:block;font:700 11px var(--sans);color:var(--faint);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px}
+.soldoc-tabs{display:inline-flex;gap:4px;background:#f1f2f4;border:1px solid var(--line);border-radius:12px;padding:4px;flex-wrap:wrap}
+.soldoc-tab{border:0;background:none;border-radius:9px;padding:8px 16px;font:700 13px var(--sans);color:var(--slate);cursor:pointer;transition:.12s}
+.soldoc-tab:hover{color:var(--magenta-d)}
+.soldoc-tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+/* 구성 카드 */
+.sol-parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.sol-part{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:6px}
+.sol-part.site{border-color:var(--magenta);background:var(--magenta-soft)}
+.sol-part-tag{align-self:flex-start;font:700 10px var(--sans);color:var(--magenta-d);background:#fff;border:1px solid var(--magenta);border-radius:20px;padding:2px 9px}
+.sol-part b{font:800 15px var(--sans);color:var(--ink)}
+.sol-part-d{font-size:12.5px;color:var(--slate);line-height:1.5}
+.sol-note{font-size:12.5px;color:var(--slate);line-height:1.6;margin:10px 0 0;padding:10px 14px;background:#fafafb;border:1px solid var(--line);border-radius:10px}
+.sol-tax{display:flex;flex-direction:column;gap:9px}
+.sol-tax-row{display:flex;gap:12px;align-items:baseline;font-size:13px;color:var(--ink)}
+.sol-tax-k{flex:0 0 66px;font:700 12px var(--sans);color:var(--slate)}
+.sol-tax-k.open{color:var(--magenta-d)}
+/* 에이전트 2종 카드 */
+.agent2-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.agent2-card{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff;display:flex;flex-direction:column;gap:9px}
+.agent2-card.on{border-color:var(--magenta);box-shadow:0 0 0 3px var(--magenta-soft)}
+.agent2-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.agent2-h b{font:800 16px var(--sans);color:var(--ink)}
+.agent2-role{flex:0 0 auto;font:700 11px var(--sans);color:var(--magenta-d);background:var(--magenta-soft);border-radius:20px;padding:3px 10px}
+.agent2-desc{font-size:12.5px;color:var(--slate);line-height:1.55;margin:0}
+.agent2-know{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.agent2-know-l{font:700 11px var(--sans);color:var(--faint)}
+.agent2-chip{font-size:11px;color:var(--slate);background:#f1f2f4;border-radius:6px;padding:2px 8px}
+.agent2-pl{font:700 11.5px var(--sans);color:var(--slate);margin-top:2px}
+.agent2-prompts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.agent2-prompts li{display:flex;align-items:center;gap:8px;background:#fafafb;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+.agent2-p{flex:1;font-size:12px;color:var(--ink);line-height:1.4}
+.agent2-copy{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--slate);font:700 11px var(--sans);border-radius:7px;padding:4px 9px;cursor:pointer}
+.agent2-copy:hover{background:var(--magenta-soft);color:var(--magenta-d);border-color:transparent}
 /* 원문 검색 일자 입력 */
 .sr-date{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--sans);color:var(--slate)}
 .sr-date input{font:inherit}
@@ -1720,6 +1752,14 @@ svg.ltrend .lt-line:hover{opacity:1}
 .jsla{font:700 10px var(--mono);color:var(--muted);background:#eef0f4;border-radius:5px;padding:2px 6px}
 .jsla.over{color:var(--high);background:var(--high-soft)}
 .jcard-editor{flex-shrink:0;font:600 10px var(--sans);color:#b45309;background:#fff3df;border-radius:5px;padding:2px 6px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 지라 연결 테스트 결과 */
+.jira-test{margin-bottom:12px}
+.jt-body{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.jt-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--slate)}
+.jt-dot{width:9px;height:9px;border-radius:50%;background:var(--faint);flex-shrink:0}
+.jt-dot.ok{background:#1a9c5b}.jt-dot.bad{background:#d92d20}.jt-dot.warn{background:#f79009}
+.jt-note{font-size:12.5px;color:var(--ink);line-height:1.6;background:#fafafb;border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin:2px 0}
+.jira-test code{font:500 11.5px var(--mono,monospace);background:#f1f2f4;border-radius:5px;padding:1px 6px}
 .jcard-spacer{flex:1}
 .jcard-move{display:flex;gap:4px}
 .jempty{text-align:center;color:var(--faint);font-size:12px;padding:16px 0}

@@ -1,141 +1,29 @@
-import React, { useState } from 'react'
-import { PageHead } from '../ui.jsx'
+import React from 'react'
 
-function PromptTemplates({ notify }) {
-  const [shown, setShown] = useState({})
-  const steps = [
-    {
-      key: 'cls', n: 1, role: '분석', title: 'VOC 분류', purpose: '유형 · 세부 · 심각도 자동 분류', core: true, cta: 'Copilot으로 분석하기',
-      body: '아래 VOC를 분석해라.\n\n1. VOC 유형을 4개 중 하나로 분류\n   - 장애/오류 / 성능 / 개선 요청 / 문의·기타\n2. 세부 카테고리(22개 기준)로 분류\n3. 모호하면 "기타 + 검토필요"로 표시\n\n[출력 형식]\n- 유형:\n- 세부:\n- 심각도:',
-      preview: ['유형: 장애/오류', '세부: 앱/웹 기능오류', '심각도: High'],
-    },
-    {
-      key: 'msg', n: 2, role: '대응', title: '고객 메시지 생성', purpose: '고객 안내 메시지 초안', cta: '메시지 생성',
-      body: '아래 VOC를 기반으로 고객 안내 메시지를 작성해라.\n\n- 사실 기반\n- 오해 방지 중심\n- 간결하게 작성\n- 개인정보 포함 금지\n\n[출력]\n- 고객 안내 메시지:',
-      preview: ['고객 안내 메시지: 불편을 드려 죄송합니다. 해당 오류는 확인되어 순차 정상화 중이며, 앱 최신 버전 업데이트 후 재시도를 부탁드립니다.'],
-    },
-    {
-      key: 'imp', n: 3, role: '개선', title: '개선 요청 생성', purpose: 'UX/개발 개선 과제화', cta: '개선 요청 정리',
-      body: '아래 VOC를 기반으로 UX/개선 요청으로 정리해라.\n\n[포함 항목]\n- 문제 정의\n- 영향 범위\n- 개선 제안\n- 우선순위',
-      preview: ['문제 정의: 특정 단계에서 기능 오류 반복', '영향 범위: 동일 유형 VOC 다수', '개선 제안: 예외 처리 · 안내 보강', '우선순위: High'],
-    },
-    {
-      key: 'mail', n: 4, role: '공유', title: '담당자 메일', purpose: '담당 조직 공유 메일', cta: '메일 작성',
-      body: 'High VOC를 담당 조직에 공유할 메일을 작성해라.\n\n[포함]\n- VOC 요약\n- 고객 영향\n- 개선 필요 사항\n- 요청 액션',
-      preview: ['수신: 담당 조직', '제목: [High] 앱 기능오류 공유', '본문: VOC 요약 · 고객 영향 · 개선 필요 · 요청 액션 포함'],
-    },
-    {
-      key: 'rpt', n: 5, role: '요약', title: '인사이트 리포트', purpose: '경영 보고용 요약', cta: '리포트 생성',
-      body: 'VOC 데이터를 기반으로 리포트를 생성해라.\n\n[포함]\n- 유형 분포\n- 주요 문제\n- 개선 우선순위\n- 기대 효과',
-      preview: ['유형 분포 · 주요 문제 · 개선 우선순위 · 기대 효과를 표/비율로 요약'],
-    },
-  ]
-  const copy = (t) => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => notify.toast('프롬프트 복사됨')).catch(() => notify.toast('복사 실패')); else notify.toast('복사 불가') }
-  const run = (st) => { setShown((s) => ({ ...s, [st.key]: true })); notify.toast(`Copilot이 ${st.title} 결과를 생성했어요 (데모)`) }
-  return (
-    <div className="screen">
-      <PageHead title="Copilot 프롬프트" sub="5개 프롬프트는 따로 도는 게 아니라, 하나의 Copilot 워크플로우로 이어집니다." />
-      <div className="pipe-strip">{steps.map((st, i, a) => (
-        <React.Fragment key={st.key}><span className={'pipe-step' + (i === 0 ? ' on' : '')}>{st.n} {st.role}</span>{i < a.length - 1 && <span className="pipe-ar">→</span>}</React.Fragment>
-      ))}</div>
-      <div className="prompt-grid">{steps.map((st) => (
-        <div key={st.key} className={'prompt-card' + (st.core ? ' pc-core' : '')}>
-          <div className="pc-head">
-            <span className="pc-num">{st.n}</span>
-            <span className="pc-title">{st.title}{st.core && <span className="pc-core-badge">핵심</span>}</span>
-            <span className="pc-role">{st.role}</span>
-          </div>
-          <div className="pc-purpose">{st.purpose}</div>
-          <pre className="pc-body">{st.body}</pre>
-          {shown[st.key] && (
-            <div className="pc-preview">
-              <div className="pc-pv-l"><span className="ai-spark">✦</span> 결과 미리보기 <span className="muted" style={{ fontWeight: 400 }}>· 데모</span></div>
-              <ul className="pc-pv-list">{st.preview.map((l, i) => <li key={i}>{l}</li>)}</ul>
-            </div>
-          )}
-          <div className="pc-actions">
-            <button className="btn btn-ghost sm" onClick={() => copy(st.body)}>복사</button>
-            <button className="btn btn-primary sm" onClick={() => run(st)}>{st.cta}</button>
-          </div>
-        </div>
-      ))}</div>
-      <p className="micro">사내 네트워크 정책상 데모에서는 실제 Copilot 호출 대신 예시 결과를 보여줍니다. 실제 적용 시 사내 Copilot / Copilot Studio Agent로 연결됩니다.</p>
-    </div>
-  )
-}
+/* ============================================================
+   솔루션 설명 — 3개 탭: 솔루션 구조(TO-BE) · 에이전트 & 프롬프트 · 확장 로드맵(Phase 2)
+   현재 솔루션 기준(코파일럿 에이전트 2종 · 6분류 · 닫힌 루프 · 지식 학습)으로 정리.
+   ============================================================ */
 
-/* ---------- [Arch] Architecture (패턴 설계) ---------- */
-/* ---------- [설계] 프로세스 플로우 ---------- */
-function FlowMap() {
-  return (
-    <div className="panel flowmap-card">
-      <div className="card-title">처리 흐름 한눈에 <span className="muted">셀프 해결 → 미해결 시 수집·분류 → 운영·반영 · 결과는 학습으로 피드백</span></div>
-      <div className="flowmap-scroll">
-        <svg className="flowmap" viewBox="0 0 1040 308" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="VOC 처리 프로세스 플로우">
-          <defs>
-            <marker id="fmah" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#e6007e" /></marker>
-            <marker id="fmah2" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#b8005f" /></marker>
-          </defs>
-          <g fill="none" stroke="#e6007e" strokeWidth="2" markerEnd="url(#fmah)">
-            <path d="M152 61 L180 61" />
-            <path d="M316 61 L368 61" />
-            <path d="M522 61 L552 61" />
-            <path d="M250 94 C250 150 258 152 258 186" />
-            <path d="M336 212 L368 212" />
-            <path d="M528 212 L560 212" />
-            <path d="M720 212 L752 212" />
-          </g>
-          <path d="M642 234 C642 286 450 286 450 238" fill="none" stroke="#b8005f" strokeWidth="1.8" strokeDasharray="5 4" markerEnd="url(#fmah2)" />
-          <text x="546" y="303" textAnchor="middle" className="fm-loop-t">AI 학습 · 피드백 루프</text>
-          <text x="343" y="50" className="fm-lbl">예</text>
-          <text x="286" y="150" className="fm-lbl">아니오</text>
-          <rect className="fm-pill" x="36" y="40" width="116" height="42" rx="11" />
-          <text x="94" y="61" textAnchor="middle" dominantBaseline="central" className="fm-pill-t">VOC 발생</text>
-          <polygon className="fm-dia" points="250,28 316,61 250,94 184,61" />
-          <text x="250" y="61" textAnchor="middle" dominantBaseline="central" className="fm-dia-t">셀프 해결 가능?</text>
-          <rect className="fm-box" x="372" y="40" width="150" height="42" rx="11" />
-          <text x="447" y="61" textAnchor="middle" dominantBaseline="central" className="fm-node">고객 셀프 해결</text>
-          <rect className="fm-pill end" x="556" y="43" width="210" height="36" rx="18" />
-          <text x="661" y="61" textAnchor="middle" dominantBaseline="central" className="fm-pill-t">END · 인입콜·VOC 감소</text>
-          <rect className="fm-box" x="180" y="190" width="156" height="44" rx="11" />
-          <text x="258" y="212" textAnchor="middle" dominantBaseline="central" className="fm-node">상담 연결·VOC 접수</text>
-          <rect className="fm-box" x="372" y="190" width="156" height="44" rx="11" />
-          <text x="450" y="212" textAnchor="middle" dominantBaseline="central" className="fm-node">수집 · 자동 분류</text>
-          <rect className="fm-box" x="564" y="190" width="156" height="44" rx="11" />
-          <text x="642" y="212" textAnchor="middle" dominantBaseline="central" className="fm-node">운영 · 서비스 반영</text>
-          <rect className="fm-pill end" x="756" y="193" width="214" height="38" rx="19" />
-          <text x="863" y="212" textAnchor="middle" dominantBaseline="central" className="fm-pill-t">END · 처리율·속도 향상</text>
-        </svg>
-      </div>
-    </div>
-  )
-}
+/* ---------- 탭 1: 솔루션 구조 (TO-BE) ---------- */
 function Architecture() {
-  const Box = ({ t, d }) => <div className="fc-box"><b>{t}</b>{d && <span>{d}</span>}</div>
-  const Arrow = () => <span className="fc-arrow" aria-hidden="true" />
-  const flow = ['VOC 발생', 'Copilot 분석', '고객 대응 생성', '개선 과제 도출', '리포트 생성']
-  const roles = [
-    { t: '분석', d: '유형 · 심각도 자동 분류' },
-    { t: '대응', d: '문자 · 메일 초안 생성' },
-    { t: '개선', d: '개선 과제 도출' },
-    { t: '리포트', d: '현황 · 인사이트 요약' },
+  const loop = ['코파일럿 분류·생성', '담당자 검수', '사이트 처리(보드·티켓)', '지라 연동', '처리결과 재학습']
+  const parts = [
+    { t: 'U+VOC 고객가이드', d: '분류·분석 에이전트 — 6분류·22표준분류·대응영역, 요약·응대문·개선과제', tag: '에이전트' },
+    { t: 'U+VOC 셀프가이드', d: '고객 셀프 해결 단계 + 선제 안내문 생성, 미해결만 상담 연결', tag: '에이전트' },
+    { t: 'U+ VOICE 운영 사이트', d: 'VOC 보드 · 처리(지라형 티켓) · 셀프 가이드 · 인사이트 · 일정 · Copilot 연동', tag: '사이트' },
   ]
   const intake = [
-    { t: '채널 수집', d: '상담콜 · 앱 · 홈페이지' },
+    { t: '채널 수집', d: '상담콜 · 앱 · 홈페이지 · 메달리아' },
     { t: '전처리', d: 'STT · 개인정보 마스킹' },
-    { t: '자동 분류', d: '6그룹 · 22개 표준분류' },
-    { t: '우선순위화', d: '감성 · 긴급도 스코어링' },
-  ]
-  const operate = [
-    { t: '대시보드', d: '유형·영역 추이 · 처리현황' },
-    { t: '인사이트 · 담당자 알림', d: '예상 답안 · 처리 가이드' },
-    { t: '서비스 반영', d: '근본 원인 개선' },
+    { t: '자동 분류', d: '6그룹 · 22표준분류 · 대응영역' },
+    { t: '우선순위화', d: '심각도 · 감성 · 신뢰도(검토필요)' },
   ]
   const effects = [
-    { t: '상담 Call 감소', d: '셀프 해결로 인입 감소' },
-    { t: 'VOC 감소', d: '근본 원인 개선' },
-    { t: '분류 자동화', d: '수기 태깅 제거' },
-    { t: '대응 속도 향상', d: '실시간 처리' },
+    { t: '상담 Call 감소', d: '셀프 해결 · 선제 안내로 인입 감소' },
+    { t: 'VOC 감소', d: '근본 원인 개선 반영' },
+    { t: '분류 자동화', d: '수기 태깅 제거 · 일관성' },
+    { t: '대응 속도 향상', d: '실시간 처리 · 지라 연동' },
   ]
   return (
     <div className="screen">
@@ -149,61 +37,40 @@ function Architecture() {
         </div>
         <p className="vb-slogan">고객의 목소리가 서비스 개선으로 이어지는 순간, <b>U+ VOICE</b></p>
       </div>
+
       <div className="page-head"><div>
         <h1 className="page-title">솔루션 구조 (TO-BE)</h1>
-        <p className="page-sub">VOC 자동 분류 → 개선안 도출까지, Copilot이 전체 흐름을 자동 수행합니다.</p>
+        <p className="page-sub">M365 Copilot 에이전트가 VOC를 분류·생성하고, 사내 운영 사이트에서 티켓처럼 처리한 뒤 지라로 연동하는 닫힌 루프.</p>
       </div></div>
 
-      <h2 className="sec-title">핵심 Flow</h2>
-      <div className="pipe-strip">{flow.map((s, i, a) => (
-        <React.Fragment key={s}><span className={'pipe-step' + (i >= 1 && i <= 3 ? ' on' : '')}>{s}</span>{i < a.length - 1 && <span className="pipe-ar">→</span>}</React.Fragment>
+      <h2 className="sec-title">구성 <span className="sec-note">코파일럿 에이전트 2종 + 운영 사이트</span></h2>
+      <div className="sol-parts">{parts.map((p) => (
+        <div key={p.t} className={'sol-part' + (p.tag === '사이트' ? ' site' : '')}><span className="sol-part-tag">{p.tag}</span><b>{p.t}</b><span className="sol-part-d">{p.d}</span></div>
       ))}</div>
 
-      <h2 className="sec-title">Copilot 역할</h2>
-      <div className="effect-row">{roles.map((r) => <div key={r.t} className="effect-card"><div className="effect-t">{r.t}</div><div className="effect-d">{r.d}</div></div>)}</div>
+      <h2 className="sec-title">닫힌 루프 <span className="sec-note">생성 → 검수 → 처리 → 연동 → 재학습</span></h2>
+      <div className="pipe-strip">{loop.map((s, i, a) => (
+        <React.Fragment key={s}><span className={'pipe-step' + (i === 0 ? ' on' : '')}>{s}</span>{i < a.length - 1 && <span className="pipe-ar">→</span>}</React.Fragment>
+      ))}</div>
+      <p className="sol-note">코파일럿이 만든 결과는 <b>제안</b>이며 담당자 검수 후 확정됩니다. 사이트 처리 결과(이력·최종 수정자)는 공유 저장소로 실시간 반영되고, 분류 모델 학습으로 되먹임됩니다.</p>
 
-      <h2 className="sec-title">처리 흐름 <span className="sec-note">셀프 해결 → 미해결 시 수집·분류 → 운영·반영</span></h2>
       <FlowMap />
 
-      <h2 className="sec-title">단계별 상세 <span className="sec-note">3개 레인 · 수집부터 반영까지</span></h2>
-      <div className="flowchart">
-        <div className="fc-lane">
-          <div className="fc-lane-h"><span className="n">1</span>고객 접점 · 셀프 해결</div>
-          <Box t="VOC 발생" />
-          <Arrow />
-          <div className="fc-decision"><span className="fc-dia">◆</span> 셀프 가이드로 해결 가능?</div>
-          <div className="fc-branch">
-            <div className="fc-leg">
-              <span className="fc-yes">예</span>
-              <Box t="고객 셀프 해결" d="접수 전 맞춤 가이드" />
-              <Arrow />
-              <div className="fc-pill end">END · 인입콜 감소</div>
-            </div>
-            <div className="fc-leg">
-              <span className="fc-no">아니오</span>
-              <Box t="상담 연결 · VOC 접수" d="미해결 건만 전달" />
-              <Arrow />
-              <div className="fc-next">↳ 레인 2로 유입</div>
-            </div>
-          </div>
-        </div>
-        <div className="fc-lane">
-          <div className="fc-lane-h"><span className="n">2</span>수집 · 자동 분류</div>
-          {intake.map((s, i) => <React.Fragment key={s.t}><Box t={s.t} d={s.d} />{i < intake.length - 1 && <Arrow />}</React.Fragment>)}
-          <div className="fc-loop">⟲ 처리 결과는 분류 모델 학습으로 되먹임</div>
-        </div>
-        <div className="fc-lane">
-          <div className="fc-lane-h"><span className="n">3</span>운영 · 서비스 반영</div>
-          {operate.map((s, i) => <React.Fragment key={s.t}><Box t={s.t} d={s.d} />{i < operate.length - 1 && <Arrow />}</React.Fragment>)}
-          <Arrow />
-          <div className="fc-pill end">END · 처리율 · 속도 향상</div>
-        </div>
+      <h2 className="sec-title">수집·분류 파이프라인 <span className="sec-note">들어온 VOC를 우리 스키마로 정규화</span></h2>
+      <div className="effect-row">{intake.map((s) => <div key={s.t} className="effect-card"><div className="effect-t">{s.t}</div><div className="effect-d">{s.d}</div></div>)}</div>
+
+      <h2 className="sec-title">분류 체계 <span className="sec-note">실 VOC현황 기준 6분류</span></h2>
+      <div className="panel sol-tax">
+        <div className="sol-tax-row"><span className="sol-tax-k">정형 3</span><span>장애/오류 · 성능 · 개선 요청/희망 <span className="muted">(닫힌 분류)</span></span></div>
+        <div className="sol-tax-row"><span className="sol-tax-k open">열림 3</span><span>단순 문의 · 불만 · 기타 <span className="muted">→ 22개 표준분류로 추론</span></span></div>
+        <div className="sol-tax-row"><span className="sol-tax-k">대응영역</span><span>MY · 상품/스토어 · 혜택/멤버십 · 검색/챗봇 · 플러스탭 · 기타</span></div>
+        <div className="sol-tax-row"><span className="sol-tax-k">신뢰도</span><span>상 / 중 / 하 · 사유 코드(L01 짧음·L04 다주제 등) → ‘하’면 검토필요</span></div>
       </div>
 
-      <h2 className="sec-title">문제 → 해결</h2>
+      <h2 className="sec-title">AS-IS → TO-BE</h2>
       <div className="ba-grid">
         <div className="panel ba-before"><div className="ba-tag">AS-IS</div><ul className="ba-list"><li>수기 분류 · 태깅</li><li>채널별 중복 처리</li><li>대응 지연 · 반복 인입</li></ul></div>
-        <div className="panel ba-after"><div className="ba-tag after">TO-BE</div><ul className="ba-list"><li>Copilot 자동 분류</li><li>문자·메일 자동 생성</li><li>실시간 대응 · 셀프 해결</li></ul></div>
+        <div className="panel ba-after"><div className="ba-tag after">TO-BE</div><ul className="ba-list"><li>Copilot 자동 분류(6분류) · 응대 초안</li><li>지라형 티켓 1곳 처리 + 지라 연동</li><li>셀프 해결 · 선제 안내로 인입 감소</li></ul></div>
       </div>
 
       <h2 className="sec-title">기대 효과</h2>
@@ -211,18 +78,96 @@ function Architecture() {
 
       <h2 className="sec-title">구현 로드맵</h2>
       <div className="roadmap">
-        <div className="rm-step rm-now"><div className="rm-t">PoC <span className="rm-badge">현재</span></div><div className="rm-d">핵심 분류·대시보드 프로토타입</div></div>
+        <div className="rm-step rm-now"><div className="rm-t">PoC <span className="rm-badge">현재</span></div><div className="rm-d">에이전트 2종 · 운영 사이트 · 실데이터 학습</div></div>
         <span className="rm-ar">→</span>
-        <div className="rm-step"><div className="rm-t">파일럿</div><div className="rm-d">실 VOC·STT로 정확도 고도화</div></div>
+        <div className="rm-step"><div className="rm-t">파일럿</div><div className="rm-d">사내 지라·SSO 연동 · 정확도 고도화</div></div>
         <span className="rm-ar">→</span>
-        <div className="rm-step"><div className="rm-t">전사 확산</div><div className="rm-d">CX 전 영역·타 채널 확대</div></div>
+        <div className="rm-step"><div className="rm-t">전사 확산</div><div className="rm-d">CX 전 영역 + U+one 선제조치(Phase 2)</div></div>
       </div>
     </div>
   )
 }
 
-/* ---------- [엔진②] 고객 셀프 해결 가이드 ---------- */
+/* 처리 흐름 다이어그램 (셀프 해결 분기 → 미해결 시 수집·분류 → 운영·반영 · 피드백 루프) */
+function FlowMap() {
+  return (
+    <div className="panel flowmap-card">
+      <div className="card-title">처리 흐름 한눈에 <span className="muted">셀프 해결 → 미해결 시 수집·분류 → 운영·반영 · 결과는 학습으로 피드백</span></div>
+      <div className="flowmap-scroll">
+        <svg className="flowmap" viewBox="0 0 1040 308" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="VOC 처리 프로세스 플로우">
+          <defs>
+            <marker id="fmah" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#e6007e" /></marker>
+            <marker id="fmah2" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#b8005f" /></marker>
+          </defs>
+          <g fill="none" stroke="#e6007e" strokeWidth="2" markerEnd="url(#fmah)">
+            <path d="M152 61 L180 61" /><path d="M316 61 L368 61" /><path d="M522 61 L552 61" />
+            <path d="M250 94 C250 150 258 152 258 186" /><path d="M336 212 L368 212" /><path d="M528 212 L560 212" /><path d="M720 212 L752 212" />
+          </g>
+          <path d="M642 234 C642 286 450 286 450 238" fill="none" stroke="#b8005f" strokeWidth="1.8" strokeDasharray="5 4" markerEnd="url(#fmah2)" />
+          <text x="546" y="303" textAnchor="middle" className="fm-loop-t">AI 학습 · 피드백 루프</text>
+          <text x="343" y="50" className="fm-lbl">예</text><text x="286" y="150" className="fm-lbl">아니오</text>
+          <rect className="fm-pill" x="36" y="40" width="116" height="42" rx="11" /><text x="94" y="61" textAnchor="middle" dominantBaseline="central" className="fm-pill-t">VOC 발생</text>
+          <polygon className="fm-dia" points="250,28 316,61 250,94 184,61" /><text x="250" y="61" textAnchor="middle" dominantBaseline="central" className="fm-dia-t">셀프 해결 가능?</text>
+          <rect className="fm-box" x="372" y="40" width="150" height="42" rx="11" /><text x="447" y="61" textAnchor="middle" dominantBaseline="central" className="fm-node">고객 셀프 해결</text>
+          <rect className="fm-pill end" x="556" y="43" width="210" height="36" rx="18" /><text x="661" y="61" textAnchor="middle" dominantBaseline="central" className="fm-pill-t">END · 인입콜·VOC 감소</text>
+          <rect className="fm-box" x="180" y="190" width="156" height="44" rx="11" /><text x="258" y="212" textAnchor="middle" dominantBaseline="central" className="fm-node">상담 연결·VOC 접수</text>
+          <rect className="fm-box" x="372" y="190" width="156" height="44" rx="11" /><text x="450" y="212" textAnchor="middle" dominantBaseline="central" className="fm-node">수집 · 자동 분류</text>
+          <rect className="fm-box" x="564" y="190" width="156" height="44" rx="11" /><text x="642" y="212" textAnchor="middle" dominantBaseline="central" className="fm-node">운영 · 서비스 반영</text>
+          <rect className="fm-pill end" x="756" y="193" width="214" height="38" rx="19" /><text x="863" y="212" textAnchor="middle" dominantBaseline="central" className="fm-pill-t">END · 처리율·속도 향상</text>
+        </svg>
+      </div>
+    </div>
+  )
+}
 
+/* ---------- 탭 2: 에이전트 & 프롬프트 ---------- */
+function PromptTemplates({ notify }) {
+  const copy = (t) => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => notify.toast('프롬프트 복사됨')).catch(() => notify.toast('복사 실패')); else notify.toast('복사 불가') }
+  const agents = [
+    {
+      key: 'voice', name: 'U+VOC 고객가이드', role: '분류·분석', accent: true,
+      desc: 'VOC를 6분류·22표준분류·대응영역으로 분류하고, 핵심 의도·예상 응대문(고객/문자/담당자 메일)·개선 과제를 생성. “사이트용 JSON”이면 Copilot 연동으로 티켓 등록.',
+      know: ['서비스 이해', '분류 기준', '학습예시 889'],
+      prompts: [
+        '이 VOC를 6분류로 분류하고 핵심 의도·예상 응대문을 만들어 줘',
+        '이 건이 불만인지 단순 문의인지 신뢰도와 함께 판단해 줘',
+        '아래 VOC 목록을 사이트용 JSON으로 분류해 줘',
+      ],
+    },
+    {
+      key: 'self', name: 'U+VOC 셀프가이드', role: '고객 셀프 해결',
+      desc: '유형별 고객 셀프 해결 단계 + 선제 안내문(이메일·문자)을 생성하고, 미해결 건만 상담 연결로 정제. “사이트용 JSON”이면 셀프 가이드 화면에 반영.',
+      know: ['서비스 이해', '분류 기준', '학습예시'],
+      prompts: [
+        '‘앱/웹 접속불가’ 유형의 고객 셀프 해결 단계를 4개 만들어 줘',
+        '‘요금/청구’ 선제 안내문(이메일·문자) 초안 써 줘',
+        '이번 주 자주 묻는 상위 5개 유형 셀프 가이드를 사이트용 JSON으로 정리해 줘',
+      ],
+    },
+  ]
+  return (
+    <div className="screen">
+      <div className="page-head"><div>
+        <h1 className="page-title">에이전트 &amp; 프롬프트</h1>
+        <p className="page-sub">M365 Copilot 에이전트 빌더(선언적 에이전트) 2종. 같은 지식을 공유하고, 출력을 사이트가 받아 처리합니다.</p>
+      </div></div>
+      <div className="agent2-grid">{agents.map((a) => (
+        <div key={a.key} className={'agent2-card' + (a.accent ? ' on' : '')}>
+          <div className="agent2-h"><b>{a.name}</b><span className="agent2-role">{a.role}</span></div>
+          <p className="agent2-desc">{a.desc}</p>
+          <div className="agent2-know"><span className="agent2-know-l">지식</span>{a.know.map((k) => <span key={k} className="agent2-chip">{k}</span>)}</div>
+          <div className="agent2-pl">추천 프롬프트</div>
+          <ul className="agent2-prompts">{a.prompts.map((p, i) => (
+            <li key={i}><span className="agent2-p">{p}</span><button className="agent2-copy" onClick={() => copy(p)}>복사</button></li>
+          ))}</ul>
+        </div>
+      ))}</div>
+      <p className="micro" style={{ marginTop: 12 }}>지식: <b>voc-service-knowledge</b>(서비스 이해) · <b>voc-classification-knowledge</b>(분류 기준) · <b>voc-learning-examples</b>(실데이터 골든 예시·신뢰도·분류사유)를 Knowledge로, 지시문은 각 에이전트 문서에서 복붙, 웹 지식으로 www.lguplus.com 연결. 사내망 정책상 데모는 실제 Copilot 호출 대신 안내만 표시합니다.</p>
+    </div>
+  )
+}
+
+/* ---------- 탭 3: 확장 로드맵 (Phase 2) — U+one 선제조치 ---------- */
 function Phase2({ notify }) {
   const demo = (l) => notify && notify.toast(`${l} (콘셉트 데모 — 실제 동작 안 함)`)
   const phases = [
@@ -263,7 +208,7 @@ function Phase2({ notify }) {
       ))}</div>
       <div className="phase-note">같은 분류·대응 엔진을 <b>양쪽 끝</b>에서 씁니다 — 내부 Copilot(사후) ↔ U+one 임베드(사전). 앱에서 처리·미처리된 결과가 내부 엔진으로 돌아가 선제 정확도를 높이는 <b>닫힌 루프</b>가 일반 챗봇과의 차별점입니다.</div>
 
-      <h2 className="sec-title">대표 시나리오 <span className="sec-note">요금/청구 선제조치 · 첨부 콘셉트 화면 기준</span></h2>
+      <h2 className="sec-title">대표 시나리오 <span className="sec-note">요금/청구 선제조치 · 콘셉트 화면</span></h2>
       <div className="p2-phones">
         <div className="p2-phone-wrap">
           <div className="p2-phone-cap"><span className="p2-step-no">1</span> 청구서 진입 · 선제 버블</div>
@@ -324,12 +269,16 @@ function Phase2({ notify }) {
 }
 
 function AllMenu({ goAgent, setRail, notify, doc, setDoc }) {
+  const TABS = [['architecture', '솔루션 구조 (TO-BE)'], ['prompts', '에이전트 & 프롬프트'], ['phase2', '확장 로드맵 (Phase 2)']]
   return (
     <div className="screen portal-screen">
-      <div className="soldoc-tabs">
-        <button className={'soldoc-tab' + (doc === 'architecture' ? ' on' : '')} onClick={() => setDoc('architecture')}>솔루션 구조 (TO-BE)</button>
-        <button className={'soldoc-tab' + (doc === 'prompts' ? ' on' : '')} onClick={() => setDoc('prompts')}>Copilot 프롬프트</button>
-        <button className={'soldoc-tab' + (doc === 'phase2' ? ' on' : '')} onClick={() => setDoc('phase2')}>확장 로드맵 (Phase 2)</button>
+      <div className="soldoc-head">
+        <span className="soldoc-eyebrow">솔루션 설명</span>
+        <div className="soldoc-tabs" role="tablist">
+          {TABS.map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={doc === k} className={'soldoc-tab' + (doc === k ? ' on' : '')} onClick={() => setDoc(k)}>{label}</button>
+          ))}
+        </div>
       </div>
       {doc === 'architecture' && <Architecture />}
       {doc === 'prompts' && <PromptTemplates notify={notify} />}

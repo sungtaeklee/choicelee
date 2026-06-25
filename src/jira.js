@@ -78,6 +78,44 @@ export function jiraIntakeEmail() {
   return JIRA_INTAKE_PLACEHOLDER
 }
 export function setJiraIntakeEmail(v) { try { v ? localStorage.setItem(LS_JIRA, v) : localStorage.removeItem(LS_JIRA) } catch { /* noop */ } }
+
+/* 사내 Jira 인스턴스(베이스 URL·프로젝트) — 실제: lgdigitalcommerce.atlassian.net / 프로젝트 VOC.
+   설정 우선순위: 앱 입력값 → 환경변수(VITE_JIRA_BASE) → 기본값. */
+export const JIRA_BASE_DEFAULT = 'https://lgdigitalcommerce.atlassian.net'
+export const JIRA_PROJECT = 'VOC'
+const LS_JIRABASE = 'voc-action-copilot:jiraBase'
+export function jiraBase() {
+  try { const o = localStorage.getItem(LS_JIRABASE); if (o && o.trim()) return o.trim().replace(/\/$/, '') } catch { /* noop */ }
+  try { if (import.meta && import.meta.env && import.meta.env.VITE_JIRA_BASE) return String(import.meta.env.VITE_JIRA_BASE).replace(/\/$/, '') } catch { /* noop */ }
+  return JIRA_BASE_DEFAULT
+}
+export function setJiraBase(v) { try { v ? localStorage.setItem(LS_JIRABASE, v) : localStorage.removeItem(LS_JIRABASE) } catch { /* noop */ } }
+export const jiraBrowseUrl = (key) => `${jiraBase()}/browse/${key}`
+
+/* 내부망 연결 테스트 — 브라우저에서 직접 점검.
+   ① 네트워크 도달(no-cors: 응답만 오면 성공, 차단이면 실패) ② REST 직접호출 가능 여부(CORS).
+   브라우저는 보안상 atlassian.net REST를 교차출처로 못 읽는 게 정상(=서버 프록시 필요)이므로,
+   reachable=true & corsOk=false 면 '망은 열렸고, 실시간 API는 서버 프록시로 연동'이 결론. */
+export async function testJiraConn(timeoutMs = 7000) {
+  const base = jiraBase()
+  const out = { base, reachable: false, corsOk: false, status: 0, note: '' }
+  const withTimeout = (p, ms) => { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms); return [c.signal, () => clearTimeout(t)] }
+  try {
+    const [signal, clear] = withTimeout(null, timeoutMs)
+    await fetch(`${base}/favicon.ico?cb=${Date.now()}`, { mode: 'no-cors', cache: 'no-store', signal })
+    clear(); out.reachable = true
+  } catch (e) { out.note = '네트워크 도달 불가 — 내부망/방화벽에서 ' + base + ' 아웃바운드가 막혀 있을 수 있습니다.'; return out }
+  try {
+    const [signal, clear] = withTimeout(null, timeoutMs)
+    const res = await fetch(`${base}/rest/api/3/serverInfo`, { cache: 'no-store', signal })
+    clear(); out.status = res.status; out.corsOk = true
+    out.note = '브라우저에서 REST 직접호출까지 가능(CORS 허용). 단, 인증 토큰은 서버에만 두세요.'
+  } catch {
+    out.corsOk = false
+    out.note = '망은 열렸지만 브라우저 REST 직접호출은 CORS로 차단(정상). 실시간 API는 서버 프록시(/api)로 연동하세요. CSV 가져오기·메일 등록은 그대로 사용 가능.'
+  }
+  return out
+}
 /* VOC 케이스 → Jira 메일 등록용 mailto (메일 클라이언트가 제목·본문 채워 열림 → 발송하면 이슈 생성) */
 export function jiraMailto(c) {
   const j = buildJiraIssue(c).fields, cf = j.customFields

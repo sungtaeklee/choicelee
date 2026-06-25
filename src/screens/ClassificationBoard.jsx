@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { GROUPS, GROUP_MODE, FIXED_DEPTH2, CAT22, recDay } from '../classify.js'
 import { KANBAN_COLS, VOCS, SevBadge, GroupBadge, Tag, ChannelIcon, Avatar, PageHead } from '../ui.jsx'
 import { SLA_DAYS } from '../templates.js'
-import { toJiraCsv, exportCsv } from '../jira.js'
+import { toJiraCsv, exportCsv, testJiraConn, jiraBase } from '../jira.js'
 import { nameOfEmail } from '../directory.js'
 
 /* 티켓 유형 글리프 (지라 이슈 타입 대체) */
@@ -15,6 +15,8 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
   const [dragId, setDragId] = useState(null)
   const [q, setQ] = useState(''); const [fOwner, setFOwner] = useState('전체'); const [fGroup, setFGroup] = useState('전체')
   const [showTax, setShowTax] = useState(false)
+  const [jiraTest, setJiraTest] = useState(null) // null | 'running' | 결과객체
+  const runJiraTest = async () => { setJiraTest('running'); try { setJiraTest(await testJiraConn()) } catch (e) { setJiraTest({ base: jiraBase(), reachable: false, note: String(e && e.message || e) }) } }
 
   const owners = useMemo(() => ['전체', '미지정', ...[...new Set(all.map((v) => v.owner).filter(Boolean))]], [all])
   const filtered = useMemo(() => {
@@ -64,9 +66,24 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
         {activeFilter && <button className="btn btn-ghost sm" onClick={() => { setQ(''); setFOwner('전체'); setFGroup('전체') }}>필터 초기화</button>}
         <div className="bb-spacer" />
         <button className="btn btn-ghost sm" onClick={exportCsvAll} title="현재 필터된 티켓을 Jira ‘이슈 가져오기’용 CSV로 추출 — 일괄 생성">⤓ 지라 CSV ({filtered.length})</button>
+        <button className="btn btn-ghost sm" onClick={runJiraTest} title="사내망에서 사내 Jira(lgdigitalcommerce.atlassian.net) 연결 가능 여부 점검">🔗 지라 연결 테스트</button>
         <button className="btn btn-ghost sm" onClick={() => setShowTax((s) => !s)}>{showTax ? '분류 체계 닫기' : '분류 체계 보기'}</button>
         <button className="btn btn-primary sm" onClick={() => notify.modal('Copilot AI로 분류', '실제 적용 시 Copilot AI가 최신 수집 VOC를 6개 그룹·22개 표준분류 기준으로 자동 분류합니다. 정형 그룹은 닫힌 분류로 매핑하고, 열림 그룹은 22개로 추론합니다.')}>✦ Copilot 분류</button>
       </div>
+      {jiraTest && (
+        <div className="panel jira-test">
+          <div className="block-label">지라 연결 테스트 <span className="muted" style={{ fontWeight: 400 }}>· {jiraBase()} · 사내망 브라우저에서 실행하세요</span></div>
+          {jiraTest === 'running' ? <p className="muted">테스트 중…</p> : (
+            <div className="jt-body">
+              <div className="jt-row"><span className={'jt-dot' + (jiraTest.reachable ? ' ok' : ' bad')} />네트워크 도달: <b>{jiraTest.reachable ? '가능 ✓' : '불가 ✗'}</b></div>
+              <div className="jt-row"><span className={'jt-dot' + (jiraTest.corsOk ? ' ok' : ' warn')} />브라우저 REST 직접호출(CORS): <b>{jiraTest.corsOk ? `가능 (HTTP ${jiraTest.status})` : '차단(정상) — 서버 프록시 필요'}</b></div>
+              <p className="jt-note">{jiraTest.note}</p>
+              <p className="micro">정확한 인증 포함 점검은 사내망 단말에서: <code>curl -u 이메일:API토큰 {jiraBase()}/rest/api/3/myself</code></p>
+              <button className="btn btn-ghost sm" onClick={() => setJiraTest(null)}>닫기</button>
+            </div>
+          )}
+        </div>
+      )}
       {showTax && (
         <div className="panel">
           <div className="block-label">열림 그룹 표준분류 22</div>
