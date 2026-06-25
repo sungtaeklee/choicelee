@@ -73,13 +73,24 @@ export default function App() {
   useEffect(() => {
     if (!sharedEnabled) return
     let cancelled = false
+    // 폴링 머지: 새 레코드는 추가, **기존 레코드는 갱신**(상태·담당·활동/최종 수정자 실시간 반영).
+    // 활동 이력은 합집합으로 병합해 동시 편집 시 누구의 이력도 잃지 않는다.
+    const actKey = (a) => `${a.t}|${a.who}|${a.kind}|${a.text}`
+    const unionAct = (a = [], b = []) => { const seen = new Set(), out = []; for (const x of [...a, ...b]) { const k = actKey(x); if (!seen.has(k)) { seen.add(k); out.push(x) } } return out.sort((p, q) => (p.t < q.t ? -1 : p.t > q.t ? 1 : 0)) }
+    const sig = (v) => { try { return JSON.stringify(toCompact([v])[0]) } catch { return '' } }
     const mergeIn = (recs) => {
       if (!recs || !recs.length) return
       const hy = hydrate(recs)
       setAdded((prev) => {
-        const have = new Set(prev.map((v) => v.id))
-        const fresh = hy.filter((v) => !have.has(v.id))
-        return fresh.length ? [...prev, ...fresh] : prev
+        const map = new Map(prev.map((v) => [v.id, v]))
+        let changed = false
+        for (const inc of hy) {
+          const ex = map.get(inc.id)
+          if (!ex) { map.set(inc.id, inc); changed = true; continue }
+          const merged = { ...ex, ...inc, activity: unionAct(ex.activity, inc.activity) }
+          if (sig(ex) !== sig(merged)) { map.set(inc.id, merged); changed = true } // 실제 변경분만 반영(리렌더 최소화)
+        }
+        return changed ? [...map.values()] : prev
       })
     }
     listAll().then(({ recs, lastTs }) => {

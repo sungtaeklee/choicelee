@@ -34,10 +34,13 @@ function rowsToResult(rows) {
   for (const r of rows || []) { if (r.created_at && r.created_at > lastTs) lastTs = r.created_at }
   return { recs, lastTs }
 }
-// 압축 레코드 배열 저장. merge=true면 같은 id 갱신(상태/담당 편집 반영), 아니면 중복 무시.
+// 압축 레코드 배열 저장. merge=true면 같은 id 갱신(상태/담당/활동 편집 반영), 아니면 중복 무시.
+// ★ merge(수정) 시 created_at을 현재 시각으로 갱신 — 수정은 default now()가 안 바뀌므로 직접 세팅.
+//   그래야 listSince(created_at 기준)가 수정분을 다시 돌려줘 다른 사용자에게 실시간 반영된다.
 export async function insertMany(compactRecs, merge = false) {
   if (!compactRecs || !compactRecs.length) return
-  const body = compactRecs.map((r) => ({ id: r.id, rec: r }))
+  const nowTs = merge ? new Date().toISOString() : null
+  const body = compactRecs.map((r) => (nowTs ? { id: r.id, rec: r, created_at: nowTs } : { id: r.id, rec: r }))
   const res = await fetch(`${base}?on_conflict=id`, {
     method: 'POST',
     headers: { ...headers, Prefer: `return=minimal,resolution=${merge ? 'merge-duplicates' : 'ignore-duplicates'}` },
