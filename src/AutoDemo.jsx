@@ -9,14 +9,14 @@ function toSpeech(t) {
 function buildDemoSteps(hasData, sampleId) {
   const base = [
     { rail: 'grid', doc: 'architecture', text: 'U+ VOICE는 고객의 목소리, VOC를 Microsoft 코파일럿으로 분류하고 대응까지 만들어, 사내에서 티켓처럼 처리하는 CX 코파일럿입니다.' },
-    { rail: 'grid', doc: 'architecture', text: '상담 콜·앱·홈페이지에 흩어진 VOC를 4개 그룹, 22개 표준분류와 대응영역으로 자동 정리하고, 심각도와 긴급도로 우선순위를 매깁니다.' },
+    { rail: 'grid', doc: 'architecture', text: '상담 콜·앱·홈페이지에 흩어진 VOC를 6개 그룹, 22개 표준분류와 대응영역으로 자동 정리하고, 심각도와 긴급도로 우선순위를 매깁니다.' },
   ]
   const mid = hasData ? [
-    { rail: 'agent', screen: 'import', text: '사내 Copilot Studio 에이전트가 VOC를 분류해 만든 결과를 JSON으로 받아, 우리 운영 스키마의 티켓으로 변환·적재합니다. 단건도 여러 건도 한 번에요.' },
-    { rail: 'agent', screen: 'board', text: 'VOC 보드입니다. 지라처럼 검색·담당자·구분으로 거르고, 카드의 우선순위·라벨·담당자·SLA를 보며 판단하고 단계를 옮깁니다. 실무자가 가장 많이 보는 화면이에요.' },
-    { rail: 'agent', screen: 'detail', caseId: sampleId, text: '카드를 열면 지라 티켓과 똑같습니다. 담당자·보고자·레이블·참조자, 처리가능단계와 실공수, 체크리스트와 SLA, 코멘트와 활동 이력, 관련 VOC, 그리고 AI 응대 초안까지 한 곳에 있습니다.' },
-    { rail: 'agent', screen: 'detail', caseId: sampleId, text: '이 티켓을 버튼 하나로 사내 지라 형식 JSON으로 추출해, 기존 지라 운영과 그대로 연동합니다. 코파일럿이 만들고, 사이트에서 처리하고, 지라로 내보내는 닫힌 루프입니다.' },
-    { rail: 'agent', screen: 'selfguide', text: '두 번째 코파일럿 에이전트는 같은 분류 지식으로 고객 셀프 해결 단계와 선제 안내문을 만듭니다. 자주 묻는 유형을 접수 전에 스스로 풀게 하고, 미해결 건만 상담으로 연결해 인입콜을 줄입니다.' },
+    { rail: 'agent', screen: 'import', text: '사내 코파일럿 에이전트가 U+one 앱과 홈페이지 서비스를 학습해 VOC를 분류한 결과를 JSON으로 받아, 우리 운영 스키마의 티켓으로 변환·적재합니다. 단건도 여러 건도 한 번에요.' },
+    { rail: 'agent', screen: 'board', text: 'VOC 보드입니다. 지라처럼 검색·담당자·구분으로 거르고, 카드의 우선순위·라벨·담당자·SLA와 최종 수정자를 보며 판단하고 단계를 옮깁니다. 실무자가 가장 많이 보는 화면이에요.' },
+    { rail: 'agent', screen: 'detail', caseId: sampleId, text: '카드를 열면 지라 티켓과 똑같습니다. 담당자·보고자·레이블·참조자, 체크리스트와 SLA, 활동 이력과 코멘트가 있고, 담당자를 지정하거나 멘션하면 본인에게 알림이 갑니다.' },
+    { rail: 'agent', screen: 'detail', caseId: sampleId, text: '이 티켓을 지라 CSV로 한 번에 추출하거나 메일로 등록해, 기존 지라 운영과 그대로 연동합니다. 코파일럿이 만들고, 사이트에서 처리하고, 지라로 내보내는 닫힌 루프입니다.' },
+    { rail: 'agent', screen: 'selfguide', text: '두 번째 코파일럿 에이전트는 같은 지식으로 고객 셀프 해결 단계와 선제 안내문을 만들고, 사이트용 JSON으로 받아 이 화면에 그대로 반영합니다. 미해결 건만 상담으로 연결해 인입콜을 줄여요.' },
     { rail: 'agent', screen: 'insight', text: '기간·영역별 추이와 High 리스크를 대시보드로 보고, 유사 VOC를 묶어 개선 우선순위를 자동으로 도출합니다.' },
   ] : [
     { rail: 'grid', doc: 'architecture', text: '코파일럿 에이전트 결과를 티켓으로 적재하고, 지라형 보드와 티켓 상세에서 처리한 뒤 지라 JSON으로 추출합니다. 샘플 데이터를 넣으면 실제 화면으로 확인할 수 있어요.' },

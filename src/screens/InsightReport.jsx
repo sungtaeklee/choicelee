@@ -69,7 +69,7 @@ function InsightReport({ added, openCase, updateCases, bulkPatch, notify, addSen
   const devCnt = data.filter((v) => v.devNeeded === 'Y').length
   const reviewN = data.filter((v) => v.review).length
   // 레퍼런스형 대시보드용 집계
-  const GROUP_COLORS = { '장애/오류': '#3b5ba5', '성능': '#ff7c43', '개선 요청/희망': '#ffb020', '단순 문의/불만/기타': '#36a2c9' }
+  const GROUP_COLORS = { '장애/오류': '#3b5ba5', '성능': '#ff7c43', '개선 요청/희망': '#ffb020', '단순 문의': '#36a2c9', '불만': '#e5734d', '기타': '#9aa3b2' }
   const segs = groupSplit.filter((g) => g.n > 0).map((g) => ({ label: g.g, value: g.n, color: GROUP_COLORS[g.g] || 'var(--magenta)' }))
   const weeks = useMemo(() => { const s = new Set(); data.forEach((v) => v.week && s.add(v.week)); return [...s].sort((a, b) => weekKey(a) - weekKey(b)) }, [data])
   const weekCounts = weeks.map((w) => data.filter((v) => v.week === w).length)

@@ -21,7 +21,7 @@ describe('norm', () => {
 describe('demoClassify — 게이트 + 우선순위 규칙', () => {
   it('우선순위 도메인 신호가 장애 게이트보다 먼저 잡힌다 (로밍)', () => {
     const r = demoClassify('로밍이 안돼요')
-    expect(r.group).toBe('단순 문의/불만/기타')
+    expect(['단순 문의', '불만', '기타']).toContain(r.group) // 열림 그룹(6분류 중 하나)
     expect(r.cat).toBe('로밍')
     expect(r.conf).toBe('높음')
   })
@@ -75,7 +75,7 @@ describe('deriveSeverity / deriveSentiment', () => {
     expect(deriveSeverity('장애/오류', '아무거나')).toBe('High')
   })
   it('고위험 신호어(환불 등)는 High로 승격', () => {
-    expect(deriveSeverity('단순 문의/불만/기타', '중복결제 환불 요청')).toBe('High')
+    expect(deriveSeverity('불만', '중복결제 환불 요청')).toBe('High')
   })
   it('장애/성능 감성은 Negative', () => {
     expect(deriveSentiment('', '성능', '느림')).toBe('Negative')
@@ -159,8 +159,10 @@ describe('toDay / recDay — 날짜 정규화', () => {
 })
 
 describe('actionNeeded — 조치 필요 판정', () => {
-  it('단순 문의/불만/기타는 항상 제외', () => {
-    expect(actionNeeded({ group: '단순 문의/불만/기타', status: '처리 필요', severity: 'High' })).toBe(false)
+  it('열림 그룹(단순문의/불만/기타)은 항상 제외', () => {
+    expect(actionNeeded({ group: '단순 문의', status: '처리 필요', severity: 'High' })).toBe(false)
+    expect(actionNeeded({ group: '불만', status: '처리 필요', severity: 'High' })).toBe(false)
+    expect(actionNeeded({ group: '기타', status: '처리 필요', severity: 'High' })).toBe(false)
   })
   it('장애 + High + 처리 전 단계 → 조치 필요', () => {
     expect(actionNeeded({ group: '장애/오류', status: '분류 완료', severity: 'High', review: false })).toBe(true)
@@ -172,8 +174,8 @@ describe('actionNeeded — 조치 필요 판정', () => {
 
 describe('catToArea — 분류 → 대응영역 매핑', () => {
   it('알려진 분류는 매핑, 미지정은 기본값', () => {
-    expect(catToArea('단순 문의/불만/기타', '로밍')).toEqual(['상품/스토어', '로밍'])
-    expect(catToArea('단순 문의/불만/기타', '존재하지않는분류')).toEqual(['MY', '메뉴/GNB/위젯'])
+    expect(catToArea('단순 문의', '로밍')).toEqual(['상품/스토어', '로밍'])
+    expect(catToArea('기타', '존재하지않는분류')).toEqual(['MY', '메뉴/GNB/위젯'])
   })
 })
 

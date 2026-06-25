@@ -169,7 +169,7 @@ function ActNeed({ list, openCase, currentId }) {
     // High 다수 → 건수 순으로 정렬
     return Object.entries(m).sort((a, b) => (b[1].filter((v) => v.severity === 'High').length - a[1].filter((v) => v.severity === 'High').length) || (b[1].length - a[1].length))
   }, [list])
-  if (!list.length) return <p className="micro">현재 조치 필요 VOC가 없습니다. (장애/성능/개선 중 검토필요 또는 High + 처리 전 단계 · 단순 문의/불만/기타 제외)</p>
+  if (!list.length) return <p className="micro">현재 조치 필요 VOC가 없습니다. (장애/성능/개선 중 검토필요 또는 High + 처리 전 단계 · 단순 문의·불만·기타 제외)</p>
   const openItems = open ? (groups.find(([k]) => k === open)?.[1] || []) : []
   return (
     <div className="an">
@@ -266,7 +266,7 @@ function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, ad
   const ageDays = (() => { const d = recDay(c); if (!d) return null; return Math.max(0, Math.floor((Date.now() - new Date(d + 'T00:00:00').getTime()) / 86400000)) })()
   const slaDone = c.status === '처리 완료'
   const slaBreach = ageDays != null && !slaDone && ageDays > slaDays
-  const catOpts = (g) => g === '단순 문의/불만/기타' ? CAT22 : (FIXED_DEPTH2[g] || CAT22)
+  const catOpts = (g) => (FIXED_DEPTH2[g] ? FIXED_DEPTH2[g] : CAT22)
   const withCur = (opts, cur) => (cur && !opts.includes(cur)) ? [cur, ...opts] : opts
   const setField = (patch) => updateCases && updateCases([c.id], patch)
   const bl = backLabel || '목록'; const ro = josaRo(bl) // 받침에 따라 로/으로
@@ -292,7 +292,7 @@ function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, ad
       </div>
       <PageHead title="VOC 처리" sub="처리 후엔 상단의 ‘돌아가기’로 목록으로 이동하세요" />
       <div className="panel act-need">
-        <div className="ip-head">조치 필요 VOC <span className="ip-note">장애/성능/개선 중 분류 미확정(검토필요) 또는 우선순위 High이면서 처리 전 단계 — 단순 문의/불만/기타는 제외됩니다. 유형을 누르면 목록이 펼쳐지고, 항목을 누르면 처리 화면으로 이동합니다.</span></div>
+        <div className="ip-head">조치 필요 VOC <span className="ip-note">장애/성능/개선 중 분류 미확정(검토필요) 또는 우선순위 High이면서 처리 전 단계 — 단순 문의·불만·기타는 제외됩니다. 유형을 누르면 목록이 펼쳐지고, 항목을 누르면 처리 화면으로 이동합니다.</span></div>
         <ActNeed list={actList} openCase={openCase} currentId={c.id} />
       </div>
       <div className="case-grid">

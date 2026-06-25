@@ -90,7 +90,7 @@ function ImportResult({ notify, added, setAdded, shared, sharedInsert, openCase 
   const c = (single && single.classification) || {}, ins = (single && single.insight) || {}, act = (single && single.actions) || {}, rsp = (single && single.response) || {}, mail = rsp.internalMail || {}, imp = (single && single.improvements) || []
   return (
     <div className="screen">
-      <PageHead title="Copilot Studio Agent 결과 연동" sub="사내 Copilot Studio Agent(‘U+VOC voice’)가 출력한 JSON을 붙여넣으면 우리 운영 스키마로 변환·등록됩니다 · 단건/여러 건(배열) 모두 지원 · LLM 직접호출 없음(사내망 무관)" />
+      <PageHead title="Copilot Studio Agent 결과 연동" sub="사내 Copilot Studio Agent(‘U+VOC 고객가이드’)가 출력한 JSON을 붙여넣으면 우리 운영 스키마로 변환·등록됩니다 · 단건/여러 건(배열) 모두 지원 · LLM 직접호출 없음(사내망 무관)" />
       <div className="panel">
         <div className="card-title">에이전트 JSON 붙여넣기 <span className="muted">코드펜스·앞뒤 설명이 섞여도, 객체 / 배열 / {'{items:[…]}'} 모두 인식</span></div>
         <textarea className="imp-ta" value={raw} onChange={(e) => setRaw(e.target.value)} placeholder={'{ "voc": "...", "classification": { "group": "...", "category": "...", "depth1": "...", "depth2": "...", "severity": "높음", "sentiment": "부정", "urgency": "높음", "signals": [], "relatedMenu": "...", "errorType": "..." }, "reviewNeeded": true, "confidence": "높음", "labels": ["VOC"], "insight": {...}, "actions": {...}, "response": {...}, "improvements": [] }\n\n여러 건: [ {…}, {…} ]  또는  { "items": [ {…} ] }'} />

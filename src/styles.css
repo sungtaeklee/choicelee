@@ -360,7 +360,7 @@ h1,h2{margin:0}
 .note-box b{color:var(--ink)}
 
 /* ---------- modal / toast ---------- */
-.modal-back{position:fixed;inset:0;background:rgba(16,21,30,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal-back{position:fixed;inset:0;background:rgba(16,21,30,.45);display:flex;align-items:center;justify-content:center;z-index:1100;padding:20px}
 .modal{background:#fff;border-radius:16px;max-width:440px;width:100%;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .modal-title{font-size:16px;font-weight:750}
 .modal-body{font-size:13.5px;color:var(--slate);line-height:1.6;margin:12px 0 20px}
@@ -382,6 +382,8 @@ h1,h2{margin:0}
 .grp-perf{background:var(--med-soft);color:var(--med)}
 .grp-improve{background:#e7eefe;color:#1d4ed8}
 .grp-simple{background:var(--magenta-soft);color:var(--magenta-d)}
+.grp-complaint{background:#fdecea;color:#c0392b}
+.grp-etc{background:#eef0f4;color:#5b6473}
 .conf{display:inline-block;font:600 11px/1 var(--mono);padding:3px 8px;border-radius:20px}
 .conf-h{background:var(--low-soft);color:var(--low)}
 .conf-m{background:var(--med-soft);color:var(--med)}
@@ -955,6 +957,45 @@ h1,h2{margin:0}
 .sc-time small{color:var(--muted);font-weight:400}
 .sc-bar{width:3px;border-radius:2px;background:var(--magenta)}
 .sc-body{display:flex;flex-direction:column;gap:2px}.sc-body .muted{font-size:12px}
+/* 일정(캘린더) — 월 그리드 + 필터 */
+.cal-in{height:38px;border:1px solid var(--line);border-radius:9px;padding:0 11px;font:500 13px var(--sans);color:var(--ink);background:#fff}
+.cal-in-title{flex:1;min-width:200px}
+.cal2-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.cal2-nav{display:flex;align-items:center;gap:8px}
+.cal2-navbtn{width:30px;height:30px;border:1px solid var(--line);background:#fff;border-radius:8px;font-size:16px;color:var(--slate);cursor:pointer}
+.cal2-navbtn:hover{background:var(--magenta-soft);color:var(--magenta-d);border-color:transparent}
+.cal2-title{font:800 16px var(--sans);color:var(--ink);min-width:118px;text-align:center}
+.cal2-search{height:34px;border:1px solid var(--line);border-radius:9px;padding:0 11px;font-size:13px;min-width:200px;flex:1}
+.cal2-f{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--slate)}
+.cal2-f select{height:34px;border:1px solid var(--line);border-radius:9px;padding:0 8px;font-size:12.5px;background:#fff;color:var(--ink)}
+.cal2-legend{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:10px;padding:8px 12px;background:var(--surface-2,#fafafb);border:1px solid var(--line);border-radius:10px}
+.cal2-leg-t{font:700 11px var(--sans);color:var(--faint)}
+.cal2-leg{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--slate)}
+.cal2-dot{width:10px;height:10px;border-radius:50%}
+.cal2-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cal2-dow{background:var(--surface);padding:9px 8px;text-align:center;font:700 12px var(--sans);color:var(--slate)}
+.cal2-dow.sun{color:#d92d20}.cal2-dow.sat{color:#2440b3}
+.cal2-cell{background:#fff;min-height:104px;padding:5px 5px 6px;display:flex;flex-direction:column;gap:3px;cursor:pointer}
+.cal2-cell.out{background:#fafbfc}
+.cal2-cell.out .cal2-daynum{color:var(--faint)}
+.cal2-cell.today{background:var(--magenta-soft)}
+.cal2-cell:hover{box-shadow:inset 0 0 0 2px var(--magenta-soft)}
+.cal2-daynum{font:700 12px var(--mono,monospace);color:var(--slate);padding:1px 2px}
+.cal2-cell.today .cal2-daynum{color:var(--magenta-d)}
+.cal2-evs{display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.cal2-ev{display:flex;align-items:center;gap:4px;width:100%;text-align:left;border:0;border-left:4px solid var(--magenta);background:#f5f6f8;border-radius:4px;padding:2px 5px;cursor:default}
+.cal2-ev.clickable{cursor:pointer}
+.cal2-ev.clickable:hover{background:var(--magenta-soft)}
+.cal2-evk{flex:0 0 auto;font:700 8.5px var(--sans);padding:1px 4px;border-radius:4px;background:#e6e8ec;color:var(--slate)}
+.cal2-k-sla{background:var(--high-soft);color:var(--high)}
+.cal2-k-deployEnd{background:var(--low-soft);color:var(--low)}
+.cal2-k-devStart,.cal2-k-devEnd{background:var(--med-soft);color:var(--med)}
+.cal2-k-custom{background:var(--magenta-soft);color:var(--magenta-d)}
+.cal2-evt{flex:1;font-size:10.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal2-evx{flex:0 0 auto;color:var(--faint);font-size:10px;padding:0 2px}
+.cal2-evx:hover{color:var(--high)}
+.cal2-more{font-size:10px;color:var(--faint);padding:1px 5px}
+@media (max-width:760px){.cal2-cell{min-height:78px}.cal2-evt{display:none}.cal2-search{min-width:140px}}
 
 .org-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
 .org-h{font:700 15px var(--sans);color:var(--magenta-d);padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:10px}
@@ -977,6 +1018,9 @@ h1,h2{margin:0}
 .share-badge.sb-err{color:#b3261e;background:#fdecea;border-color:#f3c4c0}
 .btn.danger{color:#b3261e}
 .btn.danger:hover{border-color:#e0857f;background:#fdecea}
+/* 위험 확인 버튼(예: 모두 삭제): 빨간 배경 + 흰 글자로 인지 */
+.btn.btn-primary.danger{background:#d92d20;border-color:#d92d20;color:#fff}
+.btn.btn-primary.danger:hover{background:#b3261e;border-color:#b3261e;color:#fff}
 
 /* 컴팩트 독 입력창 = AI 워크스페이스 진입 버튼 */
 .ai-input.as-launch{cursor:pointer;transition:border-color .12s,box-shadow .12s}
@@ -1226,8 +1270,9 @@ svg.ltrend .lt-line:hover{opacity:1}
 .op-id{display:flex;gap:20px;align-items:flex-end}
 .op-avatar{width:104px;height:104px;flex-shrink:0;border-radius:14px;background:linear-gradient(160deg,var(--magenta),#ff7ac0);color:#fff;font:800 40px/104px var(--sans);text-align:center;border:4px solid var(--surface);box-shadow:var(--shadow-sm)}
 .op-idmain{flex:1;min-width:0;padding-bottom:4px}
-.op-name{font:800 24px var(--sans);color:var(--ink);letter-spacing:-.02em}
-.op-title{font-size:15px;font-weight:600;color:var(--muted)}
+/* 프로필 이름·직함은 어두운 배너 위에 올라가므로 흰색으로(가독성). 모바일 세로 적층 시 되돌림 */
+.op-name{font:800 24px var(--sans);color:#fff;letter-spacing:-.02em;text-shadow:0 1px 4px rgba(0,0,0,.4)}
+.op-title{font-size:15px;font-weight:600;color:rgba(255,255,255,.82)}
 .op-bread{font-size:12.5px;color:var(--magenta-d);font-weight:600;margin-top:5px}
 .op-contact{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:11px}
 .op-mode{font:700 11.5px var(--sans);color:var(--magenta-d);background:var(--magenta-soft);border-radius:7px;padding:3px 10px}
@@ -1246,7 +1291,7 @@ svg.ltrend .lt-line:hover{opacity:1}
 .ops-d{font-size:13.5px;color:var(--ink);line-height:1.6}
 .ops-d .magenta{color:var(--magenta-d)}
 .op-work{margin:0;padding-left:16px;color:var(--slate);font-size:13px;line-height:1.7}
-@media (max-width:760px){.orgapp{grid-template-columns:1fr}.org-side{border-right:0;border-bottom:1px solid var(--line);max-height:240px}.op-id{flex-direction:column;align-items:flex-start}.ops-row{grid-template-columns:1fr;gap:8px}}
+@media (max-width:760px){.orgapp{grid-template-columns:1fr}.org-side{border-right:0;border-bottom:1px solid var(--line);max-height:240px}.op-id{flex-direction:column;align-items:flex-start}.ops-row{grid-template-columns:1fr;gap:8px}.op-name{color:var(--ink);text-shadow:none}.op-title{color:var(--muted)}}
 
 /* ===== 레퍼런스형 인사이트 대시보드 (KPI 델타 + 도넛/추이/막대) ===== */
 .dash-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}

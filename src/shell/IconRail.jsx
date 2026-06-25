@@ -2,7 +2,7 @@ import React from 'react'
 import { RAIL_ICONS, RailIcon } from '../ui.jsx'
 
 function IconRail({ account, onLogout, notify, railView, setRail, notifUnread = 0, onBell }) {
-  const items = [['home', '홈'], ['grid', '솔루션 설명'], ['agent', 'Agent'], ['mail', '메일'], ['org', '조직도']]
+  const items = [['home', '홈'], ['grid', '솔루션 설명'], ['agent', 'Agent'], ['cal', '일정'], ['mail', '메일'], ['org', '조직도']]
   return (
     <nav className="rail">
       <div className="rail-top">

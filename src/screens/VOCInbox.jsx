@@ -109,7 +109,7 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert }) {
   }
   return (
     <div className="screen">
-      <PageHead title="VOC 수집·입력" sub="채널 수집 + 화면 직접 입력 → Copilot이 4그룹·22분류·대응영역·초안까지 자동 생성 (담당자 검수 후 처리)" />
+      <PageHead title="VOC 수집·입력" sub="채널 수집 + 화면 직접 입력 → Copilot이 6그룹·22분류·대응영역·초안까지 자동 생성 (담당자 검수 후 처리)" />
       <div className="panel input-panel">
         <div className="ip-head">VOC 직접 입력 → Copilot 분류·추가 <span className="ip-note">내용(또는 상담콜 STT 전사)을 붙여넣으면 VOC구분1/2·대응영역·요약·예상답안·개발대응·진행상황을 채워 목록에 추가 (데모: 키워드 기반 · 담당자 검수 후 처리)</span></div>
         <div className="input-grid">

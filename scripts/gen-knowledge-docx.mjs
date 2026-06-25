@@ -30,9 +30,9 @@ const mapTable = () => new Table({
 
 const children = [
   H1('U+ VOICE — VOC 분류 기준 (Copilot Studio Agent Knowledge)'),
-  P('사내 Copilot Studio Agent ‘U+VOC voice’의 지식(Knowledge)으로 업로드해 분류·대응의 일관성을 보장하기 위한 기준 문서입니다. (앱 소스 src/classify.js에서 생성)', { italics: true, color: '666666' }),
+  P('사내 Copilot Studio Agent ‘U+VOC 고객가이드’의 지식(Knowledge)으로 업로드해 분류·대응의 일관성을 보장하기 위한 기준 문서입니다. (앱 소스 src/classify.js에서 생성)', { italics: true, color: '666666' }),
 
-  H2('1. VOC구분 4그룹'),
+  H2('1. VOC구분 6그룹'),
   ...GROUPS.map((g, i) => num(g)),
   P('정형 그룹의 닫힌 분류(구분2):', { bold: true }),
   ...Object.entries(FIXED_DEPTH2).map(([g, arr]) => bullet(`${g}: ${arr.join(' · ')}`)),

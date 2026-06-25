@@ -6,7 +6,7 @@ import { toJiraCsv, exportCsv } from '../jira.js'
 import { nameOfEmail } from '../directory.js'
 
 /* 티켓 유형 글리프 (지라 이슈 타입 대체) */
-const TYPE_GLYPH = { '장애/오류': '🐞', '성능': '⚡', '개선 요청/희망': '✦', '단순 문의/불만/기타': '💬' }
+const TYPE_GLYPH = { '장애/오류': '🐞', '성능': '⚡', '개선 요청/희망': '✦', '단순 문의': '💬', '불만': '😣', '기타': '🎫' }
 const COL_CLS = { '신규': 'new', '분류 완료': 'cls', '처리 필요': 'todo', '처리 중': 'doing', '보류(BLOCK)': 'block', '처리 완료': 'done' }
 
 function ClassificationBoard({ openCase, notify, added, updateCases }) {
@@ -65,7 +65,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
         <div className="bb-spacer" />
         <button className="btn btn-ghost sm" onClick={exportCsvAll} title="현재 필터된 티켓을 Jira ‘이슈 가져오기’용 CSV로 추출 — 일괄 생성">⤓ 지라 CSV ({filtered.length})</button>
         <button className="btn btn-ghost sm" onClick={() => setShowTax((s) => !s)}>{showTax ? '분류 체계 닫기' : '분류 체계 보기'}</button>
-        <button className="btn btn-primary sm" onClick={() => notify.modal('Copilot AI로 분류', '실제 적용 시 Copilot AI가 최신 수집 VOC를 4개 그룹·22개 표준분류 기준으로 자동 분류합니다. 정형 그룹은 닫힌 분류로 매핑하고, 열림 그룹은 22개로 추론합니다.')}>✦ Copilot 분류</button>
+        <button className="btn btn-primary sm" onClick={() => notify.modal('Copilot AI로 분류', '실제 적용 시 Copilot AI가 최신 수집 VOC를 6개 그룹·22개 표준분류 기준으로 자동 분류합니다. 정형 그룹은 닫힌 분류로 매핑하고, 열림 그룹은 22개로 추론합니다.')}>✦ Copilot 분류</button>
       </div>
       {showTax && (
         <div className="panel">

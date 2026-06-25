@@ -29,7 +29,7 @@ import { getSession, setSession } from './auth.js'
    U+ VOICE · VOC Action Copilot — 공모전 MVP (정적 프로토타입 · React)
    VOC Orchestration & Insight-driven CX Engine
    채널 수집 + 화면 직접 입력. 샘플은 하드코딩(입력분은 useState).
-   분류표: depth1 4그룹(정형 3 + 열림 1) + 열림 그룹의 표준분류 22개.
+   분류표: depth1 6그룹(정형 3 + 열림 3) + 열림 그룹의 표준분류 22개.
    ============================================================ */
 
 const PORTAL_TITLES = { home: '통합 홈', mail: '메일', cal: '일정', org: '조직도', pay: '결재', grid: '솔루션 설명' }
@@ -280,7 +280,7 @@ export default function App() {
             ) : (
               <div className="content">
                 {railView === 'mail' && <MailApp sentLog={sentLog} notify={notify} openCase={openCase} />}
-                {railView === 'cal' && <CalendarApp />}
+                {railView === 'cal' && <CalendarApp added={added} openCase={openCase} notify={notify} />}
                 {railView === 'org' && <OrgApp notify={notify} />}
                 {railView === 'pay' && <ApprovalApp notify={notify} />}
                 {railView === 'grid' && <AllMenu goAgent={goAgent} setRail={setRail} notify={notify} doc={solDoc} setDoc={setSolDoc} />}

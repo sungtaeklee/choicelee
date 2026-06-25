@@ -5,21 +5,41 @@
    ============================================================ */
 
 /* ---------- 분류표(확정본) ---------- */
-export const GROUPS = ['장애/오류', '성능', '개선 요청/희망', '단순 문의/불만/기타']
+/* VOC구분 1depth — 실 VOC현황 CSV 기준 6분류(정형 3 + 열림 3). 열림(단순문의/불만/기타)은 22표준분류로 추론 */
+export const GROUPS = ['장애/오류', '성능', '개선 요청/희망', '단순 문의', '불만', '기타']
+export const OPEN_GROUPS = ['단순 문의', '불만', '기타']
+export const isOpenGroup = (g) => OPEN_GROUPS.includes(g)
 export const GROUP_MODE = {
-  '장애/오류': '정형', '성능': '정형', '개선 요청/희망': '정형', '단순 문의/불만/기타': '열림',
+  '장애/오류': '정형', '성능': '정형', '개선 요청/희망': '정형',
+  '단순 문의': '열림', '불만': '열림', '기타': '열림',
+}
+/* 열림 그룹 판정 — 불만 신호(부정 감정·불능·항의) → 불만, 칭찬/스팸/설문 등 → 기타, 나머지 → 단순 문의 */
+const COMPLAINT_RE = /불만|짜증|화[가나남]|어이없|황당|엉망|실망|불편|불쾌|답답|최악|항의|왜\s?안|왜\s?이|안\s?돼|안\s?되|안\s?터|안\s?나와|못\s?[받쓰하]|먹통|먹히|환불|손해|피해|사기|보상|책임|도대체|언제까지|그만\s?[보좀]|시정|개판|짜증나|너무하|ㅠ|ㅜ|ㅡㅡ|!!|\?\?\?/
+const ETC_RE = /칭찬|감사합니다|감사해요|고맙|좋아요|최고예요|만족|수고|응원|광고\s?그만|스팸|설문|당첨|경품|이벤트\s?참여|테스트\s?글|문의내역\s?삭제/
+const QUESTION_RE = /문의|궁금|어떻게|방법|되나요|될까요|할까요|하나요|알려|확인|얼마|언제|어디|신청|가능|인가요|있나요|되는지|문의드려|해\s?주세요|부탁/
+export function openGroupOf(text) {
+  const s = String(text || '')
+  if (norm(s).length < 4) return '기타'
+  if (COMPLAINT_RE.test(s)) return '불만'     // 부정 감정·불능·항의가 가장 먼저
+  if (ETC_RE.test(s)) return '기타'            // 칭찬·스팸·설문 등
+  if (QUESTION_RE.test(s)) return '단순 문의'
+  return '단순 문의'                            // 기본(빈도 최다)
 }
 export const FIXED_DEPTH2 = {
   '장애/오류': ['로그인불가/로그인풀림', '앱/웹 기능오류', '앱/웹 접속불가', '앱/웹화면 데이터 정합성 이슈', '기타'],
   '성능': ['앱/웹 속도 느림', '앱/웹 백화 현상'],
   '개선 요청/희망': ['앱/웹 기능 개선', '회원/로그인 개선', '기타'],
 }
-/* 대응영역 트리 (엑셀 '오류VOC인입영역' 기준) — 1depth → 2depth */
+/* 대응영역 트리 (실 VOC현황 CSV '대응 영역 구분' 기준) — 1depth → 2depth.
+   CSV 분포 반영: MY에 IMSI 추가, 상품/스토어에 인터넷/TV 가입, 혜택/멤버십에 제휴(네이버 등),
+   그리고 플러스탭·기타(미분류 캐치올) 영역 추가. */
 export const AREA_TREE = {
-  'MY': ['가입정보관리', '요금/납부/청구', '회원/로그인/ID', '휴대폰 결제', '데이터', '고객지원', '자녀 통신요금 관리', '메뉴/GNB/위젯', '결합할인'],
-  '검색/챗봇': ['검색/챗봇'],
-  '혜택/멤버십': ['VIP콕(영화/구독/제휴)', '바코드/메뉴', '유플미션/출석체크', '멤버십(등급/정책)', '유플투쁠'],
-  '상품/스토어': ['기타(유독)', '로밍', '모바일 가입', '유심/이심(eSIM)/너겟', '모바일 요금제', '모바일 부가서비스', '홈 요금제/홈 부가서비스', '액세서리/라이브'],
+  'MY': ['가입정보관리', '요금/납부/청구', '회원/로그인/ID', 'IMSI', '휴대폰 결제', '데이터', '고객지원', '자녀 통신요금 관리', '메뉴/GNB/위젯', '결합할인'],
+  '검색/챗봇': ['검색/챗봇', '챗봇'],
+  '혜택/멤버십': ['VIP콕(영화/구독/제휴)', '바코드/메뉴', '유플미션/출석체크', '멤버십(등급/정책)', '유플투쁠', '제휴(네이버 등)'],
+  '상품/스토어': ['기타(유독)', '로밍', '모바일 가입', '인터넷/TV 가입', '유심/이심(eSIM)/너겟', '모바일 요금제', '모바일 부가서비스', '홈 요금제/홈 부가서비스', '액세서리/라이브'],
+  '플러스탭': ['플러스탭'],
+  '기타': ['기타'],
 }
 export const AREA1_LIST = Object.keys(AREA_TREE)
 /* 영역별 담당자 매핑 (임시 예시 — 김형걸 담당자 표 입수 시 교체) */
@@ -38,7 +58,8 @@ export const CAT22 = [
 ]
 export const GROUP_CLS = {
   '장애/오류': 'grp grp-fault', '성능': 'grp grp-perf',
-  '개선 요청/희망': 'grp grp-improve', '단순 문의/불만/기타': 'grp grp-simple',
+  '개선 요청/희망': 'grp grp-improve',
+  '단순 문의': 'grp grp-simple', '불만': 'grp grp-complaint', '기타': 'grp grp-etc',
 }
 
 /* ---------- 데모용 경량 분류기 (직접 입력 → 게이트+22) ---------- */
@@ -124,14 +145,14 @@ export function demoClassify(text) {
   const v = norm(text)
   if (!v) return null
   // 0) 도메인 신호 먼저 — 구어체 '안돼/안되'가 장애 게이트를 오발동시키는 것을 방지(STT 학습 반영)
-  for (const [re, cat] of PRIORITY_RULES) if (re.test(v)) return { group: '단순 문의/불만/기타', cat, conf: '높음', review: false, mode: '열림' }
+  for (const [re, cat] of PRIORITY_RULES) if (re.test(v)) return { group: openGroupOf(text), cat, conf: '높음', review: false, mode: '열림' }
   // 게이트: 정형 그룹
   if (FAULT_KW.some((k) => v.includes(norm(k)))) return { group: '장애/오류', cat: '앱/웹 기능오류', conf: '보통', review: false, mode: '정형' }
   if (PERF_KW.some((k) => v.includes(norm(k)))) return { group: '성능', cat: v.includes('백화') ? '앱/웹 백화 현상' : '앱/웹 속도 느림', conf: '보통', review: false, mode: '정형' }
   if (IMPROVE_KW.some((k) => v.includes(norm(k)))) return { group: '개선 요청/희망', cat: '앱/웹 기능 개선', conf: '보통', review: false, mode: '정형' }
   // 열림 그룹: 22개 분류는 점수제로
   const p = pick22(text)
-  return { group: '단순 문의/불만/기타', cat: p.cat, conf: p.conf, review: p.review, mode: '열림' }
+  return { group: openGroupOf(text), cat: p.cat, conf: p.conf, review: p.review, mode: '열림' }
 }
 
 /* ---------- 업로드 VOC 분류·보강 (raw 행 → 우리 스키마) ----------
@@ -200,10 +221,10 @@ export function deriveAction(group) {
   return { action: '담당자 메일 전달', org: 'CX/운영' }
 }
 /* 조치 필요 = 처리 전 단계(신규·분류완료·처리필요)이면서, 분류 미확정(검토필요) 또는 우선순위 High.
-   단, '단순 문의/불만/기타'(열림 그룹)는 일상 문의라 조치 필요 리스트에서 제외 — 장애/성능/개선만 큐에 노출. */
+   단, 열림 그룹(단순문의/불만/기타)은 일상 문의라 조치 필요 리스트에서 제외 — 장애/성능/개선만 큐에 노출. */
 export const PRE_DONE = ['신규', '분류 완료', '처리 필요']
 export function actionNeeded(v) {
-  return v.group !== '단순 문의/불만/기타' && PRE_DONE.includes(v.status) && (v.review || v.severity === 'High')
+  return !isOpenGroup(v.group) && PRE_DONE.includes(v.status) && (v.review || v.severity === 'High')
 }
 
 /* ---------- 빈 컬럼 자동 생성(채널+내용 → 검토용 초안) ----------
@@ -454,7 +475,7 @@ export function enrichRow(r, id, ov) {
   const content = maskPII(r.content || '(내용 없음)')
   const issue = customerIssueText(content)      // 전사면 고객 발화만, 아니면 원문 — 상담사 인사말 노이즈 제거
   // 1) 고객 발화 기준으로 그룹·분류 도출 (저장된 값 ov가 있으면 그 값을 우선 — 표시·생성 일관성)
-  const cls = demoClassify(issue) || { group: '단순 문의/불만/기타', mode: '열림' }
+  const cls = demoClassify(issue) || { group: '기타', mode: '열림' }
   const mode = cls.mode
   let group = cls.group, cat, conf, review
   if (mode === '정형') { cat = pickFixedCat(group, issue); conf = '보통'; review = false }
@@ -475,7 +496,7 @@ export function enrichRow(r, id, ov) {
   const status = (ov && ov.status) || (severity === 'High' ? '처리 필요' : '분류 완료')
   // 3) 액션 초안: 문자/푸시는 항상 생성(분류별 안내), 메일은 정형/High면 담당 전달용
   const sms = draftSms(group, cat, summary)
-  const mail = (group !== '단순 문의/불만/기타' || severity === 'High')
+  const mail = (!isOpenGroup(group) || severity === 'High')
     ? { to: org, subject: `[VOC ${severity}] ${cat} — ${summary}`, body: `핵심 의도: ${summary}\n\n${content}\n\n분류: ${group} · ${cat} / 대응영역: ${area1} › ${area2}\n권장 조치: ${guideFor(cat) ? guideFor(cat).act : action}\n담당 검토 후 처리 요청 (개발 대응: ${dev}).` }
     : null
   return {

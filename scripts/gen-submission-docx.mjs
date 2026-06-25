@@ -20,7 +20,7 @@ const children = [
 
   H2('2. 에이전트 — 2종 (M365 Copilot 에이전트 빌더 · 선언적 에이전트)'),
   P('두 에이전트 모두 같은 분류 지식을 공유한다. Copilot Studio가 아닌 에이전트 빌더(지시문 + 지식 + 추천 프롬프트)로 제작.', { italics: true, color: '666666' }),
-  B('**① 분류·분석 에이전트 ‘U+VOC voice’** — 흩어진 VOC(상담콜·앱·홈페이지·메일)를 **4개 그룹·22개 표준분류·대응영역**으로 분류하고 요약·예상 응대문(고객/문자/담당자 메일)·개선 과제를 생성. “사이트용” 요청 시 구조화 JSON 출력'),
+  B('**① 분류·분석 에이전트 ‘U+VOC 고객가이드’** — 흩어진 VOC(상담콜·앱·홈페이지·메일)를 **6개 그룹·22개 표준분류·대응영역**으로 분류하고 요약·예상 응대문(고객/문자/담당자 메일)·개선 과제를 생성. “사이트용” 요청 시 구조화 JSON 출력'),
   B('**② 고객 셀프 해결 가이드 에이전트 ‘U+VOC 셀프가이드’** — 같은 분류 지식으로 **유형별 셀프 해결 단계 + 선제 안내문(이메일·문자)** 을 생성. 미해결 건만 상담 연결로 정제. (고객이 직접 대화하지 않고, 담당자 검수 후 사이트가 고객에 노출)'),
   B('**근거(지식)**: U+one·홈페이지 **서비스 이해 문서** + 분류 기준 문서 + www.uplus.co.kr·사내 SharePoint·Teams·FAQ를 지식으로 연결해 출처 기반 응답(서비스 도메인을 이해해야 VOC를 정확히 분류·응대)'),
 
@@ -47,9 +47,9 @@ const children = [
   B('VOC가 보드·티켓·인사이트로 이어지는 **닫힌 루프** — 별도 Jira 없이 분류→처리→이력까지 한 곳에서'),
 
   H2('제출물'),
-  B('에이전트 2종: ‘U+VOC voice’(분류·분석) · ‘U+VOC 셀프가이드’(고객 셀프 해결) — M365 Copilot 에이전트 빌더, 공유 링크/계정 추가로 전달'),
+  B('에이전트 2종: ‘U+VOC 고객가이드’(분류·분석) · ‘U+VOC 셀프가이드’(고객 셀프 해결) — M365 Copilot 에이전트 빌더, 공유 링크/계정 추가로 전달'),
   B('사이트: U+ VOICE (VOC 보드 · VOC 처리 · 셀프 해결 가이드 · 인사이트 · Copilot Agent 연동)'),
-  B('지식·지시문 문서: voc-service-knowledge.docx(서비스 이해) · voc-classification-knowledge.docx(분류 기준) · voc-selfguide-agent.docx(셀프가이드 에이전트 지시문·지식)'),
+  B('지식·지시문 문서: voc-service-knowledge.docx(서비스 이해) · voc-classification-knowledge.docx(분류 기준) · voc-learning-examples.docx(골든 예시·신뢰도·분류사유) · voc-classification-agent.docx(고객가이드 지시문) · voc-selfguide-agent.docx(셀프가이드 지시문)'),
 ]
 
 const doc = new Document({

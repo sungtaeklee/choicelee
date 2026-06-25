@@ -18,7 +18,7 @@ function SubLNB({ screen, setScreen }) {
         </React.Fragment>
       ))}
       <div className="slnb-sec-l">분류 체계</div>
-      <div className="slnb-pin">4그룹 게이트 + 표준분류 22종<br />Copilot 분류 · 사람 검수 후 처리</div>
+      <div className="slnb-pin">6그룹 게이트 + 표준분류 22종<br />Copilot 분류 · 사람 검수 후 처리</div>
       <div className="slnb-foot">고객의 목소리가 서비스 개선으로 이어지는 순간, <b>U+ VOICE</b><br />공모전 MVP · 사내 전용</div>
     </aside>
   )
