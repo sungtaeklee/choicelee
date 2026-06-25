@@ -7,7 +7,7 @@ import React from 'react'
 
 /* ---------- 탭 1: 솔루션 구조 (TO-BE) ---------- */
 function Architecture() {
-  const loop = ['코파일럿 분류·생성', '담당자 검수', '사이트 처리(보드·티켓)', '지라 연동', '처리결과 재학습']
+  const loop = ['코파일럿 분류·생성', '담당자 검수', '사이트 처리(보드·티켓)', '지라 연동(CSV·메일)', '처리결과 재학습']
   const parts = [
     { t: 'U+VOC 고객가이드', d: '분류·분석 에이전트 — 6분류·22표준분류·대응영역, 요약·응대문·개선과제', tag: '에이전트' },
     { t: 'U+VOC 셀프가이드', d: '고객 셀프 해결 단계 + 선제 안내문 생성, 미해결만 상담 연결', tag: '에이전트' },
@@ -65,12 +65,13 @@ function Architecture() {
         <div className="sol-tax-row"><span className="sol-tax-k open">열림 3</span><span>단순 문의 · 불만 · 기타 <span className="muted">→ 22개 표준분류로 추론</span></span></div>
         <div className="sol-tax-row"><span className="sol-tax-k">대응영역</span><span>MY · 상품/스토어 · 혜택/멤버십 · 검색/챗봇 · 플러스탭 · 기타</span></div>
         <div className="sol-tax-row"><span className="sol-tax-k">신뢰도</span><span>상 / 중 / 하 · 사유 코드(L01 짧음·L04 다주제 등) → ‘하’면 검토필요</span></div>
+        <div className="sol-tax-row"><span className="sol-tax-k open">학습데이터</span><span>실 VOC현황(디지털CX트라이브) <b>골든 학습예시 889건</b> + 신뢰도(상/중/하)로 분류 정확도 보정 <span className="muted">(개인정보 마스킹)</span></span></div>
       </div>
 
       <h2 className="sec-title">AS-IS → TO-BE</h2>
       <div className="ba-grid">
         <div className="panel ba-before"><div className="ba-tag">AS-IS</div><ul className="ba-list"><li>수기 분류 · 태깅</li><li>채널별 중복 처리</li><li>대응 지연 · 반복 인입</li></ul></div>
-        <div className="panel ba-after"><div className="ba-tag after">TO-BE</div><ul className="ba-list"><li>Copilot 자동 분류(6분류) · 응대 초안</li><li>지라형 티켓 1곳 처리 + 지라 연동</li><li>셀프 해결 · 선제 안내로 인입 감소</li></ul></div>
+        <div className="panel ba-after"><div className="ba-tag after">TO-BE</div><ul className="ba-list"><li>Copilot 자동 분류(6분류) · 응대 초안</li><li>지라형 티켓 1곳 처리 + 지라 연동(CSV·메일, 토큰리스)</li><li>셀프 해결 · 선제 안내로 인입 감소</li></ul></div>
       </div>
 
       <h2 className="sec-title">기대 효과</h2>

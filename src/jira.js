@@ -131,6 +131,20 @@ export function jiraMailto(c) {
   return `mailto:${jiraIntakeEmail()}?subject=${encodeURIComponent(j.summary)}&body=${encodeURIComponent(body)}`
 }
 
+/* 서버 프록시(/api/jira) 호출 — 토큰은 서버에만. action: ping|meta|create|search */
+export async function jiraApi(action, payload = {}) {
+  try {
+    const res = await fetch('/api/jira', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...payload }) })
+    if (!res.ok) return { ok: false, error: `프록시 응답 ${res.status} — 배포 환경에서만 동작(/api 서버리스)` }
+    return await res.json()
+  } catch (e) { return { ok: false, error: '프록시 호출 실패 — 로컬(vite)에선 /api가 없을 수 있어요. 배포본에서 확인하세요.' } }
+}
+/* VOC 케이스 → 사내 Jira 이슈 생성(API) */
+export async function createJiraTicket(c) {
+  const j = buildJiraIssue(c).fields
+  return jiraApi('create', { summary: j.summary, description: j.description, labels: j.labels })
+}
+
 /* 문자열 → 클립보드 복사 + 파일 다운로드 (둘 다 시도, 실패해도 무해) */
 export function exportJson(obj, filename) {
   const json = JSON.stringify(obj, null, 2)
