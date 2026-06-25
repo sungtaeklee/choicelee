@@ -1105,6 +1105,21 @@ svg.ltrend .lt-line:hover{opacity:1}
 .guide-ans{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
 .guide-ans-k{font:700 11px var(--sans);color:var(--magenta-d);margin-bottom:4px}
 .guide-ans-v{font-size:12px;line-height:1.55;color:var(--slate)}
+/* 셀프가이드 에이전트 — Copilot 생성 표시 + 선제 안내문 */
+.sg-agent{font:700 12px var(--sans);color:var(--slate);padding:4px 10px;border:1px solid var(--line);border-radius:20px}
+.sg-agent.on{color:var(--magenta-d);background:var(--magenta-soft);border-color:transparent}
+.sg-basis{font-size:11px;color:var(--faint)}
+.sg-gen{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;font:700 10.5px var(--sans);color:var(--magenta-d);background:var(--magenta-soft);border-radius:6px;padding:2px 8px}
+.sg-notice-btn{align-self:flex-start;border:1px dashed var(--magenta);background:none;color:var(--magenta-d);font:700 11.5px var(--sans);border-radius:8px;padding:6px 10px;cursor:pointer}
+.sg-notice-btn:hover{background:var(--magenta-soft)}
+.sg-notice{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2,#fafafb);display:flex;flex-direction:column;gap:4px}
+.sg-notice-row{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.sg-notice-k{font:700 10.5px var(--sans);color:var(--faint)}
+.sg-copy{border:1px solid var(--line);background:#fff;color:var(--slate);font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 8px;cursor:pointer}
+.sg-copy:hover{background:var(--magenta-soft);color:var(--magenta-d)}
+.sg-notice-subj{font:600 12px var(--sans);color:var(--ink)}
+.sg-notice-body{white-space:pre-wrap;font:400 11.5px var(--sans);line-height:1.5;color:var(--slate);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0}
+.sg-notice-sms{font-size:11.5px;color:var(--slate);background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
 /* 솔루션 설명 탭 */
 .soldoc-tabs{display:flex;gap:8px;margin-bottom:8px}
 .soldoc-tab{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 16px;font:700 13px var(--sans);color:var(--slate);cursor:pointer;transition:.12s}
@@ -1631,6 +1646,7 @@ svg.ltrend .lt-line:hover{opacity:1}
 .jcard-ch{color:var(--muted);display:inline-flex}
 .jsla{font:700 10px var(--mono);color:var(--muted);background:#eef0f4;border-radius:5px;padding:2px 6px}
 .jsla.over{color:var(--high);background:var(--high-soft)}
+.jcard-editor{flex-shrink:0;font:600 10px var(--sans);color:#b45309;background:#fff3df;border-radius:5px;padding:2px 6px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jcard-spacer{flex:1}
 .jcard-move{display:flex;gap:4px}
 .jempty{text-align:center;color:var(--faint);font-size:12px;padding:16px 0}

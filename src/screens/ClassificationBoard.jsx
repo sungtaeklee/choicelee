@@ -3,6 +3,7 @@ import { GROUPS, GROUP_MODE, FIXED_DEPTH2, CAT22, recDay } from '../classify.js'
 import { KANBAN_COLS, VOCS, SevBadge, GroupBadge, Tag, ChannelIcon, Avatar, PageHead } from '../ui.jsx'
 import { SLA_DAYS } from '../templates.js'
 import { toJiraCsv, exportCsv } from '../jira.js'
+import { nameOfEmail } from '../directory.js'
 
 /* 티켓 유형 글리프 (지라 이슈 타입 대체) */
 const TYPE_GLYPH = { '장애/오류': '🐞', '성능': '⚡', '개선 요청/희망': '✦', '단순 문의/불만/기타': '💬' }
@@ -87,6 +88,8 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
               <div className="jcol-body">
                 {items.map((v) => {
                   const sla = slaOf(v)
+                  const le = (v.activity || []).filter((a) => a.who).slice(-1)[0] // 최종 수정 활동
+                  const editor = le ? nameOfEmail(le.who) : null
                   return (
                     <div key={v.id} className={'jcard' + (dragId === v.id ? ' jcard-drag' : '')} draggable
                       onDragStart={(e) => { e.dataTransfer.setData('text/plain', v.id); e.dataTransfer.effectAllowed = 'move'; setDragId(v.id) }}
@@ -106,6 +109,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
                       <div className="jcard-foot">
                         <span className="jcard-ch" title={v.channel}><ChannelIcon channel={v.channel} size={13} /></span>
                         {sla && <span className={'jsla' + (sla.over ? ' over' : '')}>{sla.text}</span>}
+                        {editor && <span className="jcard-editor" title={`최종 수정: ${editor} (${le.who}) · ${new Date(le.t).toLocaleString('ko-KR')}`}>✎ {editor}</span>}
                         <span className="jcard-spacer" />
                         <div className="jcard-move" onClick={(e) => e.stopPropagation()}>
                           <button className="kmove" aria-label={`${v.id} 이전 단계`} title="이전 단계로" disabled={KANBAN_COLS.indexOf(v.status) <= 0} onClick={() => move(v, -1)}>‹</button>

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { Avatar } from './ui.jsx'
-import { MEMBERS, memberLabel, searchMembers, LABELS_SUGGEST } from './directory.js'
+import { allMembers, memberLabel, searchMembers, LABELS_SUGGEST } from './directory.js'
 
 /* ============================================================
    검색형 피커 — 담당자/보고자/참조자(사람)와 레이블을 텍스트가 아닌 검색으로 지정
@@ -22,7 +22,7 @@ export function PeoplePicker({ value, onChange, multi = false, placeholder = '�
       </div>
       {open && results.length > 0 && (
         <div className="pk-drop">
-          {results.map((l) => { const m = MEMBERS.find((x) => memberLabel(x) === l); return (
+          {results.map((l) => { const m = allMembers().find((x) => memberLabel(x) === l); return (
             <button key={l} className="pk-opt" onMouseDown={(e) => { e.preventDefault(); pick(l) }}>
               <Avatar name={l} size={24} />
               <span className="pk-opt-main"><b>{m?.name}</b> <span className="muted">{m?.team}</span><br /><span className="pk-opt-email">{m?.email}</span></span>

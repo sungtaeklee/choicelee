@@ -1,20 +1,13 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { PageHead } from '../ui.jsx'
+import { SELF_GUIDE, buildSelfGuideSteps, buildProactiveNotice } from '../templates.js'
 
-const SELF_GUIDE = {
-  '로그인불가/로그인풀림': ['앱을 최신 버전으로 업데이트 후 재실행', '비밀번호 재설정 또는 간편로그인(생체인증) 재등록', '기기 날짜·시간 자동설정 확인 → 인증 오류 방지'],
-  '회원/로그인/인증': ['본인인증 수단(통신사/PASS) 재시도', '아이디 찾기 · 비밀번호 재설정', '명의자 정보 일치 여부 확인'],
-  '회원/로그인 개선': ['간편로그인(생체인증) 등록으로 재로그인 최소화', '자동 로그아웃 주기 설정 확인', '여러 기기 동시 로그인 시 재인증 안내 확인'],
-  '요금/청구/납부/환불': ['MY > 요금조회에서 청구 상세 확인', '자동이체 · 카드 등록 상태 점검', '중복결제 의심 시 결제내역 캡처 후 문의'],
-  '앱/웹 기능오류': ['앱 캐시 삭제 후 재실행', '최신 버전으로 업데이트', '기기 재부팅 후 재시도'],
-  '앱/웹 접속불가': ['Wi-Fi ↔ 데이터 전환 후 재접속', '앱 최신 버전 확인', '잠시 후 재시도(일시적 부하 가능)'],
-  '앱/웹 속도 느림': ['백그라운드 앱 종료 후 재실행', '캐시 삭제 · 저장공간 확보', 'Wi-Fi 신호 강한 곳에서 재시도'],
-  '데이터(사용량/선물/충전)': ['MY > 데이터에서 잔여량 · 사용량 확인', '데이터 선물 · 충전 메뉴 이용', '안심차단 · 한도 설정 확인'],
-  '멤버십/쿠폰/혜택/VIP콕': ['멤버십 > VIP콕에서 당월 혜택 확인', '쿠폰함에서 사용 가능 쿠폰 확인', '제휴처 사용조건(시간 · 지점) 확인'],
-  '로밍': ['로밍 요금제 가입 여부 확인', '데이터 로밍 ON/OFF 설정 확인', '현지 도착 후 네트워크 수동 검색'],
-}
-const GUIDE_FALLBACK = ['앱을 최신 버전으로 업데이트', '캐시 삭제 후 재실행', '도움말 · FAQ에서 동일 증상 확인', '미해결 시 상담 연결']
+/* 고객 셀프 해결 가이드 에이전트(U+VOC 셀프가이드)
+   - 분류 에이전트와 같은 지식(22분류 + 대응 가이드)을 공유하고, 출력만 '고객용 가이드'.
+   - Copilot이 유형별 셀프 해결 단계 + 선제 안내문을 생성 → 사람이 검수 → 사이트가 고객에 노출. */
 function SelfGuide({ added, notify }) {
+  const [aiOn, setAiOn] = useState(true)   // ✦ Copilot 가이드 생성 활성(기본 ON — 코파일럿 산출물임을 표시)
+  const [noticeFor, setNoticeFor] = useState(null) // 선제 안내문 초안을 펼친 유형(cat)
   const data = (added || []).filter((v) => v.status !== '처리 완료') // 처리 전 단계 유사 VOC
   const total = data.length
   // 비슷한 VOC를 표준분류(cat)로 그룹화 + 대표 예상답안 매칭
@@ -25,17 +18,28 @@ function SelfGuide({ added, notify }) {
     if (!m.answer) { m.answer = v.answer; m.sampleId = v.id }
   })
   const top = Object.values(map).sort((a, b) => b.n - a.n).slice(0, 8)
-  const covered = top.filter((t) => SELF_GUIDE[t.cat]).reduce((s, t) => s + t.n, 0)
+  const covered = top.reduce((s, t) => s + t.n, 0) // Copilot 생성으로 상위 유형 전부 커버
   const selfRate = total ? Math.round(covered / total * 100) : 0
+  const copy = (text, label) => { try { navigator.clipboard?.writeText(text) } catch { /* noop */ } notify.toast(`${label} 복사됨 — 검수 후 발송`) }
+  const explainAi = () => notify.modal('Copilot으로 셀프 가이드 생성',
+    'Copilot 에이전트가 분류 지식(22분류·대응 가이드)과 처리 이력을 근거로, 자주 묻는 유형별 셀프 해결 단계와 발생/예상 고객용 선제 안내문을 생성합니다. 담당자가 검수해 확정하면 사이트가 고객에게 노출하고, 미해결 건만 상담으로 연결합니다.')
+
   if (!total) return <div className="screen"><PageHead title="고객 셀프 해결 가이드" sub="엔진② · 접수 전 셀프 해결 시나리오" /><div className="panel empty-panel">집계할 데이터가 없습니다. <b>VOC 수집·입력</b>에서 VOC를 추가하면 자주 묻는 유형이 셀프 해결 가이드로 변환됩니다.</div></div>
   return (
     <div className="screen">
-      <PageHead title="고객 셀프 해결 가이드" sub="엔진② · 처리 전 단계의 비슷한 VOC를 그룹화 → 자주 묻는 유형을 접수 전 셀프 해결 시나리오 + 예상답안으로 제공" />
+      <PageHead title="고객 셀프 해결 가이드" sub="엔진② · 처리 전 단계의 비슷한 VOC를 그룹화 → Copilot이 셀프 해결 시나리오 + 선제 안내문 생성 → 검수 후 고객 노출" />
+      <div className="board-bar">
+        <span className={'sg-agent' + (aiOn ? ' on' : '')}>U+VOC 셀프가이드 에이전트</span>
+        {aiOn && <span className="sg-basis">근거: 22분류 지식 · 대응 가이드 · 처리 이력</span>}
+        <div className="bb-spacer" />
+        <button className={'btn sm ' + (aiOn ? 'btn-primary' : 'btn-ghost')} onClick={() => { setAiOn((s) => !s); if (!aiOn) explainAi() }} title="Copilot이 셀프 해결 단계·선제 안내문을 생성합니다">✦ Copilot 가이드 생성{aiOn ? ' · ON' : ''}</button>
+        <button className="btn btn-ghost sm" onClick={explainAi}>어떻게 동작하나요?</button>
+      </div>
       <div className="kpi-row">
         <div className="kpi-card">
           <div className="kpi-l">자주 묻는 유형(그룹)</div>
           <div className="kpi-v">{top.length}<span className="kpi-unit">개</span></div>
-          <span className="kpi-chip">셀프 가이드화</span>
+          <span className="kpi-chip">{aiOn ? 'Copilot 생성' : '셀프 가이드화'}</span>
         </div>
         <div className="kpi-card accent brand">
           <div className="kpi-l">셀프 가이드 커버율</div>
@@ -48,19 +52,41 @@ function SelfGuide({ added, notify }) {
           <span className="kpi-chip">접수 전 자가 해결(데모)</span>
         </div>
       </div>
-      <h2 className="sec-title">자주 묻는 VOC → 셀프 해결 시나리오 <span className="sec-note">비슷한 VOC 그룹 상위 {top.length}개 · 예상답안 매칭</span></h2>
+      <h2 className="sec-title">자주 묻는 VOC → 셀프 해결 시나리오 <span className="sec-note">비슷한 VOC 그룹 상위 {top.length}개 · {aiOn ? 'Copilot 생성 + 검수' : '예상답안 매칭'}</span></h2>
       <div className="guide-grid">{top.map((t) => {
-        const steps = SELF_GUIDE[t.cat] || GUIDE_FALLBACK
+        const steps = buildSelfGuideSteps(t.cat)
+        const known = !!SELF_GUIDE[t.cat]
+        const open = noticeFor === t.cat
+        const notice = open ? buildProactiveNotice(t.cat, t.group) : null
         return (
           <div key={t.cat} className="guide-card">
-            <div className="guide-head"><span className="guide-cat">{t.cat}</span><span className="guide-freq">{t.n.toLocaleString()}건{t.high ? ` · High ${t.high}` : ''}</span></div>
+            <div className="guide-head">
+              <span className="guide-cat">{t.cat}</span>
+              <span className="guide-freq">{t.n.toLocaleString()}건{t.high ? ` · High ${t.high}` : ''}</span>
+            </div>
+            {aiOn && <div className="sg-gen">✦ Copilot 생성 {known ? '· 검수 지식' : '· 분류 가이드 기반'}</div>}
             <ol className="guide-steps">{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
             {t.answer && <div className="guide-ans"><div className="guide-ans-k">매칭 예상답안 (고객 응대 초안)</div><div className="guide-ans-v">{t.answer}</div></div>}
+            {aiOn && (
+              <button className="sg-notice-btn" onClick={() => setNoticeFor(open ? null : t.cat)}>
+                {open ? '▴ 선제 안내문 닫기' : '✦ 선제 안내문 초안 (발생·예상 고객)'}
+              </button>
+            )}
+            {open && notice && (
+              <div className="sg-notice">
+                <div className="sg-notice-row"><span className="sg-notice-k">이메일 · 제목</span><button className="sg-copy" onClick={() => copy(notice.email.subject, '제목')}>복사</button></div>
+                <div className="sg-notice-subj">{notice.email.subject}</div>
+                <div className="sg-notice-row"><span className="sg-notice-k">이메일 · 본문</span><button className="sg-copy" onClick={() => copy(notice.email.body, '본문')}>복사</button></div>
+                <pre className="sg-notice-body">{notice.email.body}</pre>
+                <div className="sg-notice-row"><span className="sg-notice-k">문자(SMS)</span><button className="sg-copy" onClick={() => copy(notice.sms, '문자')}>복사</button></div>
+                <div className="sg-notice-sms">{notice.sms}</div>
+              </div>
+            )}
             <div className="guide-foot"><button className="btn btn-ghost sm" onClick={() => notify.toast('셀프 해결 완료 (데모) — 인입콜 1건 예방')}>해결됐어요</button><button className="btn btn-ghost sm" onClick={() => notify.toast('미해결 — 상담사 연결 (데모)')}>상담 연결</button></div>
           </div>
         )
       })}</div>
-      <div className="note-box"><b>엔진② 동작</b> — 처리 전 단계의 비슷한 VOC를 표준분류로 그룹화해 자주 묻는 유형을 셀프 해결 시나리오로 변환하고, 각 유형의 <b>예상답안</b>(VOC 처리의 응대 초안)과 매칭해 접수 전 단계에서 고객 맞춤 가이드를 노출합니다. <b>미해결 건만</b> 정제해 상담사에 연결하고, 처리결과는 분류 모델 학습으로 되먹임됩니다(피드백 루프).</div>
+      <div className="note-box"><b>엔진② 동작</b> — Copilot 에이전트가 처리 전 단계의 비슷한 VOC를 표준분류로 묶어 유형별 <b>셀프 해결 단계</b>와 <b>선제 안내문</b>(이메일·문자)을 생성합니다. 담당자가 검수해 확정하면 사이트가 고객에게 노출하고, <b>미해결 건만</b> 정제해 상담사에 연결하며, 처리결과는 분류 모델 학습으로 되먹임됩니다(피드백 루프).</div>
     </div>
   )
 }

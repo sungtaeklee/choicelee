@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { sharedEnabled, listAll, listSince, insertMany, clearAll } from './shared.js'
 import { hydrate, toCompact, loadAdded, saveAdded, loadSent, saveSent, loadNotifs, saveNotifs } from './storage.js'
-import { parseMentions } from './directory.js'
+import { parseMentions, setSelf, emailOfLabel } from './directory.js'
 import NotifPanel from './shell/NotifPanel.jsx'
 import { VOCS, Toast, Modal, ShareBadge } from './ui.jsx'
 import VOCTrends from './screens/VOCTrends.jsx'
@@ -110,15 +110,19 @@ export default function App() {
   }, []) // 최초 1회
   useEffect(() => { saveSent(sentLog) }, [sentLog])
   useEffect(() => { saveNotifs(notifs) }, [notifs])
-  // 알림 추가(담당 배정·멘션·참조자 등) — 단일 사용자 데모라 '받은 알림' 피드로 누적
+  // 알림 추가 — 대상자(to)를 이메일로 해석해 저장. 본인이 자기에게 보낸 알림(=내가 한 행동)은 만들지 않는다.
   const addNotifs = (list) => {
     if (!list || !list.length) return
     const base = Date.now(), now = new Date().toISOString()
-    const items = list.map((n, i) => ({ id: 'N' + base + '-' + i, ts: now, read: false, by: authEmail, ...n }))
-    setNotifs((prev) => [...items, ...prev].slice(0, 200))
+    const items = list
+      .map((n, i) => ({ id: 'N' + base + '-' + i, ts: now, read: false, by: authEmail, toEmail: emailOfLabel(n.to), ...n }))
+      .filter((n) => n.toEmail) // 대상 계정을 식별할 수 있는 알림만 저장(노출은 본인 것만 → myNotifs)
+    if (items.length) setNotifs((prev) => [...items, ...prev].slice(0, 200))
   }
-  const unreadNotif = notifs.reduce((n, x) => n + (x.read ? 0 : 1), 0)
-  const markAllNotifRead = () => setNotifs((p) => p.map((n) => ({ ...n, read: true })))
+  // 내 알림만 — 대상 이메일이 로그인 계정과 일치하는 것 (지정·멘션·참조된 본인에게만 노출)
+  const myNotifs = notifs.filter((n) => n.toEmail === authEmail)
+  const unreadNotif = myNotifs.reduce((n, x) => n + (x.read ? 0 : 1), 0)
+  const markAllNotifRead = () => setNotifs((p) => p.map((n) => (n.toEmail === authEmail ? { ...n, read: true } : n)))
   const openNotif = (n) => { setShowNotif(false); setNotifs((p) => p.map((x) => x.id === n.id ? { ...x, read: true } : x)); if (n.caseId) openCase(n.caseId) }
   // 공유 저장소 도구 모달: Esc로 닫기 (커스텀 모달 접근성)
   useEffect(() => {
@@ -221,6 +225,7 @@ export default function App() {
     updateCases(ids, patch)
     notify.toast(label || `${ids.length}건 변경됨`, snap.length ? () => { setAdded((cur) => { const m = new Map(snap.map((s) => [s.id, s.prev])); const nx = cur.map((v) => m.has(v.id) ? { ...v, ...m.get(v.id) } : v); if (sharedEnabled) insertMany(toCompact(nx.filter((v) => m.has(v.id))), true).catch(() => { }); return nx }); notify.toast('실행취소됨') } : undefined)
   }
+  setSelf(authEmail) // 로그인 본인을 디렉터리에 포함 — 본인 지정/멘션 시 본인 계정으로 알림
   const [t] = TITLES[screen]
   const _d = new Date() // 로컬(KST) 날짜 — toISOString(UTC)은 저녁에 하루 어긋날 수 있어 사용하지 않음
   const agentTitle = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')} · 선제조치 Copilot`
@@ -228,7 +233,7 @@ export default function App() {
   return (
     <div className="app">
       <IconRail account={authEmail} onLogout={() => { setSession(''); setAuthEmail('') }} notify={notify} railView={railView} setRail={setRail} notifUnread={unreadNotif} onBell={() => setShowNotif((s) => !s)} />
-      {showNotif && <NotifPanel notifs={notifs} onOpen={openNotif} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
+      {showNotif && <NotifPanel notifs={myNotifs} onOpen={openNotif} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       {railView === 'agent' ? (
         <>
           <SubLNB screen={screen} setScreen={setScreen} />

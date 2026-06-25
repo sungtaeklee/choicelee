@@ -3,9 +3,12 @@
    - 담당자/보고자/참조자를 텍스트가 아닌 "검색"으로 지정하기 위한 명단.
    - 실배포 시에는 사내 임직원 디렉터리(LDAP/HR API)로 교체.
    ============================================================ */
+/* 데모용 구성원 명단 (모두 사내 도메인 @lguplus.co.kr).
+   실제 알림은 아래 '가입 계정'(이 앱에 로그인한 실계정)으로 보강되어, 멘션·지정 시 실계정으로 전달된다. */
+export const DOMAIN = 'lguplus.co.kr'
 export const MEMBERS = [
   { name: '이성택', team: '디자인시스템스쿼드', email: 'choicelee@lguplus.co.kr' },
-  { name: '지현주', team: '미디어로그', email: 'jihyunju@medialog.co.kr' },
+  { name: '지현주', team: '미디어로그', email: 'jihyunju@lguplus.co.kr' },
   { name: '신효근', team: '디지털CS BE팀', email: 'shin.hg@lguplus.co.kr' },
   { name: '김낙운', team: '디지털FE팀', email: 'kim.nw@lguplus.co.kr' },
   { name: '김지형', team: '디지털CS BE팀', email: 'kim.jh@lguplus.co.kr' },
@@ -21,18 +24,53 @@ export const MEMBERS = [
 ]
 // "이름 팀" 표시 문자열 ↔ 멤버 매칭
 export const memberLabel = (m) => `${m.name} ${m.team}`
+
+/* ── 가입 계정(이 앱에 실제 로그인한 계정) ──
+   알림은 '현재 가입된 계정' 기준으로 전달되어야 하므로, 로그인 시 계정을 등록·영속한다.
+   - SELF: 지금 로그인한 본인 (담당/참조 지정·@멘션 대상이 본인이면 본인 계정으로 알림)
+   - REGISTERED: 과거에 로그인했던 동료 계정들 (멀티 사용자/공유 모드에서 각자 본인 알림 수신) */
+const LS_ACCTS = 'voc-action-copilot:accounts:v1'
+let SELF = null
+let REGISTERED = []
+try { REGISTERED = JSON.parse(localStorage.getItem(LS_ACCTS) || '[]') } catch { REGISTERED = [] }
+// 가입 계정 → 멤버 객체. 데모 명단에 있는 계정이면 한글 이름·팀을 유지, 아니면 메일 아이디로 표기.
+const acctMember = (email) => { const m = MEMBERS.find((x) => x.email === email); return m ? { ...m, registered: true } : { name: String(email).split('@')[0], team: '가입 계정', email, registered: true } }
+export function setSelf(email) {
+  SELF = email ? acctMember(email) : null
+  if (SELF && !MEMBERS.find((m) => m.email === email)) SELF.team = '나'
+  if (email && !REGISTERED.includes(email)) {
+    REGISTERED = [email, ...REGISTERED].slice(0, 50)
+    try { localStorage.setItem(LS_ACCTS, JSON.stringify(REGISTERED)) } catch { /* noop */ }
+  }
+}
+export function registeredAccounts() { return REGISTERED.slice() }
+// 디렉터리 = 본인 + 가입 계정(실계정) + 데모 명단. 이메일 중복은 앞선(실계정) 항목 우선.
+export function allMembers() {
+  const out = [], seen = new Set()
+  const push = (m) => { if (m && m.email && !seen.has(m.email)) { seen.add(m.email); out.push(m) } }
+  if (SELF) push(SELF)
+  REGISTERED.forEach((e) => push(acctMember(e)))
+  MEMBERS.forEach(push)
+  return out
+}
+// "이름 팀" 라벨 → 이메일(알림 대상 계정 식별). 못 찾으면 ''
+export function emailOfLabel(label) { const m = allMembers().find((x) => memberLabel(x) === label); return m ? m.email : '' }
+// 이메일 → 표시 이름(구성원이면 한글 이름, 아니면 메일 아이디). 활동 이력의 작성자 표시용
+export function nameOfEmail(email) { const e = String(email || ''); const m = allMembers().find((x) => x.email === e); return m ? m.name : (e.split('@')[0] || e) }
+
 // 본문에서 @멘션된 구성원 추출 → "이름 팀" 라벨 배열 (이름 긴 것부터 매칭해 부분일치 오인 방지)
 export function parseMentions(text) {
   const t = String(text || ''); const found = new Set()
-  for (const m of [...MEMBERS].sort((a, b) => b.name.length - a.name.length)) {
+  for (const m of [...allMembers()].sort((a, b) => b.name.length - a.name.length)) {
     if (new RegExp('@' + m.name + '(?![가-힣])').test(t)) found.add(memberLabel(m))
   }
   return [...found]
 }
 export function searchMembers(q, limit = 8) {
+  const list = allMembers()
   const s = String(q || '').trim().toLowerCase()
-  if (!s) return MEMBERS.slice(0, limit)
-  return MEMBERS.filter((m) => `${m.name} ${m.team} ${m.email}`.toLowerCase().includes(s)).slice(0, limit)
+  if (!s) return list.slice(0, limit)
+  return list.filter((m) => `${m.name} ${m.team} ${m.email}`.toLowerCase().includes(s)).slice(0, limit)
 }
 
 /* 레이블 추천 (검색형 입력 + 신규 추가 허용) */
