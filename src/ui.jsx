@@ -50,13 +50,17 @@ export const ChannelChip = ({ channel }) => <span className="chchip"><ChannelIco
 export const RailIcon = ({ d }) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 // 담당자 아바타(이니셜) — 이름 문자열에서 첫 글자, 빈 값이면 미지정 점선 원
 const AV_COLORS = ['#e6007e', '#6938ef', '#1570ef', '#12b76a', '#f79009', '#06b6d4', '#9333ea']
+/* 이름 → 고정 색 (보드 아바타·일정 캘린더가 동일 함수를 써서 담당자 색을 일치시킨다) */
+export function avatarColor(name) {
+  const n = String(name || '').trim(); if (!n) return '#9aa3b2'
+  let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0
+  return AV_COLORS[h % AV_COLORS.length]
+}
 export function Avatar({ name, size = 22 }) {
   const n = String(name || '').trim()
   if (!n) return <span className="avatar avatar-none" title="미지정" style={{ width: size, height: size }} />
   const ch = n.replace(/^[^가-힣A-Za-z]+/, '')[0] || n[0]
-  let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0
-  const bg = AV_COLORS[h % AV_COLORS.length]
-  return <span className="avatar" title={n} style={{ width: size, height: size, background: bg, fontSize: Math.round(size * 0.42) }}>{ch.toUpperCase()}</span>
+  return <span className="avatar" title={n} style={{ width: size, height: size, background: avatarColor(n), fontSize: Math.round(size * 0.42) }}>{ch.toUpperCase()}</span>
 }
 
 /* ---------- 토스트 · 모달 · 페이지 헤더 ---------- */

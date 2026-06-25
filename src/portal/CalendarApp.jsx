@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { PageHead, KANBAN_COLS } from '../ui.jsx'
+import { PageHead, KANBAN_COLS, avatarColor } from '../ui.jsx'
 import { GROUPS, recDay } from '../classify.js'
 import { SLA_DAYS } from '../templates.js'
 
@@ -9,7 +9,6 @@ import { SLA_DAYS } from '../templates.js'
 const KIND_LABEL = { intake: '인입', sla: 'SLA', devStart: '착수', devEnd: '완료', deployEnd: '배포' }
 const KIND_ORDER = { intake: 0, sla: 1, devStart: 2, devEnd: 3, deployEnd: 4 }
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
-const PALETTE = ['#22c1d6', '#2440b3', '#1b1d6b', '#e5734d', '#1a9c5b', '#b45309', '#7c3aed', '#0e7490', '#be185d', '#16a34a', '#db2777', '#0891b2']
 const UNASSIGNED = '#9aa3b2'
 const pad = (n) => String(n).padStart(2, '0')
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -36,14 +35,9 @@ function CalendarApp({ added = [], openCase }) {
     return out
   }, [added])
 
-  // 담당자별 고유 색 (정렬 후 팔레트 인덱스 — 충돌 없이 구분)
-  const ownerColors = useMemo(() => {
-    const us = [...new Set(allEvents.map((e) => e.owner).filter((o) => o && o !== '미지정'))].sort()
-    const m = {}; us.forEach((o, i) => { m[o] = PALETTE[i % PALETTE.length] }); return m
-  }, [allEvents])
-  const ownerColor = (o) => (o && o !== '미지정' ? (ownerColors[o] || UNASSIGNED) : UNASSIGNED)
-
-  const owners = useMemo(() => ['전체', ...Object.keys(ownerColors)], [ownerColors])
+  // 담당자별 색 — 보드 아바타와 동일한 avatarColor 사용(인지 일치)
+  const ownerColor = (o) => (o && o !== '미지정' ? avatarColor(o) : UNASSIGNED)
+  const owners = useMemo(() => ['전체', ...[...new Set(allEvents.map((e) => e.owner).filter((o) => o && o !== '미지정'))].sort()], [allEvents])
   const kw = q.trim().toLowerCase()
   const filtered = useMemo(() => allEvents.filter((e) => {
     if (fOwner !== '전체' && e.owner !== fOwner) return false

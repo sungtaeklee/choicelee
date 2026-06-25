@@ -14,7 +14,7 @@ function IconRail({ account, onLogout, notify, railView, setRail, notifUnread = 
           <RailIcon d={RAIL_ICONS.bell} />
           {notifUnread > 0 && <span className="rail-badge">{notifUnread > 99 ? '99+' : notifUnread}</span>}
         </button>
-        <button className="rail-avatar" title={`${account} · 클릭하면 로그아웃`} onClick={onLogout}>{(account || 'U')[0].toUpperCase()}</button>
+        <button className="rail-avatar" title={`${account} · 클릭하면 로그아웃`} onClick={() => (notify && notify.confirm ? notify.confirm('로그아웃', `${account} 계정에서 로그아웃할까요?`, onLogout, { confirmLabel: '로그아웃' }) : onLogout())}>{(account || 'U')[0].toUpperCase()}</button>
       </div>
     </nav>
   )

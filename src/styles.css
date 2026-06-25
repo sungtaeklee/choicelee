@@ -287,6 +287,14 @@ h1,h2{margin:0}
 .block-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .jd-editedby{float:right;text-transform:none;letter-spacing:0;font:600 11px var(--sans);color:#b45309;background:#fff3df;border-radius:6px;padding:2px 8px}
 .edited-by{color:#b45309;font-weight:600}
+/* 에러 바운더리 폴백(화이트 스크린 방지) */
+.err-boundary{display:flex;align-items:center;justify-content:center;min-height:60vh;padding:24px}
+.err-card{max-width:460px;text-align:center;background:var(--surface,#fff);border:1px solid var(--line);border-radius:16px;padding:28px 26px;box-shadow:var(--shadow-sm)}
+.err-emoji{font-size:34px}
+.err-card h2{font:800 17px var(--sans);color:var(--ink);margin:10px 0 6px}
+.err-card p{font-size:13px;color:var(--slate);line-height:1.6;margin:0 0 12px}
+.err-msg{font:500 11.5px var(--mono,monospace);color:#b3261e;background:#fdecea;border-radius:8px;padding:8px 10px;white-space:pre-wrap;word-break:break-word;text-align:left;max-height:120px;overflow:auto}
+.err-actions{display:flex;gap:8px;justify-content:center;margin-top:14px}
 .voc-raw{margin:0;font-size:14px;color:var(--ink);line-height:1.6}
 .chat-log{display:flex;flex-direction:column;gap:8px;max-height:440px;overflow-y:auto;padding:2px}
 .chat-row{display:flex;flex-direction:column;max-width:84%}

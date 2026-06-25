@@ -3,6 +3,7 @@ import { sharedEnabled, listAll, listSince, insertMany, clearAll } from './share
 import { hydrate, toCompact, loadAdded, saveAdded, loadSent, saveSent, loadNotifs, saveNotifs } from './storage.js'
 import { parseMentions, setSelf, emailOfLabel } from './directory.js'
 import NotifPanel from './shell/NotifPanel.jsx'
+import ErrorBoundary from './ErrorBoundary.jsx'
 import { VOCS, Toast, Modal, ShareBadge } from './ui.jsx'
 import VOCTrends from './screens/VOCTrends.jsx'
 import VOCInbox from './screens/VOCInbox.jsx'
@@ -243,13 +244,15 @@ export default function App() {
               {panelMode !== 'expanded' && (
                 <main className="main-nav">
                   <div className="content">
-                    {screen === 'trends' && <VOCTrends added={added} openCase={openCase} />}
-                    {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} />}
-                    {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
-                    {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} bulkPatch={bulkPatch} addSent={addSent} addComment={logActivity} sentLog={sentLog} account={authEmail} openCase={openCase} goBack={() => setScreen(prevScreen)} backLabel={(TITLES[prevScreen] || ['목록'])[0]} />}
-                    {screen === 'insight' && <InsightReport added={added} openCase={openCase} updateCases={updateCases} bulkPatch={bulkPatch} notify={notify} addSent={addSent} />}
-                    {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
-                    {screen === 'import' && <ImportResult notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} openCase={openCase} />}
+                    <ErrorBoundary key={screen + ':' + caseId}>
+                      {screen === 'trends' && <VOCTrends added={added} openCase={openCase} />}
+                      {screen === 'inbox' && <VOCInbox openCase={openCase} notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} />}
+                      {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
+                      {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} bulkPatch={bulkPatch} addSent={addSent} addComment={logActivity} sentLog={sentLog} account={authEmail} openCase={openCase} goBack={() => setScreen(prevScreen)} backLabel={(TITLES[prevScreen] || ['목록'])[0]} />}
+                      {screen === 'insight' && <InsightReport added={added} openCase={openCase} updateCases={updateCases} bulkPatch={bulkPatch} notify={notify} addSent={addSent} />}
+                      {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
+                      {screen === 'import' && <ImportResult notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} openCase={openCase} />}
+                    </ErrorBoundary>
                   </div>
                 </main>
               )}
