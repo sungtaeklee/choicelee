@@ -7,10 +7,12 @@ import { allMembers, memberLabel, searchMembers, LABELS_SUGGEST } from './direct
    ============================================================ */
 export function PeoplePicker({ value, onChange, multi = false, placeholder = '이름·팀 검색' }) {
   const [q, setQ] = useState(''); const [open, setOpen] = useState(false)
-  const sel = multi ? (value || []) : (value ? [value] : [])
+  // 저장 데이터가 배열이 아니어도(문자열 등) 죽지 않도록 안전 보정
+  const arr = multi ? (Array.isArray(value) ? value : (value ? [value] : [])) : null
+  const sel = multi ? arr : (value ? [value] : [])
   const results = searchMembers(q).map(memberLabel).filter((l) => !sel.includes(l))
-  const pick = (label) => { multi ? onChange([...(value || []), label]) : onChange(label); setQ(''); setOpen(false) }
-  const remove = (label) => { multi ? onChange((value || []).filter((x) => x !== label)) : onChange('') }
+  const pick = (label) => { onChange(multi ? [...arr, label] : label); setQ(''); setOpen(false) }
+  const remove = (label) => { onChange(multi ? arr.filter((x) => x !== label) : '') }
   return (
     <div className="pk" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false) }}>
       <div className="pk-chips">
@@ -71,7 +73,7 @@ export function MentionInput({ value, onChange, placeholder, className = 'of-are
 
 export function LabelPicker({ value, onChange }) {
   const [q, setQ] = useState(''); const [open, setOpen] = useState(false)
-  const sel = value || []
+  const sel = Array.isArray(value) ? value : []
   const kw = q.trim()
   const results = LABELS_SUGGEST.filter((l) => !sel.includes(l) && l.toLowerCase().includes(kw.toLowerCase()))
   const canAdd = kw && !sel.includes(kw)

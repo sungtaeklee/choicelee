@@ -5,12 +5,13 @@ import { PageHead, GroupBadge, Tag, SevBadge, SentBadge, StatBadge, ConfBadge, C
 import { REPLY_TEMPLATES, SLA_DAYS, defaultChecklist } from '../templates.js'
 import { jiraMailto, jiraIntakeEmail, setJiraIntakeEmail, JIRA_INTAKE_PLACEHOLDER } from '../jira.js'
 import { PeoplePicker, LabelPicker, MentionInput } from '../pickers.jsx'
-import { RESOLVE_LEVELS, BUG_RESULTS, ERROR_TYPES } from '../directory.js'
+import { RESOLVE_LEVELS, BUG_RESULTS, ERROR_TYPES, nameOfEmail } from '../directory.js'
 import { saveAttach } from '../storage.js'
 
 /* 지라 "세부 사항" — 담당자/보고자/레이블/참조자(검색형) + 처리가능단계·오류타입·실공수·BUG결과·개발일정 */
 function TicketDetails({ c, updateCases, slaDays, ageDays, slaDone, slaBreach, KANBAN_COLS }) {
   const set = (patch) => updateCases && updateCases([c.id], patch)
+  const lastEdit = (c.activity || []).filter((a) => a.who).slice(-1)[0] // 최종 수정 활동(누가·언제)
   const [rm, setRm] = useState(c.relatedMenu || ''); const [jira, setJira] = useState(c.jiraUrl || '')
   const [ef, setEf] = useState(c.effort || { plan: '', design: '', pub: '', dev: '' })
   const [ds, setDs] = useState(c.devStart || ''); const [de, setDe] = useState(c.devEnd || ''); const [dp, setDp] = useState(c.deployEnd || '')
@@ -18,7 +19,7 @@ function TicketDetails({ c, updateCases, slaDays, ageDays, slaDone, slaBreach, K
   const efSet = (k, val) => { const nx = { ...ef, [k]: val }; setEf(nx); set({ effort: nx }) }
   return (
     <div className="panel jdetails">
-      <div className="block-label">세부 사항 <span className="muted" style={{ fontWeight: 400 }}>· 지라 티켓 필드 (수정 시 저장)</span></div>
+      <div className="block-label">세부 사항 <span className="muted" style={{ fontWeight: 400 }}>· 지라 티켓 필드 (수정 시 저장)</span>{lastEdit && <span className="jd-editedby" title={`${lastEdit.who} · ${fmtTs(lastEdit.t)}`}>최종 수정 {nameOfEmail(lastEdit.who)} · {fmtTs(lastEdit.t)}</span>}</div>
       <div className="jd-grid">
         <div className="jd-row"><span className="jd-k">진행상황</span><select className="jd-sel" value={c.status} onChange={(e) => set({ status: e.target.value })}>{KANBAN_COLS.map((s) => <option key={s}>{s}</option>)}</select></div>
         <div className="jd-row"><span className="jd-k">처리가능단계</span><select className="jd-sel" value={c.resolveLevel || ''} onChange={(e) => set({ resolveLevel: e.target.value })}><option value="">선택</option>{RESOLVE_LEVELS.map((l) => <option key={l}>{l}</option>)}</select></div>

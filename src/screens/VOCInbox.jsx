@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { GROUPS, parseGrid, parsePaste, enrichRow, weekKey } from '../classify.js'
 import { toCompact } from '../storage.js'
 import { PageHead, ChannelChip, GroupBadge, Tag, StatBadge, ConfBadge, KANBAN_COLS, VOCS, useSort, SortTh } from '../ui.jsx'
+import { nameOfEmail } from '../directory.js'
 
 // VOC 목록 컬럼별 정렬 키 추출자 (주차는 weekKey로 수치 정렬)
 const LIST_SORT = {
@@ -163,6 +164,7 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert }) {
             <SortTh k="summary" sort={sort} toggle={toggle}>요약</SortTh>
             <SortTh k="week" sort={sort} toggle={toggle}>주차</SortTh>
             <SortTh k="occur" sort={sort} toggle={toggle}>발생일자</SortTh>
+            <th className="nowrap">최종 수정</th>
           </tr></thead>
           <tbody>{sortedRows.slice(0, 100).map((v) => (
             <tr key={v.id} className={v.source === 'input' ? 'row-up' : ''} onClick={() => openCase(v.id)}>
@@ -174,6 +176,7 @@ function VOCInbox({ openCase, notify, added, setAdded, shared, sharedInsert }) {
               <td className="muted nowrap">{[v.area1, v.area2].filter(Boolean).join(' › ') || '-'}</td>
               <td className="cell-content" title={v.content}>{v.summary || v.content}</td>
               <td className="muted nowrap">{v.week || '-'}</td><td className="muted nowrap">{v.occur || '-'}</td>
+              <td className="muted nowrap">{(() => { const le = (v.activity || []).filter((a) => a.who).slice(-1)[0]; return le ? <span className="edited-by" title={`${le.who}`}>✎ {nameOfEmail(le.who)}</span> : '-' })()}</td>
             </tr>
           ))}</tbody>
         </table>
