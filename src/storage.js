@@ -94,3 +94,8 @@ export function saveSent(l) { try { localStorage.setItem(LS_SENT, JSON.stringify
 const LS_NOTIF = 'voc-action-copilot:notif:v1'
 export function loadNotifs() { try { return JSON.parse(localStorage.getItem(LS_NOTIF) || '[]') } catch { return [] } }
 export function saveNotifs(l) { try { localStorage.setItem(LS_NOTIF, JSON.stringify((l || []).slice(0, 200))) } catch { } }
+
+/* 셀프가이드 에이전트가 만든 '사이트용 JSON'을 가져와 화면에 반영 (셀프 해결 단계 + 선제 안내문) */
+const LS_SELFGUIDE = 'voc-action-copilot:selfguide:v1'
+export function loadSelfGuide() { try { return JSON.parse(localStorage.getItem(LS_SELFGUIDE) || 'null') } catch { return null } }
+export function saveSelfGuide(o) { try { o ? localStorage.setItem(LS_SELFGUIDE, JSON.stringify(o)) : localStorage.removeItem(LS_SELFGUIDE) } catch { /* noop */ } }
