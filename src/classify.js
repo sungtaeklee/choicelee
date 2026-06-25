@@ -235,26 +235,37 @@ export function cleanClause(s) {
   return t.replace(/^[\s.,·ㆍ\-]+/, '').replace(/[\s.,]+$/, '').trim()
 }
 export const ISSUE_KW = ['결제', '선결제', '가상계좌', '납부', '연체', '미납', '환불', '청구', '요금', '요금제', '위약', '약정', '해지', '번호이동', '가입', '개통', '결합', '로밍', '출국', '해외', '유심', '이심', '데이터', '부가서비스', '멤버십', '쿠폰', '혜택', '영화', 'vip', '네트워크', '통화', '끊', '안터', '와이파이', '속도', '느', '인터넷', '로그인', '인증', '비밀번호', '아이디', '회원', '탈퇴', '오류', '에러', '안돼', '안되', '안됨', '먹통', '튕', '설치', '리모컨', 'iptv', '셋톱', '유독', '넷플릭스', '디즈니', '배송', '매장', '대리점', '상담', '기기', '기변', '단말', '문의', '신청', '변경', '조회', '확인', '취소', '불가', '안내', '어떻게', '얼마', '방법', '왜', '문제', '불편']
-/* 핵심 의도 한 줄 요약: 노트/전사/평문 모두 → 신호어 밀집 절을 골라 군더더기 제거·축약 */
+/* 핵심 의도 신호: 문제(불능·오류)와 요청(의도) 패턴 — 신호어 카운트만으로 못 잡는 "~가 안 됐어요/해주세요"류를 가중 */
+export const PROBLEM_RE = /(안\s*(됐|돼|되|됨|열|나와|나옴|잡|터|받|보여|뜨|들어|들려|먹)|못\s*(받|열|함|해|들|봐|보)|오류|에러|먹통|튕|버벅|멈칫|멈춰|끊겨|끊김|끊어|풀림|풀려|지연|중복|이중|백화|불가|과금|잘못|왜\s)/
+export const INTENT_RE = /(해\s*주세요|해주세요|부탁|신청|문의|요청|싶어요|싶습니다|싶은데|하려고|되나요|될까요|할까요|얼마|어떻게|방법|알려|변경하|취소하|해지하|확인하|환불|위약)/
+/* 핵심 의도 한 줄 요약: 노트/전사/평문 모두 → 짧은 단일 문장은 통째로, 긴 본문은 문제·요청 신호가 짙은 절을 선택 */
 export function smartSummary(content) {
   const issue = coreIssue(content)
   const raw = String(issue || '').replace(/tag:[A-Z_]+\([^)]*\)/g, '')
   if (!raw.trim()) return aiSummarize(content)
   if (raw.includes(' / ')) { const s = raw.replace(/\s+/g, ' ').trim(); return s.length > 60 ? s.slice(0, 60) + '…' : s } // 노트 불릿
-  // 구어체 절 분리: 종결·연결어미 + 구두점
+  const trim = (s) => (s.length > 46 ? s.slice(0, 46).replace(/\s+\S*$/, '') + '…' : s)
+  // 짧은 단일 의도문(대부분의 VOC)은 쪼개지 않고 통째로 — 'X했는데 Y가 안 됐어요'를 토막내지 않는다
+  const whole = cleanClause(raw)
+  if (whole && whole.length <= 50) return trim(whole)
+  // 긴 본문(전사·다문장): 구어체 절 분리 후 신호 밀집 절 선택
   const parts = raw.split(/(?<=거든요)|(?<=는데요)|(?<=는데)|(?<=구요)|(?<=고요)|(?<=려고요?)|(?<=려구요)|(?<=을까요)|(?<=나요)|(?<=드려요)|(?<=거예요)|(?<=합니다)|(?<=했어요)|(?<=해요)|[.!?。…\n·]/)
   let cands = parts.map(cleanClause).filter((s) => s.length >= 6)
-  if (!cands.length) cands = [cleanClause(raw)].filter(Boolean)
+  if (!cands.length) cands = [whole].filter(Boolean)
   if (!cands.length) return aiSummarize(content)
-  const score = (s) => { const sl = s.toLowerCase(); return ISSUE_KW.reduce((n, k) => n + (sl.includes(k) ? 1 : 0), 0) }
-  // 끝맺음 품질: 종결어미로 끝나면 가점, 연결어미(…서/…면/…는데 등)로 잘리면 감점 → 말이 끊긴 요약 회피
+  // 점수 = 신호어 수 + 문제(+3)·요청(+2) 가점 (도입부보다 '문제·요청을 말한 절'을 고른다)
+  const score = (s) => { const sl = s.toLowerCase(); let n = ISSUE_KW.reduce((a, k) => a + (sl.includes(k) ? 1 : 0), 0); if (PROBLEM_RE.test(s)) n += 3; if (INTENT_RE.test(s)) n += 2; return n }
+  // 끝맺음 품질: 연결어미(…는데/…서/…려고)로 끝나면 도입부 — 강하게 감점해 신호어 노이즈를 눌러둔다
   const CONNECT_END = /(는데|은데|구요|고요|아서|어서|여서|려고|려구|니까|는지|지만|거든|길래|면서|다가|면|러)$/
   const FINAL_END = /(요|다|까|죠|함|됨|네|용|음)$/
-  const endBonus = (s) => (CONNECT_END.test(s) ? -2 : (FINAL_END.test(s) ? 1 : 0))
-  cands.sort((a, b) => ((score(b) + endBonus(b)) - (score(a) + endBonus(a))) || (Math.abs(a.length - 24) - Math.abs(b.length - 24)))
-  let best = cands[0] || ''
-  if (best.length > 46) best = best.slice(0, 46).replace(/\s+\S*$/, '') + '…'
-  return best || aiSummarize(content)
+  const endBonus = (s) => (CONNECT_END.test(s) ? -3 : (FINAL_END.test(s) ? 1 : 0))
+  const ranked = cands.map((s, i) => ({ s, i, v: score(s) + endBonus(s) }))
+    .sort((a, b) => (b.v - a.v) || (Math.abs(a.s.length - 24) - Math.abs(b.s.length - 24)))
+  const top = ranked[0]
+  let best = top.s
+  // 고른 절이 연결어미로 끝나면(=도입부) 다음 절을 이어붙여 의미를 완성
+  if (CONNECT_END.test(best) && cands[top.i + 1]) best = (best + ' ' + cands[top.i + 1]).trim()
+  return trim(best) || aiSummarize(content)
 }
 /* 표준분류/정형분류 → 대응 영역(1 넓은 / 2 세부). 사내 라우팅 taxonomy (영역 트리 기준). */
 export const AREA_BY_CAT = {

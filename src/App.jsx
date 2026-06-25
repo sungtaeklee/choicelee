@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { sharedEnabled, listAll, listSince, insertMany, clearAll } from './shared.js'
-import { hydrate, toCompact, loadAdded, saveAdded, loadSent, saveSent } from './storage.js'
+import { hydrate, toCompact, loadAdded, saveAdded, loadSent, saveSent, loadNotifs, saveNotifs } from './storage.js'
+import { parseMentions } from './directory.js'
+import NotifPanel from './shell/NotifPanel.jsx'
 import { VOCS, Toast, Modal, ShareBadge } from './ui.jsx'
 import VOCTrends from './screens/VOCTrends.jsx'
 import VOCInbox from './screens/VOCInbox.jsx'
@@ -57,6 +59,8 @@ export default function App() {
   const [selected, setSelected] = useState([]) // 체크박스로 선택한 케이스 id (대시보드 ↔ Agent 패널 공유)
   const [added, setAdded] = useState(() => (sharedEnabled ? [] : loadAdded())) // 공유 모드면 서버에서, 아니면 localStorage에서
   const [sentLog, setSentLog] = useState(loadSent)
+  const [notifs, setNotifs] = useState(loadNotifs) // 알림 피드(담당 배정·멘션·참조자)
+  const [showNotif, setShowNotif] = useState(false)
   const [shareState, setShareState] = useState(sharedEnabled ? 'connecting' : 'local') // 'connecting'|'online'|'error'|'local'
   const [showShared, setShowShared] = useState(false) // 공유 저장소 도구 모달 (상단바에서 열기)
   const [solDoc, setSolDoc] = useState('architecture') // 솔루션 설명 탭 (자동 시연이 제어)
@@ -105,6 +109,17 @@ export default function App() {
     return () => { cancelled = true }
   }, []) // 최초 1회
   useEffect(() => { saveSent(sentLog) }, [sentLog])
+  useEffect(() => { saveNotifs(notifs) }, [notifs])
+  // 알림 추가(담당 배정·멘션·참조자 등) — 단일 사용자 데모라 '받은 알림' 피드로 누적
+  const addNotifs = (list) => {
+    if (!list || !list.length) return
+    const base = Date.now(), now = new Date().toISOString()
+    const items = list.map((n, i) => ({ id: 'N' + base + '-' + i, ts: now, read: false, by: authEmail, ...n }))
+    setNotifs((prev) => [...items, ...prev].slice(0, 200))
+  }
+  const unreadNotif = notifs.reduce((n, x) => n + (x.read ? 0 : 1), 0)
+  const markAllNotifRead = () => setNotifs((p) => p.map((n) => ({ ...n, read: true })))
+  const openNotif = (n) => { setShowNotif(false); setNotifs((p) => p.map((x) => x.id === n.id ? { ...x, read: true } : x)); if (n.caseId) openCase(n.caseId) }
   // 공유 저장소 도구 모달: Esc로 닫기 (커스텀 모달 접근성)
   useEffect(() => {
     if (!showShared) return
@@ -158,28 +173,47 @@ export default function App() {
       try { await clearAll(); setAdded([]); notify.toast('공유 데이터를 비웠어요') } catch { notify.toast('삭제하지 못했어요 — 네트워크를 확인하세요') }
     }, { danger: true, confirmLabel: '모두 삭제' })
   }
-  const updateCases = (ids, patch) => setAdded((prev) => {
+  // 수정 이력에 남길 추적 필드(누가 무엇을 바꿨는지) — [키, 표시명]
+  const TRACK_FIELDS = [['group', 'VOC구분'], ['cat', '표준분류'], ['area1', '대응영역'], ['severity', '심각도'], ['reporter', '보고자'], ['resolveLevel', '처리가능단계'], ['errorType', '오류타입'], ['bugResult', 'BUG처리결과'], ['relatedMenu', '관련메뉴']]
+  const updateCases = (ids, patch) => {
     const stamp = new Date().toISOString()
-    const next = prev.map((v) => {
-      if (!ids.includes(v.id)) return v
-      const merged = { ...v, ...patch }
-      // 티켓 활동 자동 기록(감사 이력) — 실제로 바뀐 상태·담당만
-      const logs = []
-      if (patch.status && patch.status !== v.status) logs.push({ t: stamp, who: authEmail, kind: 'status', text: `진행상황: ${v.status} → ${patch.status}` })
-      if (patch.owner && patch.owner !== v.owner) logs.push({ t: stamp, who: authEmail, kind: 'owner', text: `담당 배정: ${patch.owner}` })
-      if (logs.length) merged.activity = [...(v.activity || []), ...logs]
-      return merged
+    const idset = new Set(ids)
+    // 알림: 담당 배정·참조자 추가는 변경 전 상태와 비교해 산출(피드에 1회만)
+    const notifsToAdd = []
+    for (const v of added) {
+      if (!idset.has(v.id)) continue
+      if (patch.owner && patch.owner !== v.owner && patch.owner !== '미지정') notifsToAdd.push({ type: 'assign', to: patch.owner, caseId: v.id, text: `'${v.id}' ${v.cat} 건 담당자로 지정되었습니다` })
+      if (Array.isArray(patch.watchers)) patch.watchers.filter((w) => !(v.watchers || []).includes(w)).forEach((w) => notifsToAdd.push({ type: 'watch', to: w, caseId: v.id, text: `'${v.id}' ${v.cat} 건 참조자로 추가되었습니다` }))
+    }
+    setAdded((prev) => {
+      const next = prev.map((v) => {
+        if (!idset.has(v.id)) return v
+        const merged = { ...v, ...patch }
+        // 티켓 활동 자동 기록(감사 이력) — 누가·무엇을·어떻게 바꿨는지
+        const logs = []
+        if (patch.status && patch.status !== v.status) logs.push({ t: stamp, who: authEmail, kind: 'status', text: `진행상황: ${v.status} → ${patch.status}` })
+        if (patch.owner && patch.owner !== v.owner) logs.push({ t: stamp, who: authEmail, kind: 'owner', text: `담당 배정: ${patch.owner}` })
+        for (const [k, label] of TRACK_FIELDS) { if (patch[k] != null && patch[k] !== v[k]) logs.push({ t: stamp, who: authEmail, kind: 'edit', text: `${label}: ${v[k] || '-'} → ${patch[k] || '-'}` }) }
+        if (Array.isArray(patch.labels) && patch.labels.join('|') !== (v.labels || []).join('|')) logs.push({ t: stamp, who: authEmail, kind: 'edit', text: `레이블: ${(v.labels || []).join(', ') || '-'} → ${patch.labels.join(', ') || '-'}` })
+        if (Array.isArray(patch.watchers) && patch.watchers.join('|') !== (v.watchers || []).join('|')) logs.push({ t: stamp, who: authEmail, kind: 'edit', text: `참조자: ${(v.watchers || []).length}명 → ${patch.watchers.length}명` })
+        if (logs.length) merged.activity = [...(v.activity || []), ...logs]
+        return merged
+      })
+      if (sharedEnabled) { const changed = next.filter((v) => idset.has(v.id)); insertMany(toCompact(changed), true).catch(() => { }) }
+      return next
     })
-    if (sharedEnabled) { const changed = next.filter((v) => ids.includes(v.id)); insertMany(toCompact(changed), true).catch(() => { }) }
-    return next
-  })
-  // 티켓 활동 추가(코멘트·발송 등) — Jira의 코멘트/이력을 사이트에 내재화
-  const logActivity = (id, kind, text) => setAdded((prev) => {
+    if (notifsToAdd.length) addNotifs(notifsToAdd)
+  }
+  // 티켓 활동 추가(코멘트·발송 등) — Jira의 코멘트/이력을 사이트에 내재화 + @멘션 알림
+  const logActivity = (id, kind, text) => {
     const stamp = new Date().toISOString()
-    const next = prev.map((v) => v.id === id ? { ...v, activity: [...(v.activity || []), { t: stamp, who: authEmail, kind, text }] } : v)
-    if (sharedEnabled) insertMany(toCompact(next.filter((v) => v.id === id)), true).catch(() => { })
-    return next
-  })
+    setAdded((prev) => {
+      const next = prev.map((v) => v.id === id ? { ...v, activity: [...(v.activity || []), { t: stamp, who: authEmail, kind, text }] } : v)
+      if (sharedEnabled) insertMany(toCompact(next.filter((v) => v.id === id)), true).catch(() => { })
+      return next
+    })
+    if (kind === 'comment') { const ms = parseMentions(text); if (ms.length) addNotifs(ms.map((m) => ({ type: 'mention', to: m, caseId: id, text: `'${id}' 처리 활동에서 회원님을 언급했습니다` }))) }
+  }
   // 일괄 변경 + 실행취소: 변경 전 값을 스냅샷해 토스트의 '실행취소'로 원복 (id별 이전 값이 다르므로 개별 복원)
   const bulkPatch = (ids, patch, label) => {
     const idset = new Set(ids)
@@ -193,7 +227,8 @@ export default function App() {
   if (!authEmail) return <Login onAuthed={setAuthEmail} />
   return (
     <div className="app">
-      <IconRail account={authEmail} onLogout={() => { setSession(''); setAuthEmail('') }} notify={notify} railView={railView} setRail={setRail} />
+      <IconRail account={authEmail} onLogout={() => { setSession(''); setAuthEmail('') }} notify={notify} railView={railView} setRail={setRail} notifUnread={unreadNotif} onBell={() => setShowNotif((s) => !s)} />
+      {showNotif && <NotifPanel notifs={notifs} onOpen={openNotif} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       {railView === 'agent' ? (
         <>
           <SubLNB screen={screen} setScreen={setScreen} />

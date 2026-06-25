@@ -89,3 +89,8 @@ export function saveAdded(arr) {
 const LS_SENT = 'voc-action-copilot:sent:v1'
 export function loadSent() { try { return JSON.parse(localStorage.getItem(LS_SENT) || '[]') } catch { return [] } }
 export function saveSent(l) { try { localStorage.setItem(LS_SENT, JSON.stringify((l || []).slice(0, 500))) } catch { } }
+
+/* 알림(담당 배정·멘션·참조자 추가 등) — 화면 우상단 벨에 표시. 단일 사용자 데모라 받은 알림 피드로 보관 */
+const LS_NOTIF = 'voc-action-copilot:notif:v1'
+export function loadNotifs() { try { return JSON.parse(localStorage.getItem(LS_NOTIF) || '[]') } catch { return [] } }
+export function saveNotifs(l) { try { localStorage.setItem(LS_NOTIF, JSON.stringify((l || []).slice(0, 200))) } catch { } }

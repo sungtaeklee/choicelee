@@ -21,6 +21,14 @@ export const MEMBERS = [
 ]
 // "이름 팀" 표시 문자열 ↔ 멤버 매칭
 export const memberLabel = (m) => `${m.name} ${m.team}`
+// 본문에서 @멘션된 구성원 추출 → "이름 팀" 라벨 배열 (이름 긴 것부터 매칭해 부분일치 오인 방지)
+export function parseMentions(text) {
+  const t = String(text || ''); const found = new Set()
+  for (const m of [...MEMBERS].sort((a, b) => b.name.length - a.name.length)) {
+    if (new RegExp('@' + m.name + '(?![가-힣])').test(t)) found.add(memberLabel(m))
+  }
+  return [...found]
+}
 export function searchMembers(q, limit = 8) {
   const s = String(q || '').trim().toLowerCase()
   if (!s) return MEMBERS.slice(0, limit)

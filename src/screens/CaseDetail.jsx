@@ -4,7 +4,7 @@ import { AI_AUTO, aiCacheGet, aiCacheSet, analyzeCaseAI } from '../ai.js'
 import { PageHead, GroupBadge, Tag, SevBadge, SentBadge, StatBadge, ConfBadge, ChannelChip, Transcript, KANBAN_COLS, VOCS, Avatar } from '../ui.jsx'
 import { REPLY_TEMPLATES, SLA_DAYS, defaultChecklist } from '../templates.js'
 import { jiraMailto, jiraIntakeEmail, setJiraIntakeEmail, JIRA_INTAKE_PLACEHOLDER } from '../jira.js'
-import { PeoplePicker, LabelPicker } from '../pickers.jsx'
+import { PeoplePicker, LabelPicker, MentionInput } from '../pickers.jsx'
 import { RESOLVE_LEVELS, BUG_RESULTS, ERROR_TYPES } from '../directory.js'
 import { saveAttach } from '../storage.js'
 
@@ -208,7 +208,7 @@ function ActNeed({ list, openCase, currentId }) {
   )
 }
 
-const ACT_KIND = { status: '상태', owner: '담당', comment: '코멘트', send: '발송' }
+const ACT_KIND = { status: '상태', owner: '담당', comment: '코멘트', send: '발송', edit: '수정' }
 // 한국어 조사: 받침 없음/ㄹ받침 → '로', 그 외 받침 → '으로'
 function josaRo(word) {
   const s = String(word || '').trim(); if (!s) return '로'
@@ -375,7 +375,7 @@ function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, ad
           <div className="panel">
             <div className="block-label">처리 활동 <span className="muted" style={{ fontWeight: 400 }}>· 상태 변경·코멘트·발송 이력 (티켓 처리 내역)</span></div>
             <div className="cmt-box">
-              <textarea className="of-area" value={cmt} onChange={(e) => setCmt(e.target.value)} placeholder="코멘트 입력 — 처리 경과·확인 사항·인계 내용 (담당자 간 협업)" />
+              <MentionInput value={cmt} onChange={setCmt} placeholder="코멘트 입력 — 처리 경과·확인·인계 내용. @로 담당자를 멘션하면 알림이 갑니다" />
               <button className="btn btn-ghost sm" disabled={!cmt.trim() || !addComment} onClick={() => { addComment(c.id, 'comment', cmt.trim()); setCmt(''); notify.toast('코멘트 추가됨') }}>＋ 코멘트 추가</button>
             </div>
             <ul className="act-tl">

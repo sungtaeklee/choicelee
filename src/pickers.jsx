@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Avatar } from './ui.jsx'
 import { MEMBERS, memberLabel, searchMembers, LABELS_SUGGEST } from './directory.js'
 
@@ -28,6 +28,41 @@ export function PeoplePicker({ value, onChange, multi = false, placeholder = '�
               <span className="pk-opt-main"><b>{m?.name}</b> <span className="muted">{m?.team}</span><br /><span className="pk-opt-email">{m?.email}</span></span>
             </button>
           ) })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* 멘션 입력 — 텍스트에어리어에서 '@' 입력 시 구성원 자동완성. 선택하면 '@이름 ' 삽입(알림 트리거) */
+export function MentionInput({ value, onChange, placeholder, className = 'of-area' }) {
+  const ref = useRef(null)
+  const [men, setMen] = useState(null) // { start, query } | null
+  const sync = (val, caret) => {
+    const m = val.slice(0, caret).match(/@([가-힣A-Za-z]{0,10})$/)
+    setMen(m ? { start: caret - m[0].length, query: m[1] } : null)
+  }
+  const onInput = (e) => { onChange(e.target.value); sync(e.target.value, e.target.selectionStart) }
+  const pick = (name) => {
+    const el = ref.current; if (!el || !men) return
+    const before = value.slice(0, men.start), after = value.slice(el.selectionStart)
+    const ins = '@' + name + ' ', next = before + ins + after
+    onChange(next); setMen(null)
+    requestAnimationFrame(() => { try { el.focus(); const p = (before + ins).length; el.setSelectionRange(p, p) } catch { /* noop */ } })
+  }
+  const results = men ? searchMembers(men.query, 6) : []
+  return (
+    <div className="men-wrap" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setMen(null) }}>
+      <textarea ref={ref} className={className} value={value} placeholder={placeholder}
+        onChange={onInput} onKeyUp={(e) => sync(e.target.value, e.target.selectionStart)} onClick={(e) => sync(e.target.value, e.target.selectionStart)} />
+      {men && results.length > 0 && (
+        <div className="men-drop">
+          {results.map((m) => (
+            <button key={m.email} className="pk-opt" onMouseDown={(e) => { e.preventDefault(); pick(m.name) }}>
+              <Avatar name={memberLabel(m)} size={22} />
+              <span className="pk-opt-main"><b>{m.name}</b> <span className="muted">{m.team}</span></span>
+            </button>
+          ))}
         </div>
       )}
     </div>
