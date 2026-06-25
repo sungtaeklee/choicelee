@@ -68,8 +68,16 @@ export function exportCsv(text, filename) {
   } catch { /* noop */ }
 }
 
-/* 사내 Jira 프로젝트 인입 메일 주소 — 실제 주소로 교체 (Jira 관리자: 메일 핸들러 1회 설정 시 메일→이슈 자동 생성) */
-export const JIRA_INTAKE_EMAIL = 'jira-voc@your-domain.atlassian.net'
+/* 사내 Jira 프로젝트 인입 메일 주소 (Jira 관리자: 메일 핸들러 1회 설정 시 메일→이슈 자동 생성)
+   설정 우선순위: 앱에서 입력한 값(localStorage) → 배포 환경변수(VITE_JIRA_INTAKE_EMAIL) → 기본 placeholder */
+export const JIRA_INTAKE_PLACEHOLDER = 'jira-voc@your-domain.atlassian.net'
+const LS_JIRA = 'voc-action-copilot:jiraEmail'
+export function jiraIntakeEmail() {
+  try { const o = localStorage.getItem(LS_JIRA); if (o && o.trim()) return o.trim() } catch { /* noop */ }
+  try { if (import.meta && import.meta.env && import.meta.env.VITE_JIRA_INTAKE_EMAIL) return import.meta.env.VITE_JIRA_INTAKE_EMAIL } catch { /* noop */ }
+  return JIRA_INTAKE_PLACEHOLDER
+}
+export function setJiraIntakeEmail(v) { try { v ? localStorage.setItem(LS_JIRA, v) : localStorage.removeItem(LS_JIRA) } catch { /* noop */ } }
 /* VOC 케이스 → Jira 메일 등록용 mailto (메일 클라이언트가 제목·본문 채워 열림 → 발송하면 이슈 생성) */
 export function jiraMailto(c) {
   const j = buildJiraIssue(c).fields, cf = j.customFields
@@ -82,7 +90,7 @@ export function jiraMailto(c) {
     `[관련메뉴] ${cf['관련메뉴']}  [오류타입] ${cf['오류타입']}`,
     `[원본 VOC ID] ${c.id}`,
   ].join('\n')
-  return `mailto:${JIRA_INTAKE_EMAIL}?subject=${encodeURIComponent(j.summary)}&body=${encodeURIComponent(body)}`
+  return `mailto:${jiraIntakeEmail()}?subject=${encodeURIComponent(j.summary)}&body=${encodeURIComponent(body)}`
 }
 
 /* 문자열 → 클립보드 복사 + 파일 다운로드 (둘 다 시도, 실패해도 무해) */

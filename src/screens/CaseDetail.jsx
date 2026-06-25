@@ -3,7 +3,7 @@ import { CAT22, FIXED_DEPTH2, AREA_TREE, AREA1_LIST, GROUPS, actionNeeded, recDa
 import { AI_AUTO, aiCacheGet, aiCacheSet, analyzeCaseAI } from '../ai.js'
 import { PageHead, GroupBadge, Tag, SevBadge, SentBadge, StatBadge, ConfBadge, ChannelChip, Transcript, KANBAN_COLS, VOCS, Avatar } from '../ui.jsx'
 import { REPLY_TEMPLATES, SLA_DAYS, defaultChecklist } from '../templates.js'
-import { jiraMailto } from '../jira.js'
+import { jiraMailto, jiraIntakeEmail, setJiraIntakeEmail, JIRA_INTAKE_PLACEHOLDER } from '../jira.js'
 import { PeoplePicker, LabelPicker } from '../pickers.jsx'
 import { RESOLVE_LEVELS, BUG_RESULTS, ERROR_TYPES } from '../directory.js'
 import { saveAttach } from '../storage.js'
@@ -245,8 +245,15 @@ function CaseDetail({ caseId, notify, added, updateCases, bulkPatch, addSent, ad
     finally { setAiLoading(false) }
   }
   const copy = (t, l) => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => notify.toast(l + ' 복사됨')).catch(() => notify.toast('복사 실패')); else notify.toast('복사 불가') }
-  // 지라 메일 등록: 메일 클라이언트를 제목·본문 채워 열기 (발송 시 Jira가 이슈 생성)
-  const mailToJira = () => { try { const a = document.createElement('a'); a.href = jiraMailto(c); a.click() } catch { /* noop */ } notify.toast('지라 등록 메일을 열었어요 — 수신처 확인 후 발송') }
+  // 지라 메일 등록: (미설정 시) 사내 Jira 주소 1회 입력 → 저장 후 메일 클라이언트 열기 (발송 시 이슈 생성)
+  const mailToJira = () => {
+    if (jiraIntakeEmail() === JIRA_INTAKE_PLACEHOLDER) {
+      const v = window.prompt('사내 Jira 프로젝트 인입 메일 주소를 입력하세요. (이 브라우저에 저장 — 다음부터 자동 사용)', '')
+      if (v && v.trim()) setJiraIntakeEmail(v.trim())
+    }
+    try { const a = document.createElement('a'); a.href = jiraMailto(c); a.click() } catch { /* noop */ }
+    notify.toast(`지라 등록 메일을 열었어요 (수신: ${jiraIntakeEmail()})`)
+  }
   const doSend = () => {
     if (!snd.to.trim() || !snd.body.trim()) { notify.toast('수신·내용을 입력하세요'); return }
     if (addSent) addSent({ caseId: c.id, kind: snd.kind, owner: own || c.owner || '미지정', to: snd.to.trim(), content: snd.body.trim() })
