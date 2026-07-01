@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { PageHead } from '../ui.jsx'
 import { SELF_GUIDE, buildSelfGuideSteps, buildProactiveNotice } from '../templates.js'
 import { loadSelfGuide, saveSelfGuide } from '../storage.js'
+import { npsOf } from '../nps.js'
 
 /* 셀프가이드 에이전트 '사이트용 JSON' 파서 — 한/영 키 모두 수용
    기대 형태: { week?, items:[ { cat|유형, steps|셀프단계[], notice|선제안내{email|이메일{subject,body}, sms|문자}, count?, escalate|상담연결조건? } ] } */
@@ -51,8 +52,8 @@ function SelfGuide({ added, notify }) {
   // 비슷한 VOC를 표준분류로 그룹화
   const map = {}
   data.forEach((v) => {
-    const m = map[v.cat] || (map[v.cat] = { cat: v.cat, group: v.group, n: 0, high: 0, answer: '', sampleId: '' })
-    m.n++; if (v.severity === 'High') m.high++
+    const m = map[v.cat] || (map[v.cat] = { cat: v.cat, group: v.group, n: 0, high: 0, det: 0, answer: '', sampleId: '' })
+    m.n++; if (v.severity === 'High') m.high++; if (npsOf(v).bucket === 'detractor') m.det++
     if (!m.answer) { m.answer = v.answer; m.sampleId = v.id }
   })
   const top = Object.values(map).sort((a, b) => b.n - a.n).slice(0, 8)
@@ -61,7 +62,7 @@ function SelfGuide({ added, notify }) {
   const usingImport = !!(imported && imported.items && imported.items.length)
   const cards = usingImport
     ? imported.items.map((it) => ({ cat: it.cat, n: it.count, high: 0, answer: '', steps: it.steps.length ? it.steps : buildSelfGuideSteps(it.cat), notice: it.notice, imported: true, known: !!SELF_GUIDE[it.cat] }))
-    : top.map((t) => ({ cat: t.cat, n: t.n, high: t.high, answer: t.answer, steps: buildSelfGuideSteps(t.cat), notice: null, imported: false, known: !!SELF_GUIDE[t.cat] }))
+    : top.map((t) => ({ cat: t.cat, n: t.n, high: t.high, det: t.det, answer: t.answer, steps: buildSelfGuideSteps(t.cat), notice: null, imported: false, known: !!SELF_GUIDE[t.cat] }))
   const covered = (usingImport ? cards : top).reduce((s, t) => s + (t.n || 0), 0)
   const selfRate = total ? Math.round(Math.min(covered, total) / total * 100) : 0
 
@@ -116,7 +117,7 @@ function SelfGuide({ added, notify }) {
         const notice = open ? (c.notice && (c.notice.email.subject || c.notice.sms) ? c.notice : buildProactiveNotice(c.cat)) : null
         return (
           <div key={c.cat} className="guide-card">
-            <div className="guide-head"><span className="guide-cat">{c.cat}</span><span className="guide-freq">{c.n ? `${c.n.toLocaleString()}건` : ''}{c.high ? ` · High ${c.high}` : ''}</span></div>
+            <div className="guide-head"><span className="guide-cat">{c.cat}</span><span className="guide-freq">{c.n ? `${c.n.toLocaleString()}건` : ''}{c.high ? ` · High ${c.high}` : ''}{c.det ? <span className="guide-det"> · 비추천 {c.det}</span> : null}</span></div>
             {aiOn && <div className="sg-gen">✦ Copilot {c.imported ? '정리(JSON 반영)' : (c.known ? '생성 · 검수 지식' : '생성 · 분류 가이드 기반')}</div>}
             <ol className="guide-steps">{c.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
             {c.answer && <div className="guide-ans"><div className="guide-ans-k">매칭 예상답안 (고객 응대 초안)</div><div className="guide-ans-v">{c.answer}</div></div>}

@@ -9,6 +9,7 @@ import VOCTrends from './screens/VOCTrends.jsx'
 import VOCInbox from './screens/VOCInbox.jsx'
 import CaseDetail from './screens/CaseDetail.jsx'
 import InsightReport from './screens/InsightReport.jsx'
+import NPSReport from './screens/NPSReport.jsx'
 import ClassificationBoard from './screens/ClassificationBoard.jsx'
 import HomePortal from './screens/HomePortal.jsx'
 import ImportResult from './screens/ImportResult.jsx'
@@ -42,6 +43,7 @@ const TITLES = {
   board: ['VOC 보드', '티켓을 보고·판단·처리하는 작업 보드'],
   detail: ['VOC 처리', '케이스 분석 및 액션'],
   insight: ['인사이트 리포트', '개선 인사이트와 기대효과'],
+  nps: ['NPS 인사이트', '추천 의향(NPS)을 Copilot이 분석'],
   import: ['Copilot Studio Agent 연동', 'Copilot Studio Agent JSON → 티켓 변환·등록'],
 }
 
@@ -261,6 +263,7 @@ export default function App() {
                       {screen === 'board' && <ClassificationBoard openCase={openCase} notify={notify} added={added} updateCases={updateCases} />}
                       {screen === 'detail' && <CaseDetail caseId={caseId} notify={notify} added={added} updateCases={updateCases} bulkPatch={bulkPatch} addSent={addSent} addComment={logActivity} sentLog={sentLog} account={authEmail} openCase={openCase} goBack={() => setScreen(prevScreen)} backLabel={(TITLES[prevScreen] || ['목록'])[0]} />}
                       {screen === 'insight' && <InsightReport added={added} openCase={openCase} updateCases={updateCases} bulkPatch={bulkPatch} notify={notify} addSent={addSent} />}
+                      {screen === 'nps' && <NPSReport added={added} openCase={openCase} notify={notify} />}
                       {screen === 'selfguide' && <SelfGuide added={added} notify={notify} />}
                       {screen === 'import' && <ImportResult notify={notify} added={added} setAdded={setAdded} shared={sharedEnabled} sharedInsert={sharedInsert} openCase={openCase} />}
                     </ErrorBoundary>

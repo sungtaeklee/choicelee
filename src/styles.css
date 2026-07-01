@@ -1752,6 +1752,25 @@ svg.ltrend .lt-line:hover{opacity:1}
 .jsla{font:700 10px var(--mono);color:var(--muted);background:#eef0f4;border-radius:5px;padding:2px 6px}
 .jsla.over{color:var(--high);background:var(--high-soft)}
 .jcard-editor{flex-shrink:0;font:600 10px var(--sans);color:#b45309;background:#fff3df;border-radius:5px;padding:2px 6px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jnps{flex-shrink:0;min-width:18px;height:18px;border-radius:5px;color:#fff;font:800 10px var(--mono,monospace);display:inline-flex;align-items:center;justify-content:center;padding:0 4px}
+/* NPS 인사이트 */
+.nps-bar{display:flex;height:34px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#f1f2f4}
+.nps-seg{display:flex;align-items:center;justify-content:center;color:#fff;font:700 11px var(--sans);min-width:0;white-space:nowrap;transition:width .3s}
+.nps-drivers{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.nps-driver{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fafafb;cursor:pointer}
+.nps-driver:hover{background:var(--magenta-soft)}
+.nps-rank{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--high-soft);color:var(--high);font:800 12px var(--sans);display:flex;align-items:center;justify-content:center}
+.nps-d-main{flex:1;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);min-width:0}
+.nps-d-n{flex:0 0 auto;font:700 12px var(--sans);color:var(--slate)}
+.nps-lift{flex:0 0 auto;font:700 11px var(--sans);color:var(--low);background:var(--low-soft);border-radius:20px;padding:3px 9px}
+.nps-comments{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.nps-comments li{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.nps-comments li:last-child{border-bottom:0}
+.nps-comments li:hover{background:var(--magenta-soft)}
+.nps-score{flex:0 0 auto;width:24px;height:24px;border-radius:6px;color:#fff;font:800 11px var(--mono,monospace);display:flex;align-items:center;justify-content:center}
+.nps-c-body{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.nps-c-id{flex:0 0 auto;font:600 11px var(--mono,monospace);color:var(--faint)}
+.guide-det{color:var(--high);font-weight:700}
 /* 지라 연결 테스트 결과 */
 .jira-test{margin-bottom:12px}
 .jt-body{display:flex;flex-direction:column;gap:6px;margin-top:6px}

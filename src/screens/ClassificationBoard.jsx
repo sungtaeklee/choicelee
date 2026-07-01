@@ -4,6 +4,7 @@ import { KANBAN_COLS, VOCS, SevBadge, GroupBadge, Tag, ChannelIcon, Avatar, Page
 import { SLA_DAYS } from '../templates.js'
 import { toJiraCsv, exportCsv } from '../jira.js'
 import { nameOfEmail } from '../directory.js'
+import { npsOf, NPS_COLOR, NPS_LABEL } from '../nps.js'
 
 /* 티켓 유형 글리프 (지라 이슈 타입 대체) */
 const TYPE_GLYPH = { '장애/오류': '🐞', '성능': '⚡', '개선 요청/희망': '✦', '단순 문의': '💬', '불만': '😣', '기타': '🎫' }
@@ -101,6 +102,7 @@ function ClassificationBoard({ openCase, notify, added, updateCases }) {
                         <span className="jcard-id">{v.id}</span>
                         {v.review && <span className="jrev">검토</span>}
                         <SevBadge v={v.severity} />
+                        {(() => { const np = npsOf(v); return <span className="jnps" style={{ background: NPS_COLOR[np.bucket] }} title={`NPS ${np.score} · ${NPS_LABEL[np.bucket]}`}>{np.score}</span> })()}
                       </div>
                       <div className="jcard-title" title={v.content}>{v.summary || v.content}</div>
                       <div className="jcard-labels">
